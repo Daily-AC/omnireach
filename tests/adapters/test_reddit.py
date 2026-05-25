@@ -1,4 +1,6 @@
+import asyncio
 import json
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -6,75 +8,61 @@ from omnireach.adapters.base import AdapterUnavailable
 from omnireach.adapters.reddit import RedditAdapter
 
 
-async def test_reddit_search_parses_agent_reach_json(monkeypatch):
-    fake = json.dumps({
+def _mock_proc(stdout: bytes, stderr: bytes = b"", returncode: int = 0):
+    proc = AsyncMock()
+    proc.communicate = AsyncMock(return_value=(stdout, stderr))
+    proc.returncode = returncode
+    return proc
+
+
+def test_is_ready_false_without_rdt(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    assert asyncio.run(RedditAdapter().is_ready()) is False
+
+
+def test_is_ready_true_with_rdt(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: "/usr/bin/rdt-cli")
+    assert asyncio.run(RedditAdapter().is_ready()) is True
+
+
+def test_search_parses_results(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: "/usr/bin/rdt-cli")
+    payload = json.dumps({
         "results": [
             {
-                "title": "How does Claude 4.7 prompt caching actually work?",
-                "url": "https://reddit.com/r/ClaudeAI/comments/abc",
-                "subreddit": "ClaudeAI",
-                "author": "u/alice",
-                "selftext": "I've been testing...",
-                "score": 245,
-                "num_comments": 67,
-                "created_utc": "2026-05-20T12:00:00Z",
-            }
+                "title": "Post 1",
+                "permalink": "/r/python/comments/abc/post_1",
+                "selftext": "body",
+                "author": "alice",
+                "created_utc": 1716000000,
+                "score": 42,
+                "num_comments": 7,
+                "subreddit": "python",
+            },
         ]
-    })
-
-    async def fake_exec(*args, **kwargs):
-        class P:
-            returncode = 0
-
-            async def communicate(self):
-                return (fake.encode(), b"")
-
-        return P()
-
-    monkeypatch.setattr("omnireach.adapters.reddit.asyncio.create_subprocess_exec", fake_exec)
-    monkeypatch.setattr(
-        "omnireach.adapters.reddit.shutil.which",
-        lambda n: "/usr/bin/" + n,  # both binaries exist
-    )
-
-    out = await RedditAdapter().search("claude", limit=3)
+    }).encode()
+    with patch("omnireach.adapters.reddit.asyncio.create_subprocess_exec",
+               AsyncMock(return_value=_mock_proc(payload))):
+        out = asyncio.run(RedditAdapter().search("python", limit=5))
     assert len(out) == 1
     assert out[0].source == "reddit"
-    assert out[0].author == "u/alice"
-    assert out[0].engagement.likes == 245
-    assert out[0].engagement.comments == 67
-    assert "ClaudeAI" in out[0].raw.get("subreddit", "")
+    assert out[0].title == "Post 1"
+    assert "reddit.com/r/python/comments/abc" in out[0].url
+    assert out[0].author == "alice"
+    assert out[0].engagement.likes == 42
+    assert out[0].engagement.comments == 7
 
 
-async def test_reddit_missing_agent_reach(monkeypatch):
-    monkeypatch.setattr(
-        "omnireach.adapters.reddit.shutil.which",
-        lambda n: None if n == "agent-reach" else "/usr/bin/" + n,
-    )
-    with pytest.raises(AdapterUnavailable) as exc:
-        await RedditAdapter().search("x")
-    assert "agent-reach" in str(exc.value)
+def test_search_raises_when_missing(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    with pytest.raises(AdapterUnavailable):
+        asyncio.run(RedditAdapter().search("q"))
 
 
-async def test_reddit_missing_rdt_cli(monkeypatch):
-    monkeypatch.setattr(
-        "omnireach.adapters.reddit.shutil.which",
-        lambda n: None if n == "rdt-cli" else "/usr/bin/" + n,
-    )
-    with pytest.raises(AdapterUnavailable) as exc:
-        await RedditAdapter().search("x")
-    assert "rdt-cli" in str(exc.value)
-
-
-async def test_reddit_is_ready_requires_both_binaries(monkeypatch):
-    monkeypatch.setattr(
-        "omnireach.adapters.reddit.shutil.which",
-        lambda n: "/usr/bin/" + n,
-    )
-    assert await RedditAdapter().is_ready() is True
-
-    monkeypatch.setattr(
-        "omnireach.adapters.reddit.shutil.which",
-        lambda n: None if n == "rdt-cli" else "/usr/bin/" + n,
-    )
-    assert await RedditAdapter().is_ready() is False
+def test_search_detects_unauth_error(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: "/usr/bin/rdt-cli")
+    with patch("omnireach.adapters.reddit.asyncio.create_subprocess_exec",
+               AsyncMock(return_value=_mock_proc(b"", b"not logged in: run `rdt login`", 1))):
+        with pytest.raises(AdapterUnavailable) as exc:
+            asyncio.run(RedditAdapter().search("q"))
+        assert "login" in str(exc.value).lower() or "rdt" in str(exc.value).lower()

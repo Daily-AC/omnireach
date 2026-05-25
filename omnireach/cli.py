@@ -32,6 +32,7 @@ _BOOSTER_KEY_ENV = {
     "tavily": "TAVILY_API_KEY",
     "brave": "BRAVE_API_KEY",
     "perplexity": "PERPLEXITY_API_KEY",
+    "exa": "EXA_API_KEY",
 }
 
 
@@ -119,17 +120,14 @@ def doctor_cmd() -> None:
     statuses = asyncio.run(run_doctor())
     table = Table(title="omnireach doctor")
     table.add_column("源", style="cyan")
-    table.add_column("tier", style="magenta")
-    table.add_column("ok")
-    table.add_column("详情", style="dim")
-    any_bad = False
+    table.add_column("tier")
+    table.add_column("状态")
+    table.add_column("说明", style="dim")
+    table.add_column("修复")
     for s in statuses:
-        mark = "✅" if s.ok else "❌"
-        if not s.ok:
-            any_bad = True
-        table.add_row(s.source, s.tier, mark, s.detail)
+        icon = "✅" if s.ok else "❌"
+        table.add_row(s.id, s.tier, icon, s.detail, s.fix_hint)
     console.print(table)
-    raise SystemExit(0 if not any_bad else 1)
 
 
 main.add_command(init_cmd)

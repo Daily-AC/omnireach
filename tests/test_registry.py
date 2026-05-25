@@ -7,7 +7,7 @@ def test_load_registry_returns_all_sources():
     reg = load_registry()
     ids = [s.id for s in reg.sources]
     assert "hackernews" in ids
-    assert "web" in ids
+    assert "exa" in ids
     assert "wechat" in ids
     assert "bilibili" in ids
     assert "reddit" in ids
@@ -55,4 +55,25 @@ def test_registry_loads_booster_tier():
     from omnireach.registry import load_registry
     reg = load_registry()
     boosters = [s for s in reg.sources if s.tier == "booster"]
-    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity"}
+    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity", "exa"}
+
+
+def test_registry_includes_wip_tier():
+    from omnireach.registry import load_registry
+    reg = load_registry()
+    wip = {s.id for s in reg.sources if s.tier == "wip"}
+    assert wip == {"wechat", "bilibili"}
+
+
+def test_registry_has_exa_booster():
+    from omnireach.registry import load_registry
+    reg = load_registry()
+    by_id = {s.id: s for s in reg.sources}
+    assert by_id["exa"].tier == "booster"
+    assert by_id["exa"].trust == 0.85
+
+
+def test_registry_web_removed():
+    from omnireach.registry import load_registry
+    reg = load_registry()
+    assert "web" not in {s.id for s in reg.sources}

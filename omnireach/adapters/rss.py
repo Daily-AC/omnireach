@@ -1,54 +1,56 @@
-"""RSS adapter — shells out to agent-reach."""
+"""RSS adapter — Python feedparser. Query MUST be a URL."""
 
 from __future__ import annotations
 
 import asyncio
-import json
-import shutil
+import re
+from email.utils import parsedate_to_datetime
+
+import feedparser
 
 from omnireach.adapters.base import AdapterBase, AdapterUnavailable
 from omnireach.contract import SearchResult
 
+URL_RE = re.compile(r"^(https?|file)://", re.IGNORECASE)
 
-class RSSAdapter(AdapterBase):
+
+def _parse_ts(entry) -> str | None:
+    for field in ("published", "updated", "created"):
+        raw = entry.get(field)
+        if raw:
+            try:
+                return parsedate_to_datetime(raw).isoformat()
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+class RssAdapter(AdapterBase):
     name = "rss"
-    requires = ["agent-reach"]
+    requires: list[str] = []
 
     async def is_ready(self) -> bool:
-        return shutil.which("agent-reach") is not None
+        return True
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        if not shutil.which("agent-reach"):
+        if not URL_RE.match(query.strip()):
             raise AdapterUnavailable(
-                "rss", "agent-reach not installed", hint="omnireach init  (会自动 pipx install)"
+                "rss", "rss source requires a URL as query",
+                hint="omnireach 'https://example.com/feed.xml'",
             )
-
-        proc = await asyncio.create_subprocess_exec(
-            "agent-reach", "rss", "search", "--json", "--limit", str(limit), query,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        out, err = await proc.communicate()
-        if proc.returncode != 0:
-            raise AdapterUnavailable("rss", err.decode().strip() or "agent-reach rss search failed")
-
-        try:
-            data = json.loads(out.decode())
-        except json.JSONDecodeError as e:
-            raise AdapterUnavailable("rss", f"agent-reach returned non-JSON: {e}")
-
+        feed = await asyncio.to_thread(feedparser.parse, query)
+        if feed.bozo and not feed.entries:
+            raise AdapterUnavailable("rss", f"feed parse failed: {feed.bozo_exception}")
         results: list[SearchResult] = []
-        for item in data.get("results", [])[:limit]:
-            results.append(
-                SearchResult(
-                    source="rss",
-                    adapter="agent-reach",
-                    title=item.get("title", ""),
-                    url=item.get("url", ""),
-                    content=item.get("summary", "") or item.get("content", ""),
-                    ts=item.get("published_at"),
-                    score=0.4,
-                    raw=item,
-                )
-            )
+        for entry in feed.entries[:limit]:
+            results.append(SearchResult(
+                source="rss",
+                adapter="feedparser",
+                title=entry.get("title") or "",
+                url=entry.get("link") or "",
+                content=(entry.get("summary") or entry.get("description") or "")[:500],
+                author=entry.get("author"),
+                ts=_parse_ts(entry),
+                raw=dict(entry),
+            ))
         return results
