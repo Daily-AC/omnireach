@@ -66,5 +66,26 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
         console.print(f"[red]✗ {err.source}: {err.error}[/red]")
 
 
+@main.command("doctor")
+def doctor_cmd() -> None:
+    """检查每个源的就绪状态."""
+    from omnireach.doctor import run_doctor
+
+    statuses = asyncio.run(run_doctor())
+    table = Table(title="omnireach doctor")
+    table.add_column("源", style="cyan")
+    table.add_column("tier", style="magenta")
+    table.add_column("ok")
+    table.add_column("详情", style="dim")
+    any_bad = False
+    for s in statuses:
+        mark = "✅" if s.ok else "❌"
+        if not s.ok:
+            any_bad = True
+        table.add_row(s.source, s.tier, mark, s.detail)
+    console.print(table)
+    raise SystemExit(0 if not any_bad else 1)
+
+
 if __name__ == "__main__":
     main()
