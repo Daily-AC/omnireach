@@ -152,3 +152,43 @@ def test_dispatcher_keeps_successful_results_alongside_errors():
     categories = {e.source: e.category for e in errors}
     assert categories["u"] == "unavailable"
     assert categories["f"] == "failed"
+
+
+def test_dispatcher_uses_per_source_timeout():
+    import asyncio
+    from omnireach.adapters.base import AdapterBase
+    from omnireach.dispatcher import Dispatcher
+
+    class _Slow(AdapterBase):
+        name = "slow"
+        async def is_ready(self):
+            return True
+        async def search(self, q, *, limit=10):
+            await asyncio.sleep(2)
+            return []
+
+    d = Dispatcher(timeout=10.0, per_source_limit=5,
+                   timeouts_by_source={"slow": 0.1})
+    results, errors = asyncio.run(d.run({"slow": _Slow()}, "q"))
+    assert len(errors) == 1
+    assert errors[0].category == "failed"
+    assert "timeout" in errors[0].error.lower()
+
+
+def test_dispatcher_falls_back_to_global_timeout_when_per_source_missing():
+    import asyncio
+    from omnireach.adapters.base import AdapterBase
+    from omnireach.dispatcher import Dispatcher
+
+    class _Slow(AdapterBase):
+        name = "slow"
+        async def is_ready(self):
+            return True
+        async def search(self, q, *, limit=10):
+            await asyncio.sleep(2)
+            return []
+
+    d = Dispatcher(timeout=0.1, per_source_limit=5, timeouts_by_source={})
+    results, errors = asyncio.run(d.run({"slow": _Slow()}, "q"))
+    assert len(errors) == 1
+    assert errors[0].category == "failed"

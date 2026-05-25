@@ -18,6 +18,7 @@
   query_hints: [hn, hackernews, "show hn"]
   default_in_auto: true
   trust: 0.85
+  timeout_seconds: 10
   deps: { auto: [], manual: [] }
 
 - id: youtube
@@ -27,6 +28,7 @@
   query_hints: [youtube, "video", "视频", "教程"]
   default_in_auto: true
   trust: 0.60
+  timeout_seconds: 20
   deps: { auto: [], manual: [] }
 
 - id: github
@@ -36,6 +38,7 @@
   query_hints: [github, repo, issue, "源码"]
   default_in_auto: true
   trust: 0.90
+  timeout_seconds: 15
   deps: { auto: [], manual: [] }
 
 - id: rss
@@ -45,6 +48,7 @@
   query_hints: [rss, atom, feed, "订阅"]
   default_in_auto: false
   trust: 0.75
+  timeout_seconds: 15
   deps: { auto: [], manual: [] }
 
 - id: wechat
@@ -54,6 +58,7 @@
   query_hints: ["微信", "公众号", wechat]
   default_in_auto: false
   trust: 0.55
+  timeout_seconds: 15
   deps:
     auto: []
     manual: []
@@ -69,6 +74,7 @@
   # or query hints (b站 / bilibili / 哔哩) makes more sense.
   default_in_auto: false
   trust: 0.55
+  timeout_seconds: 15
   deps:
     auto: []
     manual: []
@@ -85,6 +91,7 @@
   # or explicit --on reddit.
   default_in_auto: false
   trust: 0.70
+  timeout_seconds: 20
   deps:
     auto:
       - { kind: npm, name: rdt-cli }
@@ -98,6 +105,7 @@
   query_hints: [twitter, "x.com", "推特"]
   default_in_auto: false
   trust: 0.60
+  timeout_seconds: 30
   deps:
     auto:
       - { kind: npm, name: "@jackwener/opencli" }
@@ -112,6 +120,7 @@
   query_hints: ["小红书", xiaohongshu, "种草", "笔记"]
   default_in_auto: false
   trust: 0.50
+  timeout_seconds: 30
   deps:
     auto:
       - { kind: npm, name: "@jackwener/opencli" }
@@ -126,6 +135,7 @@
   query_hints: []
   default_in_auto: true
   trust: 0.85
+  timeout_seconds: 10
   deps:
     auto: []
     manual:
@@ -139,6 +149,7 @@
   query_hints: []
   default_in_auto: true
   trust: 0.80
+  timeout_seconds: 10
   deps:
     auto: []
     manual:
@@ -152,6 +163,7 @@
   query_hints: []
   default_in_auto: true
   trust: 0.90
+  timeout_seconds: 30
   deps:
     auto: []
     manual:
@@ -165,6 +177,7 @@
   query_hints: []
   default_in_auto: true
   trust: 0.85
+  timeout_seconds: 15
   deps:
     auto: []
     manual:

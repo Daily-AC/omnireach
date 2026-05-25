@@ -28,6 +28,7 @@ class SourceSpec:
     query_hints: list[str] = field(default_factory=list)
     default_in_auto: bool = False
     trust: float = 0.7
+    timeout_seconds: float | None = None
     deps_auto: list[Dep] = field(default_factory=list)
     deps_manual: list[Dep] = field(default_factory=list)
 
@@ -65,6 +66,8 @@ def load_registry(path: Path | None = None) -> Registry:
     sources: list[SourceSpec] = []
     for entry in raw:
         deps = entry.get("deps") or {}
+        timeout_raw = entry.get("timeout_seconds")
+        timeout_seconds = float(timeout_raw) if timeout_raw is not None else None
         spec = SourceSpec(
             id=entry["id"],
             tier=entry["tier"],
@@ -73,6 +76,7 @@ def load_registry(path: Path | None = None) -> Registry:
             query_hints=entry.get("query_hints", []),
             default_in_auto=entry.get("default_in_auto", False),
             trust=entry.get("trust", 0.7),
+            timeout_seconds=timeout_seconds,
             deps_auto=[Dep(**d) for d in (deps.get("auto") or [])],
             deps_manual=[Dep(**d) for d in (deps.get("manual") or [])],
         )

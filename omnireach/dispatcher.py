@@ -9,9 +9,20 @@ from omnireach.contract import SearchResult, SourceError
 
 
 class Dispatcher:
-    def __init__(self, *, timeout: float = 15.0, per_source_limit: int = 10) -> None:
+    def __init__(
+        self,
+        *,
+        timeout: float = 15.0,
+        per_source_limit: int = 10,
+        timeouts_by_source: dict[str, float | None] | None = None,
+    ) -> None:
         self.timeout = timeout
         self.per_source_limit = per_source_limit
+        self.timeouts_by_source = timeouts_by_source or {}
+
+    def _resolved_timeout(self, source_id: str) -> float:
+        t = self.timeouts_by_source.get(source_id)
+        return t if t is not None else self.timeout
 
     async def run(
         self, adapters: dict[str, AdapterBase], query: str
@@ -19,15 +30,16 @@ class Dispatcher:
         async def one(
             name: str, adapter: AdapterBase
         ) -> tuple[str, list[SearchResult] | SourceError]:
+            resolved = self._resolved_timeout(name)
             try:
                 results = await asyncio.wait_for(
-                    adapter.search(query, limit=self.per_source_limit), timeout=self.timeout
+                    adapter.search(query, limit=self.per_source_limit), timeout=resolved
                 )
                 return name, results
             except asyncio.TimeoutError:
                 return name, SourceError(
                     source=name,
-                    error=f"timeout (>{self.timeout:.1f}s)",
+                    error=f"timeout (>{resolved:.1f}s)",
                     category="failed",
                 )
             except AdapterUnavailable as e:
