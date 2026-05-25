@@ -1,7 +1,6 @@
 import pytest
 
 from omnireach.adapters.base import AdapterBase
-from omnireach.contract import SearchResult
 from omnireach.installer import InstallError
 from omnireach.registry import Dep, SourceSpec
 from omnireach.wizard import (
