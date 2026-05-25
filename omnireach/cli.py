@@ -69,7 +69,7 @@ def main() -> None:
 @click.option("--on", "on_", help="只用这些源, 逗号分隔. 例: --on hackernews,web")
 @click.option("--mode", type=click.Choice(["auto", "quick", "deep"]), default="auto")
 @click.option("--limit", type=int, default=10, help="每个源最多返回多少条")
-@click.option("--timeout", type=float, default=15.0)
+@click.option("--timeout", type=float, default=30.0, help="每个源超时秒数 (默认 30, OpenCLI 类源建议保留)")
 @click.option("--json", "json_out", is_flag=True, help="输出 JSON, 适合下游 pipe")
 def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: float, json_out: bool) -> None:
     """运行一次搜索."""

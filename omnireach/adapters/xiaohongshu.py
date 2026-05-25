@@ -29,7 +29,7 @@ class XiaohongshuAdapter(AdapterBase):
             )
 
         proc = await asyncio.create_subprocess_exec(
-            "opencli", "xiaohongshu", "search", "--json", "--limit", str(limit), query,
+            "opencli", "xiaohongshu", "search", "--format", "json", "--limit", str(limit), query,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -42,8 +42,11 @@ class XiaohongshuAdapter(AdapterBase):
         except json.JSONDecodeError as e:
             raise AdapterUnavailable("xiaohongshu", f"opencli returned non-JSON: {e}")
 
+        # opencli v1.7.22 returns a JSON array directly. Older shapes used {"results": [...]}.
+        items = data if isinstance(data, list) else data.get("results", [])
+
         results: list[SearchResult] = []
-        for item in data.get("results", [])[:limit]:
+        for item in items[:limit]:
             results.append(
                 SearchResult(
                     source="xiaohongshu",
