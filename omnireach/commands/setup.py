@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
 
 import click
 from rich.console import Console
@@ -41,6 +42,11 @@ def _prompt_user_step_factory(yes: bool):
     return prompt
 
 
+def _run_verify(cmd: str) -> tuple[int, str]:
+    res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    return res.returncode, (res.stdout or "") + (res.stderr or "")
+
+
 @click.command("setup")
 @click.argument("source_id")
 @click.option("--yes", "-y", is_flag=True, help="跳过所有确认 (CI / 自动化)")
@@ -61,6 +67,7 @@ def setup_cmd(source_id: str, yes: bool) -> None:
             confirm=_confirm_factory(yes),
             run_install=_run_install,
             prompt_user_step=_prompt_user_step_factory(yes),
+            run_verify=_run_verify,
         )
     )
 
