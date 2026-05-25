@@ -52,16 +52,18 @@
   deps: { auto: [], manual: [] }
 
 - id: wechat
-  tier: wip
+  tier: booster
   adapter: omnireach.adapters.wechat.WeChatAdapter
-  description: 微信公众号文章搜索 (全文 Markdown) (v0.6 重写中)
-  query_hints: ["微信", "公众号", wechat]
-  default_in_auto: false
-  trust: 0.55
+  description: 微信公众号 (Exa domain-filtered, 需 EXA_API_KEY)
+  query_hints: [微信, 公众号, wechat]
+  default_in_auto: true
+  trust: 0.65
   timeout_seconds: 15
   deps:
     auto: []
-    manual: []
+    manual:
+      - step: "去 https://exa.ai 拿 EXA_API_KEY"
+        verify: "echo $EXA_API_KEY 非空"
 
 - id: bilibili
   tier: wip

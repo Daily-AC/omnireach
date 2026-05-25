@@ -30,9 +30,9 @@ def test_doctor_marks_rss_ok(monkeypatch):
 def test_doctor_marks_wip_not_ok(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda b: None)
     statuses = asyncio.run(run_doctor())
-    wechat = next(s for s in statuses if s.id == "wechat")
-    assert wechat.ok is False
-    assert "v0.6" in wechat.detail or "重写" in wechat.detail
+    bilibili = next(s for s in statuses if s.id == "bilibili")
+    assert bilibili.ok is False
+    assert "v0.6" in bilibili.detail or "重写" in bilibili.detail
 
 
 def test_doctor_marks_youtube_ok_with_binary(monkeypatch):

@@ -55,14 +55,14 @@ def test_registry_loads_booster_tier():
     from omnireach.registry import load_registry
     reg = load_registry()
     boosters = [s for s in reg.sources if s.tier == "booster"]
-    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity", "exa"}
+    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity", "exa", "wechat"}
 
 
 def test_registry_includes_wip_tier():
     from omnireach.registry import load_registry
     reg = load_registry()
     wip = {s.id for s in reg.sources if s.tier == "wip"}
-    assert wip == {"wechat", "bilibili"}
+    assert wip == {"bilibili"}
 
 
 def test_registry_has_exa_booster():
