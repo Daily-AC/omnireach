@@ -87,3 +87,16 @@
     auto:
       - { kind: pipx, name: agent-reach }
     manual: []
+
+- id: reddit
+  tier: one_step
+  adapter: omnireach.adapters.reddit.RedditAdapter
+  description: Reddit 帖子 + 评论搜索 (需要 rdt-cli 登录)
+  query_hints: [reddit, "r/", subreddit]
+  default_in_auto: true
+  deps:
+    auto:
+      - { kind: pipx, name: agent-reach }
+      - { kind: npm, name: rdt-cli }
+    manual:
+      - { step: "在浏览器完成 Reddit OAuth — 运行 `rdt login` 并按提示授权" }
