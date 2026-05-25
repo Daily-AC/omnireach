@@ -1,0 +1,11 @@
+{
+  "name": "omnireach",
+  "version": "0.1.0",
+  "description": "全网通搜索 Skill: web + Twitter/Reddit/YouTube/B站/小红书/HN/GitHub 一站接入, 中转站用户也能用",
+  "author": "Daily-AC",
+  "license": "MIT",
+  "homepage": "https://github.com/Daily-AC/omnireach",
+  "components": {
+    "skills": ["./skills/omnireach"]
+  }
+}
