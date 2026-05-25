@@ -105,3 +105,29 @@
       - { kind: npm, name: rdt-cli }
     manual:
       - { step: "在浏览器完成 Reddit OAuth — 运行 `rdt login` 并按提示授权" }
+
+- id: twitter
+  tier: heavy
+  adapter: omnireach.adapters.twitter.TwitterAdapter
+  description: Twitter / X 搜索 (登录态 Chrome, 通过 OpenCLI)
+  query_hints: [twitter, "x.com", "推特"]
+  default_in_auto: false
+  deps:
+    auto:
+      - { kind: npm, name: "@jackwener/opencli" }
+    manual:
+      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk (装完后启用 chrome://extensions 里的开发者模式)", verify: "opencli doctor" }
+      - { step: "在 Chrome 中登录 Twitter / X 账号 (打开 twitter.com 完成登录)", verify: "opencli twitter state" }
+
+- id: xiaohongshu
+  tier: heavy
+  adapter: omnireach.adapters.xiaohongshu.XiaohongshuAdapter
+  description: 小红书 搜索 + 笔记内容 (登录态 Chrome, 通过 OpenCLI)
+  query_hints: ["小红书", xiaohongshu, "种草", "笔记"]
+  default_in_auto: false
+  deps:
+    auto:
+      - { kind: npm, name: "@jackwener/opencli" }
+    manual:
+      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
+      - { step: "在 Chrome 中登录 小红书 账号 (打开 xiaohongshu.com 完成登录)", verify: "opencli xiaohongshu state" }
