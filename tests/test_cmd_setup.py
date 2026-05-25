@@ -42,3 +42,17 @@ def test_setup_reports_failure(monkeypatch):
     res = runner.invoke(main, ["setup", "hackernews", "--yes"])
     assert res.exit_code == 1
     assert "失败" in res.output or "failed" in res.output.lower()
+
+
+def test_setup_tavily_writes_secrets_env(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    from click.testing import CliRunner
+    from omnireach.cli import main
+    runner = CliRunner()
+    result = runner.invoke(main, ["setup", "tavily"], input="y\ntvly-abc123\n")
+    assert result.exit_code == 0
+    secrets = tmp_path / ".omnireach" / "secrets.env"
+    assert secrets.exists()
+    assert "TAVILY_API_KEY=tvly-abc123" in secrets.read_text()
+    mode = secrets.stat().st_mode & 0o777
+    assert mode == 0o600

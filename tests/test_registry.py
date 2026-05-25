@@ -13,7 +13,7 @@ def test_load_registry_returns_all_sources():
     assert "reddit" in ids
     assert "twitter" in ids
     assert "xiaohongshu" in ids
-    assert len(reg.sources) == 10
+    assert len(reg.sources) == 13
 
 
 def test_get_by_id():
@@ -41,3 +41,18 @@ def test_source_with_hint_matches_query():
     hits = reg.sources_matching_hints("YouTube 教程")
     ids = [s.id for s in hits]
     assert "youtube" in ids
+
+
+def test_registry_loads_trust_field():
+    from omnireach.registry import load_registry
+    reg = load_registry()
+    by_id = {s.id: s for s in reg.sources}
+    assert by_id["hackernews"].trust == 0.85
+    assert by_id["xiaohongshu"].trust == 0.50
+
+
+def test_registry_loads_booster_tier():
+    from omnireach.registry import load_registry
+    reg = load_registry()
+    boosters = [s for s in reg.sources if s.tier == "booster"]
+    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity"}

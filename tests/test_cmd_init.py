@@ -30,3 +30,15 @@ def test_init_skips_when_agent_reach_present(monkeypatch):
     res = runner.invoke(main, ["init", "--yes"])
     assert res.exit_code == 0, res.output
     assert "已安装" in res.output or "already" in res.output.lower()
+
+
+def test_init_writes_default_preferences(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    from click.testing import CliRunner
+    from omnireach.cli import main
+    runner = CliRunner()
+    result = runner.invoke(main, ["init"])
+    assert result.exit_code == 0
+    p = tmp_path / ".omnireach" / "preferences.toml"
+    assert p.exists()
+    assert "[defaults]" in p.read_text()

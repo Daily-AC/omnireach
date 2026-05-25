@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "omnireach"
-version = "0.1.0"
+version = "0.4.0-alpha"
 description = "全网通搜索: web + 多平台 (Twitter / Reddit / YouTube / B站 / 小红书 / HN / GitHub) — 一个 CLI + Skill 解决中转站 Agent 用不了 WebSearch 的问题"
 readme = "README.md"
 requires-python = ">=3.10"

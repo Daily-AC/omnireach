@@ -107,3 +107,34 @@ def test_cli_search_warns_on_unknown_on_source(monkeypatch):
     assert res.exit_code == 0, res.output
     assert "未知源" in res.stderr or "未知源" in res.output
     assert "twiter" in res.stderr or "twiter" in res.output
+
+
+def test_search_includes_active_booster_in_fanout(monkeypatch):
+    """When TAVILY_API_KEY is set, tavily MUST be in the fanout source list
+    even if the router's MAX_SOURCES cap would exclude it."""
+    from omnireach.cli import _augment_with_active_boosters
+    from omnireach.registry import load_registry
+
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-x")
+    monkeypatch.delenv("BRAVE_API_KEY", raising=False)
+    monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
+    reg = load_registry()
+    # Simulate router returning 5 non-booster sources
+    base = ["hackernews", "web", "youtube", "github", "rss"]
+    out = _augment_with_active_boosters(base, reg, explicit_sources=None)
+    assert "tavily" in out
+    assert "brave" not in out
+    assert "perplexity" not in out
+    # Existing entries preserved
+    for s in base:
+        assert s in out
+
+
+def test_search_does_not_augment_when_explicit_on(monkeypatch):
+    from omnireach.cli import _augment_with_active_boosters
+    from omnireach.registry import load_registry
+
+    monkeypatch.setenv("TAVILY_API_KEY", "x")
+    reg = load_registry()
+    out = _augment_with_active_boosters(["hackernews"], reg, explicit_sources=["hackernews"])
+    assert out == ["hackernews"]

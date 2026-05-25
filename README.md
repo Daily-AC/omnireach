@@ -48,13 +48,46 @@ omnireach "Claude 4.7 prompt caching 实测"
 
 ## 支持的源
 
-✅ **零配置 (7 个)**: `web` · `hackernews` · `youtube` · `github` · `rss` · `wechat` (微信公众号) · `bilibili` (B 站)
+| 源            | 类型                              | 配置方式                                  |
+|---------------|-----------------------------------|-------------------------------------------|
+| web           | 免费 (零配置)                     | 默认启用                                  |
+| hackernews    | 免费 (零配置)                     | 默认启用                                  |
+| youtube       | 免费 (零配置)                     | 默认启用                                  |
+| github        | 免费 (零配置)                     | 默认启用                                  |
+| rss           | 免费 (零配置)                     | 默认启用                                  |
+| wechat        | 免费 (微信公众号, 零配置)         | 默认启用                                  |
+| bilibili      | 免费 (B 站, 零配置)               | 默认启用                                  |
+| reddit        | 免费 (一步配置)                   | `omnireach setup reddit` (OAuth)          |
+| twitter       | 免费 (重配置, v0.3)               | `omnireach setup twitter` (Chrome 扩展)   |
+| xiaohongshu   | 免费 (小红书, 重配置, v0.3)       | `omnireach setup xiaohongshu`             |
+| 💎 tavily     | 付费 (Tavily Search API)          | env `TAVILY_API_KEY`                      |
+| 💎 brave      | 付费 (Brave Search API)           | env `BRAVE_API_KEY`                       |
+| 💎 perplexity | 付费 (Perplexity Sonar)           | env `PERPLEXITY_API_KEY`                  |
 
-🟡 **一步配置 (1 个)**: `reddit` — 跑 `omnireach setup reddit`, Agent 自动装 rdt-cli, 你完成 OAuth
+## 💎 付费 booster (v0.4)
 
-🔴 **重配置 (2 个, v0.3 新增)**: `twitter` · `xiaohongshu` (小红书) — 跑 `omnireach setup twitter` / `omnireach setup xiaohongshu`, Agent 装 OpenCLI, 你装 Chrome 扩展 + 登录账号
+omnireach 默认完全免费。如果你愿意配置付费 API Key，结果质量会更高：
 
-📋 计划中 (v0.4+): 付费 booster (Tavily / Brave / Perplexity), 用户偏好层
+```bash
+omnireach setup tavily       # 引导拿 Key + 写入 ~/.omnireach/secrets.env
+omnireach setup brave
+omnireach setup perplexity
+```
+
+检测到 Key 后自动启用。结果元数据 `cost="paid"`，TTY 显示前缀 💎，便于审计。
+
+要禁用：编辑 `~/.omnireach/preferences.toml` 设 `[boosters] auto_enable = false`。
+
+## ⚙️ 用户偏好 (v0.4)
+
+`~/.omnireach/preferences.toml` 可配置默认源、语言、输出格式、source_trust 覆盖。
+
+```bash
+omnireach preferences show     # 查看当前配置
+omnireach preferences edit     # 用 $EDITOR 编辑
+omnireach preferences reset    # 重置 (备份原文件到 .bak)
+omnireach preferences path     # 打印文件位置
+```
 
 ## 设计
 

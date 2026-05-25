@@ -8,20 +8,34 @@ import click
 from rich.console import Console
 
 from omnireach import installer
+from omnireach.preferences import preferences_path, write_default_preferences
 
 console = Console()
+
+
+def _write_default_prefs_if_missing() -> None:
+    pref_path = preferences_path()
+    if not pref_path.exists():
+        write_default_preferences(pref_path)
+        click.echo(f"  ✅ 已写入默认偏好: {pref_path}")
 
 
 @click.command("init")
 @click.option("--yes", "-y", is_flag=True, help="跳过确认")
 def init_cmd(yes: bool) -> None:
     """安装零配置源所需的上游工具 (主要是 agent-reach)."""
+    _write_default_prefs_if_missing()
+
     if shutil.which("agent-reach"):
         console.print("[green]✅ agent-reach 已安装[/green]")
         return
 
     if not yes:
-        if not click.confirm("即将通过 pipx 安装 agent-reach (Agent-Reach), 继续?"):
+        try:
+            proceed = click.confirm("即将通过 pipx 安装 agent-reach (Agent-Reach), 继续?")
+        except click.exceptions.Abort:
+            proceed = False
+        if not proceed:
             console.print("[yellow]取消[/yellow]")
             return
 
