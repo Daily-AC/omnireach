@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 
 import click
 from rich.console import Console
@@ -45,7 +44,7 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
             spec = reg.get(sid)
             adapters[sid] = spec.load_adapter_class()()
         except Exception as e:  # noqa: BLE001
-            console.print(f"[yellow]skip {sid}: {e}[/yellow]", file=sys.stderr)
+            click.echo(f"skip {sid}: {e}", err=True)
 
     dispatcher = Dispatcher(timeout=timeout, per_source_limit=limit)
     results, errors = asyncio.run(dispatcher.run(adapters, query))
