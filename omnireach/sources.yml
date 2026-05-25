@@ -78,7 +78,11 @@
   adapter: omnireach.adapters.bilibili.BilibiliAdapter
   description: B站视频搜索 + 字幕 (海外/服务器需配代理)
   query_hints: ["bilibili", "b站", "哔哩"]
-  default_in_auto: true
+  # default_in_auto is false: 7 sources default_in_auto > MAX_SOURCES=5,
+  # so bilibili was silently dropped from auto fanout. Honest default —
+  # 海外/服务器 IP often can't reach B站, so opt-in via --on bilibili
+  # or query hints (b站 / bilibili / 哔哩) makes more sense.
+  default_in_auto: false
   deps:
     auto:
       - { kind: pipx, name: agent-reach }
