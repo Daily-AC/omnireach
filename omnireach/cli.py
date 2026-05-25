@@ -40,6 +40,9 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
     router = Router(reg)
     route = router.plan(RouteRequest(query=query, explicit_sources=explicit, mode=mode))
 
+    for unknown in route.unknown_sources:
+        click.echo(f"warning: 未知源 '{unknown}' — 跳过 (用 `omnireach sources` 查看可用源)", err=True)
+
     adapters = {}
     for sid in route.source_ids:
         try:
