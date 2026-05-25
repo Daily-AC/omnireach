@@ -38,8 +38,8 @@ def test_rank_orders_by_trust_desc():
     assert [r.source for r in ranked] == ["b", "c", "a"]
 
 
-def test_rank_breaks_ties_by_recency_when_trust_equal():
-    # Same ts on all three — recency normalizes to 0.5 for all, so trust drives ordering.
+def test_rank_uses_trust_when_all_ts_equal():
+    # Same ts on all three — recency normalizes to 0.0 for all (lo == hi), so trust drives ordering.
     older = _r("a", 0.5, likes=10, ts="2026-05-25T00:00:00Z")
     mid = _r("b", 0.5, likes=10, ts="2026-05-25T00:00:00Z")
     high_trust = _r("c", 0.5, likes=999, ts="2026-05-25T00:00:00Z")
@@ -51,37 +51,37 @@ def test_rank_breaks_ties_by_recency_when_trust_equal():
 # --- v0.4 scorer rewrite ---------------------------------------------------
 
 
-def _r2(source: str, ts: str | None, trust: float, **kw) -> SearchResult:
+def _r2(source: str, ts: str | None, **kw) -> SearchResult:
     return SearchResult(source=source, adapter="t", title=source, url=f"https://x/{source}", ts=ts, **kw)
 
 
 def test_rank_uses_source_trust_when_recency_equal():
     trust_map = {"hn": 0.85, "youtube": 0.6}
-    a = _r2("hn", "2026-05-25T00:00:00+00:00", 0.85)
-    b = _r2("youtube", "2026-05-25T00:00:00+00:00", 0.6)
+    a = _r2("hn", "2026-05-25T00:00:00+00:00")
+    b = _r2("youtube", "2026-05-25T00:00:00+00:00")
     out = rank([b, a], trust_map=trust_map)
     assert [r.source for r in out] == ["hn", "youtube"]
 
 
 def test_rank_uses_recency_when_trust_equal():
     trust_map = {"hn": 0.7, "web": 0.7}
-    old = _r2("hn", "2020-01-01T00:00:00+00:00", 0.7)
-    new = _r2("web", "2026-05-25T00:00:00+00:00", 0.7)
+    old = _r2("hn", "2020-01-01T00:00:00+00:00")
+    new = _r2("web", "2026-05-25T00:00:00+00:00")
     out = rank([old, new], trust_map=trust_map)
     assert [r.source for r in out] == ["web", "hn"]
 
 
 def test_rank_handles_missing_ts_as_midpoint():
     trust_map = {"hn": 0.7, "web": 0.7}
-    no_ts = _r2("hn", None, 0.7)
-    old = _r2("web", "2020-01-01T00:00:00+00:00", 0.7)
+    no_ts = _r2("hn", None)
+    old = _r2("web", "2020-01-01T00:00:00+00:00")
     out = rank([old, no_ts], trust_map=trust_map)
     assert [r.source for r in out] == ["hn", "web"]
 
 
 def test_rank_writes_raw_score():
     trust_map = {"hn": 0.85}
-    r = _r2("hn", "2026-05-25T00:00:00+00:00", 0.85)
+    r = _r2("hn", "2026-05-25T00:00:00+00:00")
     out = rank([r], trust_map=trust_map)
     assert 0.0 <= out[0].raw_score <= 1.0
 
