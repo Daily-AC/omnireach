@@ -1,5 +1,3 @@
-import json
-
 import pytest
 from pydantic import ValidationError
 
@@ -23,7 +21,9 @@ def test_search_result_minimum_fields():
 
 def test_search_result_rejects_unknown_source_type():
     with pytest.raises(ValidationError):
-        SearchResult.model_validate({"source": 123, "title": "x", "url": "x"})
+        SearchResult.model_validate(
+            {"source": 123, "adapter": "builtin", "title": "x", "url": "x"}
+        )
 
 
 def test_search_envelope_roundtrip():
