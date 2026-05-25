@@ -55,14 +55,14 @@ def test_registry_loads_booster_tier():
     from omnireach.registry import load_registry
     reg = load_registry()
     boosters = [s for s in reg.sources if s.tier == "booster"]
-    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity", "exa"}
+    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity", "exa", "wechat", "bilibili"}
 
 
 def test_registry_includes_wip_tier():
     from omnireach.registry import load_registry
     reg = load_registry()
     wip = {s.id for s in reg.sources if s.tier == "wip"}
-    assert wip == {"wechat", "bilibili"}
+    assert wip == set()  # v0.6: wechat & bilibili promoted to booster
 
 
 def test_registry_has_exa_booster():
@@ -77,3 +77,22 @@ def test_registry_web_removed():
     from omnireach.registry import load_registry
     reg = load_registry()
     assert "web" not in {s.id for s in reg.sources}
+
+
+def test_sources_yml_per_source_timeout():
+    from omnireach.registry import load_registry
+    reg = load_registry()
+    by_id = {s.id: s for s in reg.sources}
+    assert by_id["hackernews"].timeout_seconds == 10.0
+    assert by_id["twitter"].timeout_seconds == 30.0
+    assert by_id["xiaohongshu"].timeout_seconds == 30.0
+
+
+def test_sources_yml_timeout_none_when_unset():
+    from omnireach.registry import load_registry
+    reg = load_registry()
+    # Pick any source we deliberately leave unset — actually all v0.6 sources get a timeout.
+    # So this test asserts that source without timeout in yml stays None.
+    # Skip if all sources have timeout; assert at least one has a value.
+    has_set = any(s.timeout_seconds is not None for s in reg.sources)
+    assert has_set

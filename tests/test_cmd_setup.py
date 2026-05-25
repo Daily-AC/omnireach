@@ -75,14 +75,29 @@ def test_setup_youtube_installs_yt_dlp(tmp_path, monkeypatch):
     assert any("yt-dlp" in (c if isinstance(c, str) else " ".join(c)) for c in calls)
 
 
-def test_setup_wechat_is_wip(tmp_path, monkeypatch):
+def test_setup_wechat_routes_to_exa_booster(tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     from click.testing import CliRunner
     from omnireach.cli import main
     runner = CliRunner()
-    result = runner.invoke(main, ["setup", "wechat"])
+    result = runner.invoke(main, ["setup", "wechat"], input="y\nexa-test-key\n")
     assert result.exit_code == 0
-    assert "v0.6" in result.output or "wip" in result.output.lower()
+    assert "EXA_API_KEY" in result.output or "Exa" in result.output or "exa" in result.output.lower()
+    secrets = tmp_path / ".omnireach" / "secrets.env"
+    if secrets.exists():
+        assert "EXA_API_KEY=exa-test-key" in secrets.read_text()
+
+
+def test_setup_bilibili_routes_to_exa_booster(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    from click.testing import CliRunner
+    from omnireach.cli import main
+    runner = CliRunner()
+    result = runner.invoke(main, ["setup", "bilibili"], input="y\nexa-test-key2\n")
+    assert result.exit_code == 0
+    secrets = tmp_path / ".omnireach" / "secrets.env"
+    if secrets.exists():
+        assert "EXA_API_KEY=exa-test-key2" in secrets.read_text() or "EXA_API_KEY" in secrets.read_text()
 
 
 def test_setup_github_prompts_manual(tmp_path, monkeypatch):

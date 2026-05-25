@@ -1,55 +1,55 @@
-"""WeChat 公众号 adapter — shells out to agent-reach."""
+"""WeChat 公众号 adapter — Exa domain-filtered search (booster, needs EXA_API_KEY)."""
 
 from __future__ import annotations
 
-import asyncio
-import json
-import shutil
+import os
+
+import httpx
 
 from omnireach.adapters.base import AdapterBase, AdapterUnavailable
 from omnireach.contract import SearchResult
 
+EXA_URL = "https://api.exa.ai/search"
+DOMAINS = ["mp.weixin.qq.com"]
+
 
 class WeChatAdapter(AdapterBase):
     name = "wechat"
-    requires = ["agent-reach"]
+    requires: list[str] = []
 
     async def is_ready(self) -> bool:
-        return shutil.which("agent-reach") is not None
+        return bool(os.environ.get("EXA_API_KEY"))
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        if not shutil.which("agent-reach"):
-            raise AdapterUnavailable(
-                "wechat", "agent-reach not installed", hint="omnireach init  (会自动 pipx install)"
-            )
-
-        proc = await asyncio.create_subprocess_exec(
-            "agent-reach", "wechat", "search", "--json", "--limit", str(limit), query,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        out, err = await proc.communicate()
-        if proc.returncode != 0:
-            raise AdapterUnavailable("wechat", err.decode().strip() or "agent-reach wechat search failed")
-
-        try:
-            data = json.loads(out.decode())
-        except json.JSONDecodeError as e:
-            raise AdapterUnavailable("wechat", f"agent-reach returned non-JSON: {e}")
-
+        key = os.environ.get("EXA_API_KEY")
+        if not key:
+            raise AdapterUnavailable("wechat", "EXA_API_KEY 未设置", hint="omnireach setup wechat")
+        headers = {"x-api-key": key, "Content-Type": "application/json"}
+        body = {"query": query, "numResults": limit, "type": "auto",
+                "includeDomains": DOMAINS}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                resp = await client.post(EXA_URL, json=body, headers=headers)
+            except httpx.HTTPError as e:
+                raise AdapterUnavailable("wechat", f"http error: {e}") from e
+        if resp.status_code == 401:
+            raise AdapterUnavailable("wechat", "API Key 无效 (401)")
+        if resp.status_code == 429:
+            raise AdapterUnavailable("wechat", "rate limited (429)")
+        if resp.status_code >= 500:
+            raise AdapterUnavailable("wechat", f"upstream {resp.status_code}")
+        data = resp.json()
         results: list[SearchResult] = []
-        for item in data.get("results", [])[:limit]:
-            results.append(
-                SearchResult(
-                    source="wechat",
-                    adapter="agent-reach",
-                    title=item.get("title", ""),
-                    url=item.get("url", ""),
-                    content=item.get("content_markdown", "") or item.get("content", ""),
-                    author=item.get("account"),
-                    ts=item.get("published_at"),
-                    score=0.5,
-                    raw=item,
-                )
-            )
+        for hit in data.get("results", [])[:limit]:
+            results.append(SearchResult(
+                source="wechat",
+                adapter="exa-api",
+                title=hit.get("title") or "",
+                url=hit.get("url") or "",
+                content=hit.get("text") or "",
+                author=hit.get("author"),
+                ts=hit.get("publishedDate"),
+                cost="paid",
+                raw=hit,
+            ))
         return results

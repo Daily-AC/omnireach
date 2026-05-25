@@ -38,6 +38,7 @@ class SourceError(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source: str
     error: str
+    category: Literal["unavailable", "failed"] = "failed"
 
 
 class SearchEnvelope(BaseModel):

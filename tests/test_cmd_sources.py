@@ -35,12 +35,15 @@ def test_sources_command_shows_booster_section(monkeypatch):
     assert "未配" in out
 
 
-def test_sources_command_shows_wip_section():
+def test_sources_command_skips_wip_section_when_empty():
+    """v0.6: wechat/bilibili promoted out of wip; sources cmd should not render '🚧' section."""
     from click.testing import CliRunner
     from omnireach.cli import main
     runner = CliRunner()
     result = runner.invoke(main, ["sources"])
     assert result.exit_code == 0
-    assert "🚧" in result.output or "v0.6" in result.output
+    # 🚧 emoji should NOT appear because no source has tier=wip
+    assert "🚧" not in result.output
+    # And the source list should still include wechat/bilibili under 💎 booster
     assert "wechat" in result.output
     assert "bilibili" in result.output

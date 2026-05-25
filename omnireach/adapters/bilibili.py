@@ -1,59 +1,55 @@
-"""Bilibili adapter — shells out to agent-reach."""
+"""B站 (Bilibili) adapter — Exa domain-filtered search (booster, needs EXA_API_KEY)."""
 
 from __future__ import annotations
 
-import asyncio
-import json
-import shutil
+import os
+
+import httpx
 
 from omnireach.adapters.base import AdapterBase, AdapterUnavailable
-from omnireach.contract import Engagement, SearchResult
+from omnireach.contract import SearchResult
+
+EXA_URL = "https://api.exa.ai/search"
+DOMAINS = ["bilibili.com", "www.bilibili.com"]
 
 
 class BilibiliAdapter(AdapterBase):
     name = "bilibili"
-    requires = ["agent-reach"]
+    requires: list[str] = []
 
     async def is_ready(self) -> bool:
-        return shutil.which("agent-reach") is not None
+        return bool(os.environ.get("EXA_API_KEY"))
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        if not shutil.which("agent-reach"):
-            raise AdapterUnavailable(
-                "bilibili", "agent-reach not installed", hint="omnireach init  (会自动 pipx install)"
-            )
-
-        proc = await asyncio.create_subprocess_exec(
-            "agent-reach", "bilibili", "search", "--json", "--limit", str(limit), query,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        out, err = await proc.communicate()
-        if proc.returncode != 0:
-            raise AdapterUnavailable("bilibili", err.decode().strip() or "agent-reach bilibili search failed")
-
-        try:
-            data = json.loads(out.decode())
-        except json.JSONDecodeError as e:
-            raise AdapterUnavailable("bilibili", f"agent-reach returned non-JSON: {e}")
-
+        key = os.environ.get("EXA_API_KEY")
+        if not key:
+            raise AdapterUnavailable("bilibili", "EXA_API_KEY 未设置", hint="omnireach setup bilibili")
+        headers = {"x-api-key": key, "Content-Type": "application/json"}
+        body = {"query": query, "numResults": limit, "type": "auto",
+                "includeDomains": DOMAINS}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                resp = await client.post(EXA_URL, json=body, headers=headers)
+            except httpx.HTTPError as e:
+                raise AdapterUnavailable("bilibili", f"http error: {e}") from e
+        if resp.status_code == 401:
+            raise AdapterUnavailable("bilibili", "API Key 无效 (401)")
+        if resp.status_code == 429:
+            raise AdapterUnavailable("bilibili", "rate limited (429)")
+        if resp.status_code >= 500:
+            raise AdapterUnavailable("bilibili", f"upstream {resp.status_code}")
+        data = resp.json()
         results: list[SearchResult] = []
-        for item in data.get("results", [])[:limit]:
-            results.append(
-                SearchResult(
-                    source="bilibili",
-                    adapter="agent-reach",
-                    title=item.get("title", ""),
-                    url=item.get("url", ""),
-                    content=item.get("subtitle", "") or item.get("description", ""),
-                    author=item.get("uploader"),
-                    ts=item.get("published_at"),
-                    score=0.5,
-                    engagement=Engagement(
-                        likes=item.get("like_count"),
-                        views=item.get("play_count"),
-                    ),
-                    raw=item,
-                )
-            )
+        for hit in data.get("results", [])[:limit]:
+            results.append(SearchResult(
+                source="bilibili",
+                adapter="exa-api",
+                title=hit.get("title") or "",
+                url=hit.get("url") or "",
+                content=hit.get("text") or "",
+                author=hit.get("author"),
+                ts=hit.get("publishedDate"),
+                cost="paid",
+                raw=hit,
+            ))
         return results
