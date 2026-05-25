@@ -11,7 +11,9 @@ def test_load_registry_returns_all_sources():
     assert "wechat" in ids
     assert "bilibili" in ids
     assert "reddit" in ids
-    assert len(reg.sources) == 8
+    assert "twitter" in ids
+    assert "xiaohongshu" in ids
+    assert len(reg.sources) == 10
 
 
 def test_get_by_id():
