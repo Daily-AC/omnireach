@@ -1,8 +1,8 @@
 """Wizard — drive a source's setup flow.
 
 The wizard is dependency-injected: tests pass stubs for `confirm`,
-`run_install`, and `prompt_user_step`. The CLI subcommand (Task 4)
-will wire them to Click prompts + installer.py.
+`run_install`, `prompt_user_step`, and `run_verify`. The CLI subcommand
+wires them to Click prompts + installer.py + subprocess.
 """
 
 from __future__ import annotations
@@ -55,6 +55,11 @@ class SetupReport:
 ConfirmFn = Callable[[str], bool]
 InstallFn = Callable[[str, str], None]
 PromptFn = Callable[[Dep], None]
+RunVerifyFn = Callable[[str], tuple[int, str]]
+
+
+def _noop_verify(cmd: str) -> tuple[int, str]:  # pragma: no cover - default fallback
+    return (0, "")
 
 
 async def run_setup(
@@ -64,6 +69,7 @@ async def run_setup(
     confirm: ConfirmFn,
     run_install: InstallFn,
     prompt_user_step: PromptFn,
+    run_verify: RunVerifyFn = _noop_verify,
 ) -> SetupReport:
     """Drive a source through its setup steps. Returns a structured report.
 
@@ -73,7 +79,9 @@ async def run_setup(
     Otherwise:
       1. Confirm overall flow with the user.
       2. For each auto dep, call run_install(kind, name); on InstallError, mark step FAILED and stop.
-      3. For each manual dep, call prompt_user_step(dep) (which is expected to block until user signals done).
+      3. For each manual dep, call prompt_user_step(dep). If dep.verify is set,
+         run_verify(dep.verify) — exit 0 = MANUAL OK, non-zero = MANUAL FAILED + early-return
+         (with combined output captured as `detail`).
       4. Re-probe adapter.is_ready(). VERIFY step is OK iff ready, FAILED otherwise.
     """
     report = SetupReport(source_id=spec.id)
@@ -104,6 +112,13 @@ async def run_setup(
 
     for dep in spec.deps_manual:
         prompt_user_step(dep)
+        if dep.verify:
+            code, out = run_verify(dep.verify)
+            if code != 0:
+                report.steps.append(
+                    WizardStep(StepKind.MANUAL, dep.step, StepStatus.FAILED, detail=out.strip() or f"verify exited {code}")
+                )
+                return report
         report.steps.append(WizardStep(StepKind.MANUAL, dep.step, StepStatus.OK))
 
     ready = await adapter.is_ready()
