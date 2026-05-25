@@ -153,3 +153,17 @@ def test_search_augment_includes_exa(monkeypatch):
     reg = load_registry()
     out = _augment_with_active_boosters(["hackernews"], reg, explicit_sources=None)
     assert "exa" in out
+
+
+def test_search_augment_includes_wechat_bilibili_via_exa_key(monkeypatch):
+    from omnireach.cli import _augment_with_active_boosters
+    from omnireach.registry import load_registry
+
+    monkeypatch.setenv("EXA_API_KEY", "x")
+    for k in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    reg = load_registry()
+    out = _augment_with_active_boosters(["hackernews"], reg, explicit_sources=None)
+    assert "wechat" in out
+    assert "bilibili" in out
+    assert "exa" in out
