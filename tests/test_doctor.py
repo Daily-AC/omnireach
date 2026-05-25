@@ -27,12 +27,10 @@ def test_doctor_marks_rss_ok(monkeypatch):
     assert rss.ok is True
 
 
-def test_doctor_marks_wip_not_ok(monkeypatch):
-    monkeypatch.setattr("shutil.which", lambda b: None)
+def test_doctor_no_wip_sources_in_v0_6():
     statuses = asyncio.run(run_doctor())
-    bilibili = next(s for s in statuses if s.id == "bilibili")
-    assert bilibili.ok is False
-    assert "v0.6" in bilibili.detail or "重写" in bilibili.detail
+    wip = [s for s in statuses if s.tier == "wip"]
+    assert wip == []
 
 
 def test_doctor_marks_youtube_ok_with_binary(monkeypatch):
