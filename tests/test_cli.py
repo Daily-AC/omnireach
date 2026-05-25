@@ -81,3 +81,29 @@ def test_cli_search_skips_broken_adapter(monkeypatch):
     assert parsed["query"] == "claude"
     # web was skipped, only hackernews ran
     assert all(r["source"] != "web" for r in parsed["results"])
+
+
+def test_cli_search_warns_on_unknown_on_source(monkeypatch):
+    """--on with a typo should print a warning to stderr (and still run the valid sources)."""
+    import omnireach.adapters.hackernews as hn
+
+    async def fake_search(self, query, *, limit=10):
+        from omnireach.contract import SearchResult
+        return [
+            SearchResult(
+                source="hackernews",
+                adapter="builtin",
+                title="ok",
+                url="https://e.x/1",
+                ts="2026-05-25T12:00:00Z",
+                score=0.5,
+            )
+        ]
+
+    monkeypatch.setattr(hn.HackerNewsAdapter, "search", fake_search)
+
+    runner = CliRunner()
+    res = runner.invoke(main, ["search", "--on", "hackernews,twiter", "--json", "x"])
+    assert res.exit_code == 0, res.output
+    assert "未知源" in res.stderr or "未知源" in res.output
+    assert "twiter" in res.stderr or "twiter" in res.output

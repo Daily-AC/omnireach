@@ -36,3 +36,18 @@ def test_route_caps_at_five_sources():
     r = Router(reg)
     route = r.plan(RouteRequest(query="anything", mode="deep"))
     assert len(route.source_ids) <= 5
+
+
+def test_unknown_explicit_source_recorded_in_route():
+    reg = load_registry()
+    r = Router(reg)
+    route = r.plan(RouteRequest(query="x", explicit_sources=["hackernews", "twiter"]))
+    assert route.source_ids == ["hackernews"]
+    assert route.unknown_sources == ["twiter"]
+
+
+def test_route_has_empty_unknown_sources_by_default():
+    reg = load_registry()
+    r = Router(reg)
+    route = r.plan(RouteRequest(query="x"))
+    assert route.unknown_sources == []
