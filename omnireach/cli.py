@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -17,6 +18,10 @@ from omnireach.normalizer import build_envelope
 from omnireach.registry import load_registry
 from omnireach.router import RouteRequest, Router
 from omnireach.scorer import rank
+from omnireach.secrets_env import load_secrets_env
+
+_SECRETS_PATH = Path.home() / ".omnireach" / "secrets.env"
+load_secrets_env(_SECRETS_PATH)
 
 console = Console()
 
