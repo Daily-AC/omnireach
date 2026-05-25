@@ -54,3 +54,26 @@ def test_route_has_empty_unknown_sources_by_default():
     r = Router(reg)
     route = r.plan(RouteRequest(query="x"))
     assert route.unknown_sources == []
+
+
+def test_router_includes_rss_only_for_url_query():
+    from omnireach.registry import load_registry
+    from omnireach.router import RouteRequest, Router
+    reg = load_registry()
+    router = Router(reg)
+
+    auto = router.plan(RouteRequest(query="claude 4.7", explicit_sources=None, mode="auto"))
+    assert "rss" not in auto.source_ids
+
+    url_route = router.plan(RouteRequest(query="https://example.com/feed.xml", explicit_sources=None, mode="auto"))
+    assert "rss" in url_route.source_ids
+
+
+def test_router_rss_only_when_explicit_or_url():
+    from omnireach.registry import load_registry
+    from omnireach.router import RouteRequest, Router
+    reg = load_registry()
+    router = Router(reg)
+
+    explicit = router.plan(RouteRequest(query="anything", explicit_sources=["rss"], mode="auto"))
+    assert "rss" in explicit.source_ids  # explicit override still works
