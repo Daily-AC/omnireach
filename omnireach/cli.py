@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from omnireach import __version__
+from omnireach.commands.check_update import check_update_cmd
 from omnireach.commands.init import init_cmd
 from omnireach.commands.setup import setup_cmd
 from omnireach.commands.preferences import preferences_cmd
@@ -134,6 +135,7 @@ main.add_command(init_cmd)
 main.add_command(setup_cmd)
 main.add_command(sources_cmd)
 main.add_command(preferences_cmd)
+main.add_command(check_update_cmd)
 
 if __name__ == "__main__":
     main()

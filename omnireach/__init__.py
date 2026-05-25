@@ -1,3 +1,3 @@
 """omnireach: 全网通 — web + multi-platform search for proxy-station agent users."""
 
-__version__ = "0.5.0-alpha"
+__version__ = "0.5.1-alpha"
