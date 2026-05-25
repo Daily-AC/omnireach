@@ -10,6 +10,7 @@ from rich.table import Table
 
 from omnireach import __version__
 from omnireach.commands.init import init_cmd
+from omnireach.commands.sources import sources_cmd
 from omnireach.dispatcher import Dispatcher
 from omnireach.normalizer import build_envelope
 from omnireach.registry import load_registry
@@ -89,6 +90,7 @@ def doctor_cmd() -> None:
 
 
 main.add_command(init_cmd)
+main.add_command(sources_cmd)
 
 if __name__ == "__main__":
     main()
