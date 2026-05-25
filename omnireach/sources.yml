@@ -16,6 +16,7 @@
   description: HackerNews 全文搜索
   query_hints: [hn, hackernews, "show hn"]
   default_in_auto: true
+  trust: 0.85
   deps: { auto: [], manual: [] }
 
 - id: web
@@ -24,6 +25,7 @@
   description: 全网搜索 (Jina Reader + MCP, 免费)
   query_hints: []
   default_in_auto: true
+  trust: 0.70
   deps:
     auto:
       - { kind: pipx, name: agent-reach }
@@ -35,6 +37,7 @@
   description: YouTube 视频搜索 + 字幕提取
   query_hints: [youtube, "video", "视频", "教程"]
   default_in_auto: true
+  trust: 0.60
   deps:
     auto:
       - { kind: pipx, name: agent-reach }
@@ -46,6 +49,7 @@
   description: GitHub 仓库/Issue/Discussion 搜索
   query_hints: [github, repo, issue, "源码"]
   default_in_auto: true
+  trust: 0.90
   deps:
     auto:
       - { kind: pipx, name: agent-reach }
@@ -57,6 +61,7 @@
   description: RSS / Atom 源阅读
   query_hints: [rss, atom, feed, "订阅"]
   default_in_auto: false
+  trust: 0.75
   deps:
     auto:
       - { kind: pipx, name: agent-reach }
@@ -68,6 +73,7 @@
   description: 微信公众号文章搜索 (全文 Markdown)
   query_hints: ["微信", "公众号", wechat]
   default_in_auto: true
+  trust: 0.55
   deps:
     auto:
       - { kind: pipx, name: agent-reach }
@@ -83,6 +89,7 @@
   # 海外/服务器 IP often can't reach B站, so opt-in via --on bilibili
   # or query hints (b站 / bilibili / 哔哩) makes more sense.
   default_in_auto: false
+  trust: 0.55
   deps:
     auto:
       - { kind: pipx, name: agent-reach }
@@ -99,6 +106,7 @@
   # errors on every search. Discoverable via query hints (reddit/r//subreddit)
   # or explicit --on reddit.
   default_in_auto: false
+  trust: 0.70
   deps:
     auto:
       - { kind: pipx, name: agent-reach }
@@ -112,6 +120,7 @@
   description: Twitter / X 搜索 (登录态 Chrome, 通过 OpenCLI)
   query_hints: [twitter, "x.com", "推特"]
   default_in_auto: false
+  trust: 0.60
   deps:
     auto:
       - { kind: npm, name: "@jackwener/opencli" }
@@ -125,9 +134,49 @@
   description: 小红书 搜索 + 笔记内容 (登录态 Chrome, 通过 OpenCLI)
   query_hints: ["小红书", xiaohongshu, "种草", "笔记"]
   default_in_auto: false
+  trust: 0.50
   deps:
     auto:
       - { kind: npm, name: "@jackwener/opencli" }
     manual:
       - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
       - { step: "在 Chrome 中登录 小红书 账号 (打开 xiaohongshu.com 完成登录)", verify: "opencli xiaohongshu state" }
+
+- id: tavily
+  tier: booster
+  adapter: omnireach.adapters.tavily.TavilyAdapter
+  description: Tavily Search API (付费, web 类增强)
+  query_hints: []
+  default_in_auto: true
+  trust: 0.85
+  deps:
+    auto: []
+    manual:
+      - step: "去 https://tavily.com 注册并复制 API Key"
+        verify: "echo $TAVILY_API_KEY 非空"
+
+- id: brave
+  tier: booster
+  adapter: omnireach.adapters.brave.BraveAdapter
+  description: Brave Search API (付费, 隐私友好 web 搜索)
+  query_hints: []
+  default_in_auto: true
+  trust: 0.80
+  deps:
+    auto: []
+    manual:
+      - step: "去 https://brave.com/search/api 注册并复制 Key"
+        verify: "echo $BRAVE_API_KEY 非空"
+
+- id: perplexity
+  tier: booster
+  adapter: omnireach.adapters.perplexity.PerplexityAdapter
+  description: Perplexity Sonar (付费, AI 检索摘要)
+  query_hints: []
+  default_in_auto: true
+  trust: 0.90
+  deps:
+    auto: []
+    manual:
+      - step: "去 https://perplexity.ai/settings/api 注册并复制 Key"
+        verify: "echo $PERPLEXITY_API_KEY 非空"
