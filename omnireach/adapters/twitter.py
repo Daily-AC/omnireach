@@ -32,7 +32,7 @@ class TwitterAdapter(AdapterBase):
             )
 
         proc = await asyncio.create_subprocess_exec(
-            "opencli", "twitter", "search", "--json", "--limit", str(limit), query,
+            "opencli", "twitter", "search", "--format", "json", "--limit", str(limit), query,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -45,8 +45,11 @@ class TwitterAdapter(AdapterBase):
         except json.JSONDecodeError as e:
             raise AdapterUnavailable("twitter", f"opencli returned non-JSON: {e}")
 
+        # opencli v1.7.22 returns a JSON array directly. Older shapes used {"results": [...]}.
+        items = data if isinstance(data, list) else data.get("results", [])
+
         results: list[SearchResult] = []
-        for item in data.get("results", [])[:limit]:
+        for item in items[:limit]:
             text = item.get("text", "") or ""
             title = (text[:80] + "…") if len(text) > 80 else text
             results.append(
