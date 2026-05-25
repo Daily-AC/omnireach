@@ -40,4 +40,28 @@ async def test_base_cannot_instantiate():
 def test_adapter_unavailable_carries_hint():
     exc = AdapterUnavailable("dummy", "agent-reach not installed", hint="pipx install agent-reach")
     assert "agent-reach" in str(exc)
+    assert exc.source == "dummy"
+    assert exc.reason == "agent-reach not installed"
     assert exc.hint == "pipx install agent-reach"
+
+
+def test_requires_is_not_shared_across_subclasses():
+    """Regression: requires defaults must not alias the base class list."""
+
+    class A(AdapterBase):
+        async def is_ready(self) -> bool:
+            return True
+
+        async def search(self, query: str, *, limit: int = 10):
+            return []
+
+    class B(AdapterBase):
+        async def is_ready(self) -> bool:
+            return True
+
+        async def search(self, query: str, *, limit: int = 10):
+            return []
+
+    A.requires.append("only-on-A")
+    assert "only-on-A" not in B.requires
+    assert "only-on-A" not in AdapterBase.requires

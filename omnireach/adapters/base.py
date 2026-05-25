@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import ClassVar
 
 from omnireach.contract import SearchResult
 
@@ -25,8 +26,13 @@ class AdapterBase(ABC):
     into a list of normalized SearchResult.
     """
 
-    name: str = ""           # override in subclass; matches sources.yml id
-    requires: list[str] = []  # CLI binaries / pip pkgs the adapter needs
+    name: ClassVar[str] = ""           # override in subclass; matches sources.yml id
+    requires: ClassVar[list[str]] = []  # CLI binaries / pip pkgs the adapter needs
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        if "requires" not in cls.__dict__:
+            cls.requires = []
 
     @abstractmethod
     async def is_ready(self) -> bool:
