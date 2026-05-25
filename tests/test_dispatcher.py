@@ -67,3 +67,88 @@ async def test_dispatch_times_out_one_source_without_blocking_others():
     out, errs = await d.run({"ok": a, "slow": SlowAdapter()}, "q")
     assert any(r.source == "ok" for r in out)
     assert any(e.source == "slow" and "timeout" in e.error.lower() for e in errs)
+
+
+# --- v0.6 T1: SourceError.category classification ---
+
+
+class _CatOkAdapter(AdapterBase):
+    name = "ok"
+
+    async def is_ready(self) -> bool:
+        return True
+
+    async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
+        return [SearchResult(source="ok", adapter="t", title="x", url="https://x")]
+
+
+class _CatUnavailableAdapter(AdapterBase):
+    name = "u"
+
+    async def is_ready(self) -> bool:
+        return False
+
+    async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
+        raise AdapterUnavailable("u", "missing key")
+
+
+class _CatFailedAdapter(AdapterBase):
+    name = "f"
+
+    async def is_ready(self) -> bool:
+        return True
+
+    async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
+        raise ValueError("kaboom")
+
+
+def test_dispatcher_classifies_unavailable():
+    d = Dispatcher(timeout=5.0, per_source_limit=5)
+    results, errors = asyncio.run(d.run({"u": _CatUnavailableAdapter()}, "q"))
+    assert results == []
+    assert len(errors) == 1
+    assert errors[0].category == "unavailable"
+
+
+def test_dispatcher_classifies_failed():
+    d = Dispatcher(timeout=5.0, per_source_limit=5)
+    results, errors = asyncio.run(d.run({"f": _CatFailedAdapter()}, "q"))
+    assert len(errors) == 1
+    assert errors[0].category == "failed"
+
+
+def test_dispatcher_classifies_timeout_as_failed():
+    class _CatSlow(AdapterBase):
+        name = "slow"
+
+        async def is_ready(self) -> bool:
+            return True
+
+        async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
+            await asyncio.sleep(2)
+            return []
+
+    d = Dispatcher(timeout=0.1, per_source_limit=5)
+    results, errors = asyncio.run(d.run({"slow": _CatSlow()}, "q"))
+    assert len(errors) == 1
+    assert errors[0].category == "failed"
+    assert "timeout" in errors[0].error.lower()
+
+
+def test_dispatcher_keeps_successful_results_alongside_errors():
+    d = Dispatcher(timeout=5.0, per_source_limit=5)
+    results, errors = asyncio.run(
+        d.run(
+            {
+                "ok": _CatOkAdapter(),
+                "u": _CatUnavailableAdapter(),
+                "f": _CatFailedAdapter(),
+            },
+            "q",
+        )
+    )
+    assert len(results) == 1
+    assert len(errors) == 2
+    categories = {e.source: e.category for e in errors}
+    assert categories["u"] == "unavailable"
+    assert categories["f"] == "failed"
