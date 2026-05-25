@@ -10,6 +10,7 @@ from rich.table import Table
 
 from omnireach import __version__
 from omnireach.commands.init import init_cmd
+from omnireach.commands.setup import setup_cmd
 from omnireach.commands.sources import sources_cmd
 from omnireach.dispatcher import Dispatcher
 from omnireach.normalizer import build_envelope
@@ -39,6 +40,9 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
     reg = load_registry()
     router = Router(reg)
     route = router.plan(RouteRequest(query=query, explicit_sources=explicit, mode=mode))
+
+    for unknown in route.unknown_sources:
+        click.echo(f"warning: 未知源 '{unknown}' — 跳过 (用 `omnireach sources` 查看可用源)", err=True)
 
     adapters = {}
     for sid in route.source_ids:
@@ -90,6 +94,7 @@ def doctor_cmd() -> None:
 
 
 main.add_command(init_cmd)
+main.add_command(setup_cmd)
 main.add_command(sources_cmd)
 
 if __name__ == "__main__":

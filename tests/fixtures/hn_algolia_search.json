@@ -1,0 +1,25 @@
+{
+  "hits": [
+    {
+      "objectID": "1",
+      "title": "Claude 4.7 prompt caching benchmarks",
+      "url": "https://example.com/post-1",
+      "author": "alice",
+      "created_at_i": 1748160000,
+      "points": 250,
+      "num_comments": 88
+    },
+    {
+      "objectID": "2",
+      "title": "Show HN: omnireach — search the whole internet from your agent",
+      "url": "https://example.com/post-2",
+      "author": "bob",
+      "created_at_i": 1748170000,
+      "points": 42,
+      "num_comments": 6
+    }
+  ],
+  "nbHits": 2,
+  "page": 0,
+  "hitsPerPage": 20
+}

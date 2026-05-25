@@ -1,8 +1,7 @@
-"""HackerNews adapter — talks directly to public JSON API, no upstream needed."""
+"""HackerNews adapter — talks directly to Algolia HN Search API, no upstream needed."""
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timezone
 
 import httpx
@@ -10,7 +9,7 @@ import httpx
 from omnireach.adapters.base import AdapterBase
 from omnireach.contract import Engagement, SearchResult
 
-HN_BASE = "https://hacker-news.firebaseio.com/v0"
+ALGOLIA_URL = "https://hn.algolia.com/api/v1/search"
 
 
 class HackerNewsAdapter(AdapterBase):
@@ -21,44 +20,33 @@ class HackerNewsAdapter(AdapterBase):
         return True
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        q = query.lower()
+        params = {"query": query, "tags": "story", "hitsPerPage": limit}
         async with httpx.AsyncClient(timeout=15.0) as client:
-            top = (await client.get(f"{HN_BASE}/topstories.json")).json()
-            top_ids = top[:200]  # widen pool, filter client-side
+            resp = await client.get(ALGOLIA_URL, params=params)
+            data = resp.json()
 
-            async def fetch(item_id: int) -> dict | None:
-                try:
-                    return (await client.get(f"{HN_BASE}/item/{item_id}.json")).json()
-                except Exception:
-                    return None
-
-            items = await asyncio.gather(*[fetch(i) for i in top_ids])
-
-        matches: list[SearchResult] = []
-        for it in items:
-            if not it or it.get("type") != "story":
-                continue
-            title = it.get("title") or ""
-            if q not in title.lower():
-                continue
-            ts = datetime.fromtimestamp(it.get("time", 0), tz=timezone.utc).isoformat()
-            matches.append(
+        results: list[SearchResult] = []
+        for hit in data.get("hits", [])[:limit]:
+            object_id = hit.get("objectID") or ""
+            url = hit.get("url") or f"https://news.ycombinator.com/item?id={object_id}"
+            created_i = hit.get("created_at_i") or 0
+            ts = datetime.fromtimestamp(created_i, tz=timezone.utc).isoformat() if created_i else None
+            points = hit.get("points") or 0
+            results.append(
                 SearchResult(
                     source="hackernews",
                     adapter="builtin",
-                    title=title,
-                    url=it.get("url") or f"https://news.ycombinator.com/item?id={it['id']}",
+                    title=hit.get("title") or "",
+                    url=url,
                     content="",
-                    author=it.get("by"),
+                    author=hit.get("author"),
                     ts=ts,
-                    score=min(1.0, (it.get("score") or 0) / 500.0),
+                    score=min(1.0, points / 500.0),
                     engagement=Engagement(
-                        likes=it.get("score"),
-                        comments=it.get("descendants"),
+                        likes=points,
+                        comments=hit.get("num_comments"),
                     ),
-                    raw=it,
+                    raw=hit,
                 )
             )
-            if len(matches) >= limit:
-                break
-        return matches
+        return results
