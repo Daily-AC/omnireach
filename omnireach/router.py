@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from omnireach.registry import Registry
 
@@ -12,14 +12,15 @@ MAX_SOURCES = 5
 @dataclass
 class RouteRequest:
     query: str
-    explicit_sources: list[str] | None = None  # --on flag
-    mode: str = "auto"  # auto | quick | deep
+    explicit_sources: list[str] | None = None
+    mode: str = "auto"
 
 
 @dataclass
 class Route:
     source_ids: list[str]
-    rationale: str  # short explanation for --verbose
+    rationale: str
+    unknown_sources: list[str] = field(default_factory=list)
 
 
 class Router:
@@ -30,7 +31,8 @@ class Router:
         if req.explicit_sources:
             valid = [s.id for s in self.registry.sources]
             chosen = [s for s in req.explicit_sources if s in valid]
-            return Route(source_ids=chosen, rationale="explicit --on")
+            unknown = [s for s in req.explicit_sources if s not in valid]
+            return Route(source_ids=chosen, rationale="explicit --on", unknown_sources=unknown)
 
         if req.mode == "quick":
             return Route(source_ids=["web", "hackernews"], rationale="mode=quick")
@@ -39,7 +41,6 @@ class Router:
             all_ready = [s.id for s in self.registry.sources if s.tier == "ready"]
             return Route(source_ids=all_ready[:MAX_SOURCES], rationale="mode=deep")
 
-        # auto: hint matches first, then default
         hinted = [s.id for s in self.registry.sources_matching_hints(req.query)]
         defaults = [s.id for s in self.registry.default_auto_sources()]
         merged: list[str] = []
