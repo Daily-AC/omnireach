@@ -75,6 +75,17 @@ omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 
 > v0.4 及之前曾把 `web` 列为零配置, 实际不可用 (v0.1 起就是 architecture bug — 详见 `docs/superpowers/specs/2026-05-26-omnireach-v0.5-design.md`)。v0.5 起 web search 走 💎 exa booster (或任一付费 booster)。
 
+## 升级
+
+omnireach 还在 alpha 频繁迭代。检查 + 升级:
+
+```bash
+omnireach check-update                                                            # 比对 GitHub Releases
+uv tool install --force git+https://github.com/Daily-AC/omnireach.git             # 拉最新
+```
+
+> ⚠️  `uv tool upgrade omnireach` **不会**拉新 commit (uv 把 git URL 装的工具锁在 install 时的 commit 上). `--force` 重装才会去 fetch 最新.
+
 ## 上游依赖
 
 omnireach 不再在运行时调用任何 wrapper。每个 adapter 直接 shell 出对应上游 binary (yt-dlp / gh / rdt-cli) 或调用 Python 库 (feedparser)。每个 binary 用 `omnireach setup <X>` 引导安装。
