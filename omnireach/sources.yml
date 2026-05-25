@@ -1,0 +1,89 @@
+# Source Registry — single source of truth for available sources.
+# Schema:
+#   id: string                         (matches AdapterBase.name)
+#   tier: ready | one_step | heavy     (visualized in `omnireach sources`)
+#   adapter: python.dotted.path        (importable AdapterBase subclass)
+#   description: human label (zh)
+#   query_hints: [str]                 (router weights these queries toward this source)
+#   default_in_auto: bool              (included in auto fanout when ready)
+#   deps:
+#     auto: [{kind: pipx|npm|pip, name: str}]
+#     manual: [{step: str, verify: str}]
+
+- id: hackernews
+  tier: ready
+  adapter: omnireach.adapters.hackernews.HackerNewsAdapter
+  description: HackerNews 全文搜索
+  query_hints: [hn, hackernews, "show hn"]
+  default_in_auto: true
+  deps: { auto: [], manual: [] }
+
+- id: web
+  tier: ready
+  adapter: omnireach.adapters.web.WebSearchAdapter
+  description: 全网搜索 (Jina Reader + MCP, 免费)
+  query_hints: []
+  default_in_auto: true
+  deps:
+    auto:
+      - { kind: pipx, name: agent-reach }
+    manual: []
+
+- id: youtube
+  tier: ready
+  adapter: omnireach.adapters.youtube.YouTubeAdapter
+  description: YouTube 视频搜索 + 字幕提取
+  query_hints: [youtube, "video", "视频", "教程"]
+  default_in_auto: true
+  deps:
+    auto:
+      - { kind: pipx, name: agent-reach }
+    manual: []
+
+- id: github
+  tier: ready
+  adapter: omnireach.adapters.github.GitHubAdapter
+  description: GitHub 仓库/Issue/Discussion 搜索
+  query_hints: [github, repo, issue, "源码"]
+  default_in_auto: true
+  deps:
+    auto:
+      - { kind: pipx, name: agent-reach }
+    manual: []
+
+- id: rss
+  tier: ready
+  adapter: omnireach.adapters.rss.RSSAdapter
+  description: RSS / Atom 源阅读
+  query_hints: [rss, atom, feed, "订阅"]
+  default_in_auto: false
+  deps:
+    auto:
+      - { kind: pipx, name: agent-reach }
+    manual: []
+
+- id: wechat
+  tier: ready
+  adapter: omnireach.adapters.wechat.WeChatAdapter
+  description: 微信公众号文章搜索 (全文 Markdown)
+  query_hints: ["微信", "公众号", wechat]
+  default_in_auto: true
+  deps:
+    auto:
+      - { kind: pipx, name: agent-reach }
+    manual: []
+
+- id: bilibili
+  tier: ready
+  adapter: omnireach.adapters.bilibili.BilibiliAdapter
+  description: B站视频搜索 + 字幕 (海外/服务器需配代理)
+  query_hints: ["bilibili", "b站", "哔哩"]
+  # default_in_auto is false: 7 sources default_in_auto > MAX_SOURCES=5,
+  # so bilibili was silently dropped from auto fanout. Honest default —
+  # 海外/服务器 IP often can't reach B站, so opt-in via --on bilibili
+  # or query hints (b站 / bilibili / 哔哩) makes more sense.
+  default_in_auto: false
+  deps:
+    auto:
+      - { kind: pipx, name: agent-reach }
+    manual: []
