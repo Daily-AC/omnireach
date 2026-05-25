@@ -114,8 +114,13 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
         source_label = f"💎 {r.source}" if r.cost == "paid" else r.source
         table.add_row(source_label, r.title[:80], r.url)
     console.print(table)
-    for err in errors:
+    failed = [e for e in errors if e.category == "failed"]
+    unavailable = [e for e in errors if e.category == "unavailable"]
+    for err in failed:
         console.print(f"[red]✗ {err.source}: {err.error}[/red]")
+    if unavailable:
+        n = len(unavailable)
+        console.print(f"[dim]ℹ️  {n} 个源未配置 (跑 `omnireach doctor` 查看修复建议)[/dim]")
 
 
 @main.command("doctor")
