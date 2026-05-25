@@ -1,20 +1,55 @@
-from click.testing import CliRunner
+import asyncio
+import os
 
-from omnireach.cli import main
 from omnireach.doctor import run_doctor
 
 
-async def test_run_doctor_returns_status_per_source():
-    statuses = await run_doctor()
-    ids = [s.source for s in statuses]
-    assert "hackernews" in ids
-    hn = next(s for s in statuses if s.source == "hackernews")
+def test_doctor_reports_each_source(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):
+        monkeypatch.delenv(env, raising=False)
+    statuses = asyncio.run(run_doctor())
+    ids = {s.id for s in statuses}
+    assert {"hackernews", "youtube", "github", "reddit", "rss", "exa", "wechat", "bilibili"}.issubset(ids)
+
+
+def test_doctor_marks_hackernews_ok(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    statuses = asyncio.run(run_doctor())
+    hn = next(s for s in statuses if s.id == "hackernews")
     assert hn.ok is True
 
 
-def test_doctor_cli_runs():
-    runner = CliRunner()
-    res = runner.invoke(main, ["doctor"])
-    # exit_code may be 0 (all green) or 1 (some sources fail), but output must render
-    assert res.exit_code in (0, 1)
-    assert "hackernews" in res.output
+def test_doctor_marks_rss_ok(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    statuses = asyncio.run(run_doctor())
+    rss = next(s for s in statuses if s.id == "rss")
+    assert rss.ok is True
+
+
+def test_doctor_marks_wip_not_ok(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    statuses = asyncio.run(run_doctor())
+    wechat = next(s for s in statuses if s.id == "wechat")
+    assert wechat.ok is False
+    assert "v0.6" in wechat.detail or "重写" in wechat.detail
+
+
+def test_doctor_marks_youtube_ok_with_binary(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: "/usr/bin/yt-dlp" if b == "yt-dlp" else None)
+    statuses = asyncio.run(run_doctor())
+    yt = next(s for s in statuses if s.id == "youtube")
+    assert yt.ok is True
+
+
+def test_doctor_marks_booster_ok_with_key(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    monkeypatch.setenv("EXA_API_KEY", "exa-x")
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.delenv("BRAVE_API_KEY", raising=False)
+    monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
+    statuses = asyncio.run(run_doctor())
+    exa = next(s for s in statuses if s.id == "exa")
+    assert exa.ok is True
+    tavily = next(s for s in statuses if s.id == "tavily")
+    assert tavily.ok is False
