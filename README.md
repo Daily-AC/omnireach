@@ -43,13 +43,16 @@ omnireach "Claude 4.7 prompt caching 实测"
 | `omnireach search --json "..."` | 输出 JSON 给下游 pipe |
 | `omnireach init` | 安装零配置依赖 |
 | `omnireach sources` | 列出所有源 + 心愿单状态 |
+| `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 (Agent 装上游 + 你完成认证) |
 | `omnireach doctor` | 健康检查 |
 
-## v0.1 支持的源
+## 支持的源
 
 ✅ **零配置 (7 个)**: `web` · `hackernews` · `youtube` · `github` · `rss` · `wechat` (微信公众号) · `bilibili` (B 站)
 
-🟡 / 🔴 计划中 (v0.2+): `reddit` · `twitter` · `xiaohongshu` (小红书)
+🟡 **一步配置 (1 个, v0.2 新增)**: `reddit` — 跑 `omnireach setup reddit`, Agent 自动装 rdt-cli, 你完成 OAuth
+
+🔴 计划中 (v0.3+): `twitter` · `xiaohongshu` (小红书)
 
 ## 设计
 
