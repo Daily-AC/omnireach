@@ -132,3 +132,96 @@ async def test_setup_verify_fails_when_adapter_still_not_ready():
     assert report.success is False
     verify_step = next(s for s in report.steps if s.kind == StepKind.VERIFY)
     assert verify_step.status == StepStatus.FAILED
+
+
+async def test_setup_runs_verify_after_manual_step_when_provided():
+    """When dep.verify is set, wizard runs it after the manual step. exit 0 → OK."""
+    spec = _spec(
+        manual=[Dep(step="login somewhere", verify="echo done")],
+    )
+    adapter = _StubAdapter(ready=False)
+
+    def post_manual_make_ready():
+        adapter._ready = True
+
+    verifies: list[str] = []
+
+    def run_verify(cmd: str) -> tuple[int, str]:
+        verifies.append(cmd)
+        post_manual_make_ready()
+        return (0, "done\n")
+
+    report = await run_setup(
+        spec,
+        adapter=adapter,
+        confirm=lambda msg: True,
+        run_install=lambda kind, name: None,
+        prompt_user_step=lambda step: None,
+        run_verify=run_verify,
+    )
+
+    assert verifies == ["echo done"]
+    assert report.success is True
+    manual_step = next(s for s in report.steps if s.kind == StepKind.MANUAL)
+    assert manual_step.status == StepStatus.OK
+
+
+async def test_setup_marks_manual_failed_when_verify_fails():
+    """When verify exits non-zero, the manual step is FAILED and wizard early-returns."""
+    spec = _spec(
+        manual=[
+            Dep(step="step A", verify="exit 1"),
+            Dep(step="step B"),  # should not be reached
+        ],
+    )
+    adapter = _StubAdapter(ready=False)
+
+    prompts_seen: list[str] = []
+
+    def prompt_user_step(dep: Dep) -> None:
+        prompts_seen.append(dep.step)
+
+    def run_verify(cmd: str) -> tuple[int, str]:
+        return (1, "boom: not logged in")
+
+    report = await run_setup(
+        spec,
+        adapter=adapter,
+        confirm=lambda msg: True,
+        run_install=lambda kind, name: None,
+        prompt_user_step=prompt_user_step,
+        run_verify=run_verify,
+    )
+
+    assert prompts_seen == ["step A"]  # step B never prompted
+    assert report.success is False
+    failed = next(s for s in report.steps if s.status == StepStatus.FAILED)
+    assert failed.kind == StepKind.MANUAL
+    assert "boom" in (failed.detail or "")
+    # No VERIFY step appended (final readiness probe skipped on early-return)
+    assert not any(s.kind == StepKind.VERIFY for s in report.steps)
+
+
+async def test_setup_skips_verify_when_dep_has_no_verify():
+    """Manual deps without a verify field continue to mark OK without invoking run_verify."""
+    spec = _spec(manual=[Dep(step="just do it")])
+    adapter = _StubAdapter(ready=False)
+
+    def make_ready_after_prompt(dep):
+        adapter._ready = True
+
+    def boom_verify(cmd: str) -> tuple[int, str]:
+        raise AssertionError("run_verify must NOT be called when dep.verify is empty")
+
+    report = await run_setup(
+        spec,
+        adapter=adapter,
+        confirm=lambda msg: True,
+        run_install=lambda kind, name: None,
+        prompt_user_step=make_ready_after_prompt,
+        run_verify=boom_verify,
+    )
+
+    assert report.success is True
+    manual_step = next(s for s in report.steps if s.kind == StepKind.MANUAL)
+    assert manual_step.status == StepStatus.OK
