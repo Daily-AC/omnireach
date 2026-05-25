@@ -20,7 +20,7 @@ class XiaohongshuAdapter(AdapterBase):
     requires = ["opencli"]
 
     async def is_ready(self) -> bool:
-        return shutil.which("opencli") is not None
+        return all(shutil.which(b) is not None for b in self.requires)
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
         if not shutil.which("opencli"):

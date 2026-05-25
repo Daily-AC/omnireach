@@ -40,6 +40,7 @@ async def test_xhs_search_parses_opencli_json(monkeypatch):
     assert out[0].author == "AI小白"
     assert out[0].engagement.likes == 4200
     assert out[0].engagement.comments == 87
+    assert out[0].engagement.shares == 256
 
 
 async def test_xhs_missing_opencli(monkeypatch):
