@@ -1,4 +1,4 @@
-"""Scorer — rank results across sources."""
+"""Scorer — rank results across sources by recency + source_trust."""
 
 from __future__ import annotations
 
@@ -6,21 +6,33 @@ from datetime import datetime
 
 from omnireach.contract import SearchResult
 
+W_RECENCY = 0.4
+W_TRUST = 0.6
 
-def _ts_to_epoch(ts: str | None) -> float:
+
+def _ts_to_epoch(ts: str | None) -> float | None:
     if not ts:
-        return 0.0
+        return None
     try:
         return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
     except ValueError:
-        return 0.0
+        return None
 
 
-def rank(results: list[SearchResult]) -> list[SearchResult]:
-    """Sort by score desc, breaking ties with engagement.likes then ts (newer first)."""
+def _normalize_recency(results: list[SearchResult]) -> list[float]:
+    epochs = [_ts_to_epoch(r.ts) for r in results]
+    real = [e for e in epochs if e is not None]
+    if not real:
+        return [0.5] * len(results)
+    lo, hi = min(real), max(real)
+    span = hi - lo if hi > lo else 1.0
+    return [0.5 if e is None else (e - lo) / span for e in epochs]
 
-    def key(r: SearchResult) -> tuple[float, int, float]:
-        likes = (r.engagement.likes if r.engagement and r.engagement.likes else 0)
-        return (-r.score, -likes, -_ts_to_epoch(r.ts))
 
-    return sorted(results, key=key)
+def rank(results: list[SearchResult], *, trust_map: dict[str, float] | None = None) -> list[SearchResult]:
+    trust_map = trust_map or {}
+    rec = _normalize_recency(results)
+    for r, rn in zip(results, rec, strict=True):
+        t = trust_map.get(r.source, 0.7)
+        r.raw_score = W_RECENCY * rn + W_TRUST * t
+    return sorted(results, key=lambda r: -r.raw_score)

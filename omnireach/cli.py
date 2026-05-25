@@ -54,7 +54,8 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
 
     dispatcher = Dispatcher(timeout=timeout, per_source_limit=limit)
     results, errors = asyncio.run(dispatcher.run(adapters, query))
-    ranked = rank(results)
+    trust_map = {s.id: s.trust for s in reg.sources}
+    ranked = rank(results, trust_map=trust_map)
     envelope = build_envelope(query=query, results=ranked, errors=errors)
 
     if json_out:
