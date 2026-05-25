@@ -50,9 +50,11 @@ omnireach "Claude 4.7 prompt caching 实测"
 
 ✅ **零配置 (7 个)**: `web` · `hackernews` · `youtube` · `github` · `rss` · `wechat` (微信公众号) · `bilibili` (B 站)
 
-🟡 **一步配置 (1 个, v0.2 新增)**: `reddit` — 跑 `omnireach setup reddit`, Agent 自动装 rdt-cli, 你完成 OAuth
+🟡 **一步配置 (1 个)**: `reddit` — 跑 `omnireach setup reddit`, Agent 自动装 rdt-cli, 你完成 OAuth
 
-🔴 计划中 (v0.3+): `twitter` · `xiaohongshu` (小红书)
+🔴 **重配置 (2 个, v0.3 新增)**: `twitter` · `xiaohongshu` (小红书) — 跑 `omnireach setup twitter` / `omnireach setup xiaohongshu`, Agent 装 OpenCLI, 你装 Chrome 扩展 + 登录账号
+
+📋 计划中 (v0.4+): 付费 booster (Tavily / Brave / Perplexity), 用户偏好层
 
 ## 设计
 
