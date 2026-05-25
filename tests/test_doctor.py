@@ -27,12 +27,10 @@ def test_doctor_marks_rss_ok(monkeypatch):
     assert rss.ok is True
 
 
-def test_doctor_marks_wip_not_ok(monkeypatch):
-    monkeypatch.setattr("shutil.which", lambda b: None)
+def test_doctor_no_wip_sources_in_v0_6():
     statuses = asyncio.run(run_doctor())
-    wechat = next(s for s in statuses if s.id == "wechat")
-    assert wechat.ok is False
-    assert "v0.6" in wechat.detail or "重写" in wechat.detail
+    wip = [s for s in statuses if s.tier == "wip"]
+    assert wip == []
 
 
 def test_doctor_marks_youtube_ok_with_binary(monkeypatch):
@@ -53,3 +51,23 @@ def test_doctor_marks_booster_ok_with_key(monkeypatch):
     assert exa.ok is True
     tavily = next(s for s in statuses if s.id == "tavily")
     assert tavily.ok is False
+
+
+def test_doctor_marks_wechat_ok_with_exa_key(monkeypatch):
+    import asyncio
+    from omnireach.doctor import run_doctor
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    monkeypatch.setenv("EXA_API_KEY", "x")
+    statuses = asyncio.run(run_doctor())
+    wc = next(s for s in statuses if s.id == "wechat")
+    assert wc.ok is True
+
+
+def test_doctor_marks_bilibili_ok_with_exa_key(monkeypatch):
+    import asyncio
+    from omnireach.doctor import run_doctor
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    monkeypatch.setenv("EXA_API_KEY", "x")
+    statuses = asyncio.run(run_doctor())
+    bili = next(s for s in statuses if s.id == "bilibili")
+    assert bili.ok is True

@@ -153,3 +153,57 @@ def test_search_augment_includes_exa(monkeypatch):
     reg = load_registry()
     out = _augment_with_active_boosters(["hackernews"], reg, explicit_sources=None)
     assert "exa" in out
+
+
+def test_search_augment_includes_wechat_bilibili_via_exa_key(monkeypatch):
+    from omnireach.cli import _augment_with_active_boosters
+    from omnireach.registry import load_registry
+
+    monkeypatch.setenv("EXA_API_KEY", "x")
+    for k in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    reg = load_registry()
+    out = _augment_with_active_boosters(["hackernews"], reg, explicit_sources=None)
+    assert "wechat" in out
+    assert "bilibili" in out
+    assert "exa" in out
+
+
+def test_tty_skips_unavailable_errors_and_prints_footer(monkeypatch):
+    """Real-user UX bug: unavailable sources should not print ✗ red rows."""
+    from click.testing import CliRunner
+    from omnireach.cli import main
+
+    # Strip everything except HN — opencli is installed on dev machines, neuter it
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):
+        monkeypatch.delenv(env, raising=False)
+    runner = CliRunner()
+    result = runner.invoke(main, ["search", "vibe coding", "--limit", "3", "--timeout", "10"])
+    out = result.output
+    # No ✗ rows for unavailable sources
+    assert "✗ tavily" not in out
+    assert "✗ exa" not in out
+    assert "✗ wechat" not in out
+    assert "✗ youtube" not in out
+    # Footer present mentioning doctor / 未配置
+    assert "doctor" in out or "未配置" in out
+
+
+def test_json_output_keeps_unavailable_errors(monkeypatch):
+    """JSON output retains all errors with category field, unlike TTY."""
+    import json as _json
+    from click.testing import CliRunner
+    from omnireach.cli import main
+
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):
+        monkeypatch.delenv(env, raising=False)
+    runner = CliRunner()
+    result = runner.invoke(main, ["search", "test", "--limit", "2", "--timeout", "5", "--json"])
+    # The output may include warning lines first; find the JSON line
+    json_line = next((ln for ln in result.output.splitlines() if ln.strip().startswith("{")), None)
+    assert json_line is not None
+    data = _json.loads(json_line)
+    cats = {e["category"] for e in data.get("errors", [])}
+    assert "unavailable" in cats

@@ -43,6 +43,18 @@ BOOSTER_GUIDES = {
         "label": "Exa Search API",
         "note": "付费 web 搜索, 检测式接入",
     },
+    "wechat": {
+        "env": "EXA_API_KEY",
+        "signup_url": "https://exa.ai",
+        "label": "微信公众号 (via Exa domain filter)",
+        "note": "复用 Exa Key; 一个 Key 同时点亮 exa + wechat + bilibili",
+    },
+    "bilibili": {
+        "env": "EXA_API_KEY",
+        "signup_url": "https://exa.ai",
+        "label": "B站 (via Exa domain filter)",
+        "note": "复用 Exa Key; 一个 Key 同时点亮 exa + wechat + bilibili",
+    },
 }
 
 
@@ -180,10 +192,6 @@ def setup_cmd(source_id: str, yes: bool) -> None:
 
     if source_id in BINARY_GUIDES:
         _setup_binary(source_id)
-        return
-
-    if source_id in ("wechat", "bilibili"):
-        _setup_wip(source_id)
         return
 
     if source_id in ("twitter", "xiaohongshu"):
