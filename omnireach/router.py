@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import re as _re
 from dataclasses import dataclass, field
 
 from omnireach.registry import Registry
 
 MAX_SOURCES = 5
+_URL_RE = _re.compile(r"^(https?|file)://", _re.IGNORECASE)
 
 
 @dataclass
@@ -49,4 +51,12 @@ class Router:
                 merged.append(sid)
             if len(merged) >= MAX_SOURCES:
                 break
+
+        # rss requires URL query; gate it
+        if not _URL_RE.match(req.query.strip()):
+            merged = [s for s in merged if s != "rss"]
+        elif "rss" not in merged:
+            # query is a URL → include rss even if default_in_auto=false
+            merged.append("rss")
+
         return Route(source_ids=merged, rationale="auto: hints + defaults")

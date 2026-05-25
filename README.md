@@ -18,9 +18,18 @@ omnireach 把社区里已经成熟的三个上游工具 (**Agent-Reach** / **Ope
 ## 快速开始
 
 ```bash
-pipx install omnireach
-omnireach init       # 自动装好 agent-reach 等零配置依赖
-omnireach "Claude 4.7 prompt caching 实测"
+uv tool install git+https://github.com/Daily-AC/omnireach.git
+omnireach init                  # 写默认 ~/.omnireach/preferences.toml
+omnireach search "vibe coding"  # HN 立即可用 (零配置)
+```
+
+零配置只跑 HackerNews。要打开其他源:
+
+```bash
+omnireach setup youtube   # pip install yt-dlp
+omnireach setup github    # 提示 brew install gh (macOS)
+omnireach setup reddit    # uv tool install rdt-cli + rdt login
+omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 ```
 
 ### 在 Claude Code 里用
@@ -48,21 +57,36 @@ omnireach "Claude 4.7 prompt caching 实测"
 
 ## 支持的源
 
-| 源            | 类型                              | 配置方式                                  |
-|---------------|-----------------------------------|-------------------------------------------|
-| web           | 免费 (零配置)                     | 默认启用                                  |
-| hackernews    | 免费 (零配置)                     | 默认启用                                  |
-| youtube       | 免费 (零配置)                     | 默认启用                                  |
-| github        | 免费 (零配置)                     | 默认启用                                  |
-| rss           | 免费 (零配置)                     | 默认启用                                  |
-| wechat        | 免费 (微信公众号, 零配置)         | 默认启用                                  |
-| bilibili      | 免费 (B 站, 零配置)               | 默认启用                                  |
-| reddit        | 免费 (一步配置)                   | `omnireach setup reddit` (OAuth)          |
-| twitter       | 免费 (重配置, v0.3)               | `omnireach setup twitter` (Chrome 扩展)   |
-| xiaohongshu   | 免费 (小红书, 重配置, v0.3)       | `omnireach setup xiaohongshu`             |
-| 💎 tavily     | 付费 (Tavily Search API)          | env `TAVILY_API_KEY`                      |
-| 💎 brave      | 付费 (Brave Search API)           | env `BRAVE_API_KEY`                       |
-| 💎 perplexity | 付费 (Perplexity Sonar)           | env `PERPLEXITY_API_KEY`                  |
+| 源 | tier | 依赖 | 说明 |
+|---|---|---|---|
+| hackernews | ✅ ready | 无 | 直连 Algolia, 零配置 |
+| youtube | ✅ ready | `yt-dlp` (pip install) | `omnireach setup youtube` |
+| github | ✅ ready | `gh` CLI + `gh auth login` | `omnireach setup github` |
+| rss | ✅ ready | 内置 feedparser | query 必须是 URL |
+| reddit | 🟡 one_step | `rdt-cli` + `rdt login` | `omnireach setup reddit` |
+| twitter | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
+| xiaohongshu | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
+| 💎 tavily | booster | env `TAVILY_API_KEY` | 付费 (v0.4) |
+| 💎 brave | booster | env `BRAVE_API_KEY` | 付费 (v0.4) |
+| 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | 付费 (v0.4) |
+| 💎 exa | booster | env `EXA_API_KEY` | 付费 web search (v0.5) |
+| 🚧 wechat | wip | — | v0.6 重写中 |
+| 🚧 bilibili | wip | — | v0.6 重写中 |
+
+> v0.4 及之前曾把 `web` 列为零配置, 实际不可用 (v0.1 起就是 architecture bug — 详见 `docs/superpowers/specs/2026-05-26-omnireach-v0.5-design.md`)。v0.5 起 web search 走 💎 exa booster (或任一付费 booster)。
+
+## 上游依赖
+
+omnireach 不再在运行时调用任何 wrapper。每个 adapter 直接 shell 出对应上游 binary (yt-dlp / gh / rdt-cli) 或调用 Python 库 (feedparser)。每个 binary 用 `omnireach setup <X>` 引导安装。
+
+一次性装齐 (可选, 不强制):
+
+```bash
+uv tool install git+https://github.com/Panniantong/Agent-Reach.git
+agent-reach install --channels youtube,github,reddit
+```
+
+Agent-Reach 是上游 installer/doctor 工具, 完全可选 — omnireach 自己 doctor/search 都不依赖它。
 
 ## 💎 付费 booster (v0.4)
 
@@ -72,6 +96,7 @@ omnireach 默认完全免费。如果你愿意配置付费 API Key，结果质�
 omnireach setup tavily       # 引导拿 Key + 写入 ~/.omnireach/secrets.env
 omnireach setup brave
 omnireach setup perplexity
+omnireach setup exa          # v0.5 新增 (替代旧 web 源)
 ```
 
 检测到 Key 后自动启用。结果元数据 `cost="paid"`，TTY 显示前缀 💎，便于审计。

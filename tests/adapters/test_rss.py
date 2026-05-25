@@ -1,39 +1,56 @@
-import json
+import asyncio
+from pathlib import Path
 
 import pytest
 
 from omnireach.adapters.base import AdapterUnavailable
-from omnireach.adapters.rss import RSSAdapter
+from omnireach.adapters.rss import RssAdapter
 
 
-async def test_rss_search_parses_agent_reach_json(monkeypatch):
-    fake = json.dumps({
-        "results": [
-            {
-                "title": "Anthropic ships Claude 4.7",
-                "url": "https://anthropic.com/blog/4-7",
-                "summary": "...",
-                "published_at": "2026-05-20T00:00:00Z",
-                "feed": "https://anthropic.com/rss",
-            }
-        ]
-    })
-
-    async def fake_exec(*args, **kwargs):
-        class P:
-            returncode = 0
-            async def communicate(self):
-                return (fake.encode(), b"")
-        return P()
-
-    monkeypatch.setattr("omnireach.adapters.rss.asyncio.create_subprocess_exec", fake_exec)
-    monkeypatch.setattr("omnireach.adapters.rss.shutil.which", lambda n: "/usr/bin/agent-reach")
-
-    out = await RSSAdapter().search("anthropic", limit=3)
-    assert out[0].source == "rss"
+RSS_FIXTURE = """<?xml version="1.0"?>
+<rss version="2.0"><channel>
+<title>Example</title>
+<link>https://example.com</link>
+<item>
+  <title>Post One</title>
+  <link>https://example.com/1</link>
+  <description>Body one</description>
+  <pubDate>Tue, 20 May 2026 10:00:00 +0000</pubDate>
+  <author>alice@example.com</author>
+</item>
+<item>
+  <title>Post Two</title>
+  <link>https://example.com/2</link>
+  <description>Body two</description>
+</item>
+</channel></rss>"""
 
 
-async def test_rss_missing_binary(monkeypatch):
-    monkeypatch.setattr("omnireach.adapters.rss.shutil.which", lambda n: None)
+def test_is_ready_always_true():
+    assert asyncio.run(RssAdapter().is_ready()) is True
+
+
+def test_search_rejects_non_url():
     with pytest.raises(AdapterUnavailable):
-        await RSSAdapter().search("x")
+        asyncio.run(RssAdapter().search("not a url"))
+
+
+def test_search_parses_feed(tmp_path: Path):
+    feed = tmp_path / "feed.xml"
+    feed.write_text(RSS_FIXTURE)
+    url = f"file://{feed}"
+    out = asyncio.run(RssAdapter().search(url, limit=5))
+    assert len(out) == 2
+    assert out[0].source == "rss"
+    assert out[0].title == "Post One"
+    assert out[0].url == "https://example.com/1"
+    assert out[0].author == "alice@example.com"
+    assert out[0].ts is not None
+    assert out[1].title == "Post Two"
+
+
+def test_search_respects_limit(tmp_path: Path):
+    feed = tmp_path / "feed.xml"
+    feed.write_text(RSS_FIXTURE)
+    out = asyncio.run(RssAdapter().search(f"file://{feed}", limit=1))
+    assert len(out) == 1

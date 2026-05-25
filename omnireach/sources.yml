@@ -1,7 +1,8 @@
 # Source Registry — single source of truth for available sources.
 # Schema:
 #   id: string                         (matches AdapterBase.name)
-#   tier: ready | one_step | heavy     (visualized in `omnireach sources`)
+#   tier: ready | one_step | heavy | booster | wip
+#                                      (visualized in `omnireach sources`)
 #   adapter: python.dotted.path        (importable AdapterBase subclass)
 #   description: human label (zh)
 #   query_hints: [str]                 (router weights these queries toward this source)
@@ -19,18 +20,6 @@
   trust: 0.85
   deps: { auto: [], manual: [] }
 
-- id: web
-  tier: ready
-  adapter: omnireach.adapters.web.WebSearchAdapter
-  description: 全网搜索 (Jina Reader + MCP, 免费)
-  query_hints: []
-  default_in_auto: true
-  trust: 0.70
-  deps:
-    auto:
-      - { kind: pipx, name: agent-reach }
-    manual: []
-
 - id: youtube
   tier: ready
   adapter: omnireach.adapters.youtube.YouTubeAdapter
@@ -38,10 +27,7 @@
   query_hints: [youtube, "video", "视频", "教程"]
   default_in_auto: true
   trust: 0.60
-  deps:
-    auto:
-      - { kind: pipx, name: agent-reach }
-    manual: []
+  deps: { auto: [], manual: [] }
 
 - id: github
   tier: ready
@@ -50,39 +36,32 @@
   query_hints: [github, repo, issue, "源码"]
   default_in_auto: true
   trust: 0.90
-  deps:
-    auto:
-      - { kind: pipx, name: agent-reach }
-    manual: []
+  deps: { auto: [], manual: [] }
 
 - id: rss
   tier: ready
-  adapter: omnireach.adapters.rss.RSSAdapter
+  adapter: omnireach.adapters.rss.RssAdapter
   description: RSS / Atom 源阅读
   query_hints: [rss, atom, feed, "订阅"]
   default_in_auto: false
   trust: 0.75
-  deps:
-    auto:
-      - { kind: pipx, name: agent-reach }
-    manual: []
+  deps: { auto: [], manual: [] }
 
 - id: wechat
-  tier: ready
+  tier: wip
   adapter: omnireach.adapters.wechat.WeChatAdapter
-  description: 微信公众号文章搜索 (全文 Markdown)
+  description: 微信公众号文章搜索 (全文 Markdown) (v0.6 重写中)
   query_hints: ["微信", "公众号", wechat]
-  default_in_auto: true
+  default_in_auto: false
   trust: 0.55
   deps:
-    auto:
-      - { kind: pipx, name: agent-reach }
+    auto: []
     manual: []
 
 - id: bilibili
-  tier: ready
+  tier: wip
   adapter: omnireach.adapters.bilibili.BilibiliAdapter
-  description: B站视频搜索 + 字幕 (海外/服务器需配代理)
+  description: B站视频搜索 + 字幕 (海外/服务器需配代理) (v0.6 重写中)
   query_hints: ["bilibili", "b站", "哔哩"]
   # default_in_auto is false: 7 sources default_in_auto > MAX_SOURCES=5,
   # so bilibili was silently dropped from auto fanout. Honest default —
@@ -91,8 +70,7 @@
   default_in_auto: false
   trust: 0.55
   deps:
-    auto:
-      - { kind: pipx, name: agent-reach }
+    auto: []
     manual: []
 
 - id: reddit
@@ -109,7 +87,6 @@
   trust: 0.70
   deps:
     auto:
-      - { kind: pipx, name: agent-reach }
       - { kind: npm, name: rdt-cli }
     manual:
       - { step: "在浏览器完成 Reddit OAuth — 运行 `rdt login` 并按提示授权" }
@@ -180,3 +157,16 @@
     manual:
       - step: "去 https://perplexity.ai/settings/api 注册并复制 Key"
         verify: "echo $PERPLEXITY_API_KEY 非空"
+
+- id: exa
+  tier: booster
+  adapter: omnireach.adapters.exa.ExaAdapter
+  description: Exa Search API (付费, web search)
+  query_hints: []
+  default_in_auto: true
+  trust: 0.85
+  deps:
+    auto: []
+    manual:
+      - step: "去 https://exa.ai 注册并复制 API Key"
+        verify: "echo $EXA_API_KEY 非空"

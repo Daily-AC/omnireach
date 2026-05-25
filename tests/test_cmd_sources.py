@@ -7,7 +7,7 @@ def test_sources_lists_all_registered():
     runner = CliRunner()
     res = runner.invoke(main, ["sources"])
     assert res.exit_code == 0
-    for sid in ["hackernews", "web", "youtube", "github", "rss", "wechat", "bilibili"]:
+    for sid in ["hackernews", "youtube", "github", "rss", "wechat", "bilibili"]:
         assert sid in res.output
 
 
@@ -33,3 +33,14 @@ def test_sources_command_shows_booster_section(monkeypatch):
     assert "tavily" in out
     assert "已配" in out
     assert "未配" in out
+
+
+def test_sources_command_shows_wip_section():
+    from click.testing import CliRunner
+    from omnireach.cli import main
+    runner = CliRunner()
+    result = runner.invoke(main, ["sources"])
+    assert result.exit_code == 0
+    assert "🚧" in result.output or "v0.6" in result.output
+    assert "wechat" in result.output
+    assert "bilibili" in result.output

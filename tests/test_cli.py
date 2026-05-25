@@ -47,8 +47,8 @@ def test_cli_search_skips_broken_adapter(monkeypatch):
     original_load = reg_mod.SourceSpec.load_adapter_class
 
     def maybe_broken(self):
-        if self.id == "web":
-            raise ModuleNotFoundError("omnireach.adapters.web")
+        if self.id == "github":
+            raise ModuleNotFoundError("omnireach.adapters.github")
         return original_load(self)
 
     monkeypatch.setattr(reg_mod.SourceSpec, "load_adapter_class", maybe_broken)
@@ -72,15 +72,15 @@ def test_cli_search_skips_broken_adapter(monkeypatch):
     monkeypatch.setattr(hn.HackerNewsAdapter, "search", fake_search)
 
     runner = CliRunner()
-    res = runner.invoke(main, ["search", "--on", "web,hackernews", "--json", "claude"])
+    res = runner.invoke(main, ["search", "--on", "github,hackernews", "--json", "claude"])
     assert res.exit_code == 0, res.output
     # Warning text appears on stderr (not stdout, because --json is on stdout)
-    assert "skip web" in res.stderr
+    assert "skip github" in res.stderr
     import json as _json
     parsed = _json.loads(res.stdout)
     assert parsed["query"] == "claude"
-    # web was skipped, only hackernews ran
-    assert all(r["source"] != "web" for r in parsed["results"])
+    # github was skipped, only hackernews ran
+    assert all(r["source"] != "github" for r in parsed["results"])
 
 
 def test_cli_search_warns_on_unknown_on_source(monkeypatch):
@@ -118,13 +118,15 @@ def test_search_includes_active_booster_in_fanout(monkeypatch):
     monkeypatch.setenv("TAVILY_API_KEY", "tvly-x")
     monkeypatch.delenv("BRAVE_API_KEY", raising=False)
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
+    monkeypatch.delenv("EXA_API_KEY", raising=False)
     reg = load_registry()
     # Simulate router returning 5 non-booster sources
-    base = ["hackernews", "web", "youtube", "github", "rss"]
+    base = ["hackernews", "youtube", "github", "rss"]
     out = _augment_with_active_boosters(base, reg, explicit_sources=None)
     assert "tavily" in out
     assert "brave" not in out
     assert "perplexity" not in out
+    assert "exa" not in out
     # Existing entries preserved
     for s in base:
         assert s in out
@@ -138,3 +140,16 @@ def test_search_does_not_augment_when_explicit_on(monkeypatch):
     reg = load_registry()
     out = _augment_with_active_boosters(["hackernews"], reg, explicit_sources=["hackernews"])
     assert out == ["hackernews"]
+
+
+def test_search_augment_includes_exa(monkeypatch):
+    from omnireach.cli import _augment_with_active_boosters
+    from omnireach.registry import load_registry
+
+    monkeypatch.setenv("EXA_API_KEY", "exa-x")
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.delenv("BRAVE_API_KEY", raising=False)
+    monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
+    reg = load_registry()
+    out = _augment_with_active_boosters(["hackernews"], reg, explicit_sources=None)
+    assert "exa" in out
