@@ -57,7 +57,7 @@
 
 - id: rss
   tier: ready
-  adapter: omnireach.adapters.rss.RSSAdapter
+  adapter: omnireach.adapters.rss.RssAdapter
   description: RSS / Atom 源阅读
   query_hints: [rss, atom, feed, "订阅"]
   default_in_auto: false
