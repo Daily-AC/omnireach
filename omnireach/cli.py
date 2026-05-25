@@ -32,6 +32,7 @@ _BOOSTER_KEY_ENV = {
     "tavily": "TAVILY_API_KEY",
     "brave": "BRAVE_API_KEY",
     "perplexity": "PERPLEXITY_API_KEY",
+    "exa": "EXA_API_KEY",
 }
 
 
