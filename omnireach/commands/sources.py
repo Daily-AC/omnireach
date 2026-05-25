@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import click
 from rich.console import Console
@@ -13,7 +14,27 @@ from omnireach.registry import load_registry
 
 console = Console()
 
-TIER_ICON = {"ready": "✅", "one_step": "🟡", "heavy": "🔴"}
+TIER_ICON = {"ready": "✅", "one_step": "🟡", "heavy": "🔴", "booster": "💎"}
+TIER_LABEL = {
+    "ready": "ready",
+    "one_step": "one_step",
+    "heavy": "heavy",
+    "booster": "付费增强",
+}
+
+BOOSTER_KEY_ENV = {
+    "tavily": "TAVILY_API_KEY",
+    "brave": "BRAVE_API_KEY",
+    "perplexity": "PERPLEXITY_API_KEY",
+}
+
+
+def _booster_key_status(source_id: str) -> str:
+    """Return ' (✓ 已配)' if the booster env var is set, else ' (未配)'."""
+    env_var = BOOSTER_KEY_ENV.get(source_id)
+    if env_var and os.environ.get(env_var):
+        return " (✓ 已配)"
+    return " (未配)"
 
 
 @click.command("sources")
@@ -27,21 +48,25 @@ def sources_cmd(probe: bool) -> None:
         for s in asyncio.run(run_doctor()):
             statuses[s.source] = s.ok
 
-    by_tier: dict[str, list] = {"ready": [], "one_step": [], "heavy": []}
+    by_tier: dict[str, list] = {"ready": [], "one_step": [], "heavy": [], "booster": []}
     for s in reg.sources:
         by_tier.setdefault(s.tier, []).append(s)
 
-    for tier in ["ready", "one_step", "heavy"]:
+    for tier in ["ready", "one_step", "heavy", "booster"]:
         items = by_tier.get(tier, [])
         if not items:
             continue
-        table = Table(title=f"{TIER_ICON[tier]} {tier} ({len(items)})", show_lines=False)
+        label = TIER_LABEL.get(tier, tier)
+        table = Table(title=f"{TIER_ICON[tier]} {label} ({len(items)})", show_lines=False)
         table.add_column("id", style="cyan")
         table.add_column("描述")
         if probe:
             table.add_column("probe")
         for s in items:
-            row = [s.id, s.description]
+            sid = s.id
+            if tier == "booster":
+                sid = f"{s.id}{_booster_key_status(s.id)}"
+            row = [sid, s.description]
             if probe:
                 row.append("✅" if statuses.get(s.id) else "❌")
             table.add_row(*row)

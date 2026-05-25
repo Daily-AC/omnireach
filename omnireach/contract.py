@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,6 +30,8 @@ class SearchResult(BaseModel):
     score: float = Field(default=0.0, ge=0.0, le=1.0)
     engagement: Engagement | None = None
     raw: dict[str, Any] = Field(default_factory=dict)
+    cost: Literal["free", "paid"] = "free"
+    raw_score: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class SourceError(BaseModel):

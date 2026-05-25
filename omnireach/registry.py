@@ -22,11 +22,12 @@ class Dep:
 @dataclass
 class SourceSpec:
     id: str
-    tier: str  # ready | one_step | heavy
+    tier: str  # ready | one_step | heavy | booster
     adapter: str  # dotted import path
     description: str
     query_hints: list[str] = field(default_factory=list)
     default_in_auto: bool = False
+    trust: float = 0.7
     deps_auto: list[Dep] = field(default_factory=list)
     deps_manual: list[Dep] = field(default_factory=list)
 
@@ -71,6 +72,7 @@ def load_registry(path: Path | None = None) -> Registry:
             description=entry["description"],
             query_hints=entry.get("query_hints", []),
             default_in_auto=entry.get("default_in_auto", False),
+            trust=entry.get("trust", 0.7),
             deps_auto=[Dep(**d) for d in (deps.get("auto") or [])],
             deps_manual=[Dep(**d) for d in (deps.get("manual") or [])],
         )
