@@ -13,7 +13,7 @@ REGISTRY_PATH = Path(__file__).parent / "sources.yml"
 
 @dataclass
 class Dep:
-    kind: str
+    kind: str = ""
     name: str = ""
     step: str = ""
     verify: str = ""

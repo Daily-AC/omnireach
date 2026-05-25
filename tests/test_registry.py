@@ -1,6 +1,6 @@
 import pytest
 
-from omnireach.registry import Registry, SourceSpec, load_registry
+from omnireach.registry import load_registry
 
 
 def test_load_registry_returns_all_sources():
@@ -10,7 +10,7 @@ def test_load_registry_returns_all_sources():
     assert "web" in ids
     assert "wechat" in ids
     assert "bilibili" in ids
-    assert len(reg.sources) >= 7
+    assert len(reg.sources) == 7
 
 
 def test_get_by_id():
