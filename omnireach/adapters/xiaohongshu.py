@@ -15,6 +15,16 @@ from omnireach.adapters.base import AdapterBase, AdapterUnavailable
 from omnireach.contract import Engagement, SearchResult
 
 
+def _parse_likes(v: object) -> int | None:
+    """OpenCLI returns likes as a string ('102', '1593'). Parse to int or None."""
+    if v is None:
+        return None
+    try:
+        return int(str(v))
+    except (TypeError, ValueError):
+        return None
+
+
 class XiaohongshuAdapter(AdapterBase):
     name = "xiaohongshu"
     requires = ["opencli"]
@@ -45,6 +55,10 @@ class XiaohongshuAdapter(AdapterBase):
         # opencli v1.7.22 returns a JSON array directly. Older shapes used {"results": [...]}.
         items = data if isinstance(data, list) else data.get("results", [])
 
+        # OpenCLI xhs search keys observed (v0.8.1 hotfix, real E2E 2026-05-27):
+        # rank, author, author_url, likes(string), title, url, published_at.
+        # body / comment_count / collect_count are NOT exposed in search results,
+        # so content stays "" and comments/shares stay None.
         results: list[SearchResult] = []
         for item in items[:limit]:
             results.append(
@@ -58,9 +72,7 @@ class XiaohongshuAdapter(AdapterBase):
                     ts=item.get("published_at"),
                     score=0.5,
                     engagement=Engagement(
-                        likes=item.get("like_count"),
-                        comments=item.get("comment_count"),
-                        shares=item.get("collect_count"),
+                        likes=_parse_likes(item.get("likes")),
                     ),
                     raw=item,
                 )
