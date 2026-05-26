@@ -57,10 +57,10 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - 不要在 omnireach 里塞 `download` / `parse` / `fetch-content` 子命令
 - 不要在 omnireach adapter 里跑 LLM call 做 summary (会引入 LLM 依赖, 让工具变"小 Agent")
 - 视频源 (youtube / bilibili / tiktok / douyin) 只返 metadata, **不抓视频直链 mp4 CDN**
-- 长文本源 (wechat / xhs / exa / tavily) content 字段应截到 ~500 字 snippet, 全文留给 omnifetch
+- 长文本源 (wechat / xhs / exa / tavily) content 字段应截到 ~500 字 snippet (v0.8 起由 `SearchResult` validator 强制), 全文保留在 `result.raw` 中, Agent 按需取用; 真要 omnifetch 才能拿的是 omnireach 本来就没全文的场景 (HN/GH/Twitter thread 等)
 - 用户问"加 X 功能"时, 先判断 X 属于 search / fetch / parse 哪层, 不属于 search 就拒绝并指向未来 sister repo
 
-**当前违规** (v0.7.2 现状, v0.8 要 fix): wechat / xiaohongshu / exa / tavily 4 个 adapter 的 `content` 字段塞了**整篇全文**, 不是 SERP snippet。v0.8 用粗暴截断 (不跑 LLM) 修这个。
+**~~当前违规~~已修** (v0.8 修复): 4 个长文本源 (wechat/xiaohongshu/exa/tavily) 在 `SearchResult.content` 上的全文塞入由 contract 层 `field_validator` 截到 500 字 + "…"; 全文保留在 `result.raw` 中。见 `docs/superpowers/specs/2026-05-27-omnireach-v0.8-design.md`。
 
 **为什么 v0.8 不抄 Claude Code 的 LLM-summarized snippet**: Claude Code 用 sub-LLM (Haiku) 压缩 snippet 是因为 user-facing 直接看; omnireach 用户 = Agent (本身就是 LLM), 拿到截断 raw 自己能消化, 不需要 omnireach 替它压缩。抄了反而让 omnireach 从"纯多源汇聚 + 零 LLM 依赖"变成"小 Agent + LLM key 必需", 边界模糊化。
 
@@ -82,6 +82,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `v0.7.0-alpha` (2026-05-26): **tiktok** (🔴 heavy) — TikTok 国际版视频搜索, 走 OpenCLI 登录态 Chrome, pattern 同 twitter/xiaohongshu。204 tests。PR #13
 - `v0.7.1-alpha` (2026-05-26): **hotfix tiktok 字段映射** — engagement 字段名是猜的, 真实 opencli output 是 plays/likes/comments/shares 而非 play_count/digg_count 等, 用户拿到的 engagement 全 None。E2E 修正后实测 likes=1291/views=24500。PR #14
 - `v0.7.2-alpha` (2026-05-26): **douyin via OpenCLI fork** — 不等上游, omnireach 切到 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)。OpenCLI 系 4 源全切 fork; 上游 merge 后切回, adapter 不动。`plays/comments/shares` zero→None normalize (DOM 卡片只暴露 likes)。E2E 实测 likes=40000。PR #15, **closes issue #12**。209 tests
+- `v0.8.0-alpha` (2026-05-27): **架构修复** — `SearchResult.content` 在 contract 层 (pydantic `field_validator`) 强制截到 500 字 + "…"; 全文保留在 `result.raw` (4 个长文本源 wechat/xhs/exa/tavily 上游 payload 本就存了)。零 adapter 改动, 单一实现点防未来 adapter 漂移。218 tests。PR #18
 
 ## v0.7 后续 (开着的)
 
@@ -90,7 +91,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 
 ## v0.8 候选
 
-- 4 个长文本源 content 字段截断到 ~500 字 snippet (修架构违规, 见上方边界决策)
+- ~~4 个长文本源 content 字段截断到 ~500 字 snippet~~ ✅ done in v0.8.0-alpha
 - 跨平台 setup wizard (gh on Linux/Windows)
 - usage tracking + monthly budget cap for boosters
 - xhs-cli 替换 OpenCLI 小红书路径 (agent-reach references 推荐 xhs)
@@ -110,8 +111,9 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 ## 关键文档 (绝对路径)
 
 - 设计 spec: `docs/superpowers/specs/2026-05-25-omnireach-design.md` (甲方决策全锁在 §3)
-- 历史 plans: `docs/superpowers/plans/2026-05-25-omnireach-v0.{1,2,3,4}.md` + `2026-05-26-omnireach-v0.{5,6}.md`
+- 历史 plans: `docs/superpowers/plans/2026-05-25-omnireach-v0.{1,2,3,4}.md` + `2026-05-26-omnireach-v0.{5,6}.md` + `2026-05-27-omnireach-v0.8.md`
 - v0.6 retrospective: `docs/retrospectives/2026-05-26-v0.3-v0.5-lessons.md`
+- v0.8 spec: `docs/superpowers/specs/2026-05-27-omnireach-v0.8-design.md`
 - 2026-05-26 session handoff: `docs/handoff/2026-05-26-session-handoff.md`
 - README: `README.md`
 

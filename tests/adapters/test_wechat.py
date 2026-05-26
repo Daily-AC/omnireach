@@ -61,3 +61,22 @@ def test_search_raises_without_key(monkeypatch):
     monkeypatch.delenv("EXA_API_KEY", raising=False)
     with pytest.raises(AdapterUnavailable):
         asyncio.run(WeChatAdapter().search("q"))
+
+
+def test_search_truncates_content_but_preserves_full_in_raw(monkeypatch):
+    """v0.8: contract validator truncates content to 500 + '…'; raw['text'] keeps full."""
+    monkeypatch.setenv("EXA_API_KEY", "exa-x")
+    long_text = "啊" * 1200
+    payload = {"results": [
+        {"title": "长文公众号", "url": "https://mp.weixin.qq.com/s/long",
+         "publishedDate": "2026-05-22T10:00:00Z", "text": long_text}
+    ]}
+    real_client = httpx.AsyncClient(transport=_mock_transport(200, payload))
+    with patch("omnireach.adapters.wechat.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value.__aenter__.return_value = real_client
+        out = asyncio.run(WeChatAdapter().search("q", limit=5))
+    assert len(out) == 1
+    assert out[0].content == "啊" * 500 + "…"
+    assert len(out[0].content) == 501
+    assert out[0].raw["text"] == long_text
+    assert len(out[0].raw["text"]) == 1200

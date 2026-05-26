@@ -74,3 +74,22 @@ def test_search_raises_without_key(monkeypatch):
     a = TavilyAdapter()
     with pytest.raises(AdapterUnavailable):
         asyncio.run(a.search("q"))
+
+
+def test_search_truncates_content_but_preserves_full_in_raw(monkeypatch):
+    """v0.8: long Tavily content gets truncated, full kept in raw['content']."""
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-x")
+    long_text = "b" * 900
+    payload = {"results": [
+        {"title": "Long", "url": "https://e/long",
+         "content": long_text, "published_date": "2026-05-20T10:00:00Z"}
+    ]}
+    real_client = httpx.AsyncClient(transport=_mock_transport(200, payload))
+    with patch("omnireach.adapters.tavily.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value.__aenter__.return_value = real_client
+        out = asyncio.run(TavilyAdapter().search("q", limit=5))
+    assert len(out) == 1
+    assert out[0].content == "b" * 500 + "…"
+    assert len(out[0].content) == 501
+    assert out[0].raw["content"] == long_text
+    assert len(out[0].raw["content"]) == 900

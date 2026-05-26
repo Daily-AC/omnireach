@@ -146,6 +146,46 @@ omnireach setup exa          # v0.5 新增 (替代旧 web 源)
 
 要禁用：编辑 `~/.omnireach/preferences.toml` 设 `[boosters] auto_enable = false`。
 
+## 📄 如何取全文 (v0.8)
+
+omnireach 是 search 层, `content` 字段始终是 SERP snippet (≤ 500 字 + `…`)。这是有意为之 —— 全文留给未来 `omnifetch` 层处理 (见上方 [关于命名](#关于命名-omnireach-是工具集-suite-不是单一工具))。
+
+但对于 wechat / xiaohongshu / exa / tavily 这 4 个上游本身就返全文的源, **完整原始 payload 保留在 `result.raw` 字典里**, Agent 想要全文时直接取:
+
+```python
+# Python (调用 CLI + 解析 JSON envelope)
+import json
+import subprocess
+
+out = subprocess.run(
+    ["omnireach", "search", "--json", "--on", "wechat", "claude 4.7"],
+    check=True, capture_output=True, text=True,
+)
+env = json.loads(out.stdout)
+snippet = env["results"][0]["content"]        # 500 字 + "…"
+full    = env["results"][0]["raw"]["text"]    # Exa/wechat 全文
+# xiaohongshu / tavily 对应 raw["content"]
+```
+
+```bash
+# CLI + jq
+omnireach search --json --on tavily "claude 4.7" | \
+  jq '.results[] | {title, snippet: .content, full: .raw.content}'
+```
+
+字段对应表:
+
+| 源 | `result.content` | `result.raw[...]` 取全文 |
+|---|---|---|
+| wechat | snippet | `raw["text"]` |
+| exa | snippet | `raw["text"]` |
+| xiaohongshu | snippet | `raw["content"]` |
+| tavily | snippet | `raw["content"]` |
+
+`raw[...]` 的具体 key 名跟上游 API schema 直接对应 (Exa/wechat 是 `text`, Tavily/xhs 是 `content`)，上游若改 schema 这里也得跟着调；如果担心可以先 `print(result.raw.keys())` 探一下。
+
+其他源 (HN / GitHub / RSS / YouTube / 等) 的 content 本身就 < 500 字, 不会被截断, 也不需要 raw 兜底。
+
 ## ⚙️ 用户偏好 (v0.4)
 
 `~/.omnireach/preferences.toml` 可配置默认源、语言、输出格式、source_trust 覆盖。
