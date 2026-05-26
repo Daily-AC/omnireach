@@ -1,0 +1,65 @@
+name: 🔌 新源请求
+description: 希望 omnireach 接入一个新的搜索源 (新平台 / 新 booster)。
+title: "[source] 加 <平台名> 支持"
+labels: ["source-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        omnireach 的设计是 umbrella + 适配器壳: 我们不重做爬虫,
+        每个源依赖一个真实的上游 (CLI binary / API / MCP / 浏览器 bridge)。
+        所以加新源最快的路径是: **你已经知道一个能 work 的上游**。
+
+  - type: input
+    id: platform
+    attributes:
+      label: 平台名称
+      placeholder: 例如 Discord / Mastodon / LinkedIn / 抖音 / 雪球
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 你想搜什么 / 为啥这个源重要
+      description: 一两段够; 帮我们决定优先级 + 评估 trust 分
+    validations:
+      required: true
+
+  - type: dropdown
+    id: upstream_kind
+    attributes:
+      label: 上游类型 (你了解的)
+      options:
+        - 公开 HTTP / JSON API (理想, 直接 httpx)
+        - CLI binary (类似 yt-dlp / gh / rdt-cli)
+        - 付费 API + Key (类似 Tavily / Exa booster)
+        - 需要登录态 + 浏览器 bridge (类似 OpenCLI 路径)
+        - 仅 Exa domain-filtered 能搜 (类似 wechat / bilibili)
+        - 不知道, 求 omnireach 想办法
+    validations:
+      required: true
+
+  - type: input
+    id: upstream_link
+    attributes:
+      label: 上游链接 / 文档
+      description: 命令名 / API 端点 / GitHub repo 链接。没有也行, 但能加快 5 倍速度。
+      placeholder: 例如 https://api.example.com/search 或 github.com/foo/bar
+
+  - type: textarea
+    id: sample_query
+    attributes:
+      label: 一个测试 query 你希望能 work
+      placeholder: 例如 omnireach --on discord search "rust async"
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: 你能贡献代码吗?
+      options:
+        - 可以提 PR 实现 adapter
+        - 可以提 PR 但需要 spec 帮我写
+        - 只能报需求, 等别人写
+    validations:
+      required: true

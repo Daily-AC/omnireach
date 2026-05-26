@@ -1,0 +1,40 @@
+name: ✨ 功能 / UX 建议
+description: 不是 bug、不是加新源, 是其他改进 (CLI 行为、输出格式、性能、文档...)。
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你遇到什么问题 / 不爽什么
+      description: 先描述痛点而不是解决方案 — 这样我们可能找到更好的解决路径
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: 你想到的解决方案 (可选)
+      description: 不强求, 描述清楚问题已经价值很大
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及哪块
+      multiple: true
+      options:
+        - CLI 命令 / flag 行为
+        - 输出格式 (TTY / JSON)
+        - ranking / 排序 / 评分
+        - 用户偏好 preferences.toml
+        - setup / doctor / init 体验
+        - 安装 / 部署
+        - 文档 / README
+        - Skill 触发 / plugin 集成
+        - 其他
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他 (可选)
+      description: 相关 issue, 参考产品, 用例上下文
