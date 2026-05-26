@@ -22,7 +22,10 @@ async def _search_exa(query: str, *, limit: int) -> list[SearchResult]:
     if not key:
         raise AdapterUnavailable("bilibili:exa", "EXA_API_KEY 未设置", hint="omnireach setup bilibili")
     headers = {"x-api-key": key, "Content-Type": "application/json"}
-    body = {"query": query, "numResults": limit, "type": "auto", "includeDomains": DOMAINS}
+    # v0.9.1: see exa.py for rationale on contents.text.maxCharacters=2000.
+    body = {"query": query, "numResults": limit, "type": "auto",
+            "includeDomains": DOMAINS,
+            "contents": {"text": {"maxCharacters": 2000}}}
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             resp = await client.post(EXA_URL, json=body, headers=headers)

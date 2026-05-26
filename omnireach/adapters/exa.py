@@ -24,7 +24,13 @@ class ExaAdapter(AdapterBase):
         if not key:
             raise AdapterUnavailable("exa", "EXA_API_KEY 未设置", hint="omnireach setup exa")
         headers = {"x-api-key": key, "Content-Type": "application/json"}
-        body = {"query": query, "numResults": limit, "type": "auto"}
+        # v0.9.1: ask for text content explicitly. Without `contents`, Exa
+        # returns metadata only and result.content stays "" (silently broken
+        # since v0.5). maxCharacters=2000 caps per-result text to ~4× the
+        # SearchResult snippet limit, avoiding envelope-size blow-up on
+        # multi-result queries while giving downstream enough material.
+        body = {"query": query, "numResults": limit, "type": "auto",
+                "contents": {"text": {"maxCharacters": 2000}}}
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
                 resp = await client.post(EXA_URL, json=body, headers=headers)
