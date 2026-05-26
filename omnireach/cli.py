@@ -132,7 +132,17 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
 @main.command("doctor")
 def doctor_cmd() -> None:
     """检查每个源的就绪状态."""
+    import platform
+    import sys
+
     from omnireach.doctor import run_doctor
+
+    # Platform info — useful for bug reports and Windows debugging
+    plat = f"{platform.system()} {platform.release()} ({platform.machine()})"
+    pyver = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    console.print(
+        f"[dim]omnireach {__version__} · {pyver} · {plat}[/dim]"
+    )
 
     statuses = asyncio.run(run_doctor())
     table = Table(title="omnireach doctor")
