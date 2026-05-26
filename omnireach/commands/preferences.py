@@ -32,14 +32,32 @@ def _show() -> None:
     click.echo(json.dumps(p.model_dump(), indent=2, ensure_ascii=False))
 
 
+def _default_editor() -> str | None:
+    """Resolve a sensible editor: $EDITOR → platform default."""
+    env_editor = os.environ.get("EDITOR")
+    if env_editor:
+        return env_editor
+    if os.name == "nt":
+        # Windows: notepad is always present; fallback notepad++ if installed
+        for candidate in ("notepad++", "notepad.exe", "notepad"):
+            if shutil.which(candidate):
+                return candidate
+        return "notepad"  # always exists on Windows even if not on PATH lookup
+    # POSIX
+    for candidate in ("nano", "vim", "vi"):
+        if shutil.which(candidate):
+            return candidate
+    return None
+
+
 @preferences_cmd.command("edit")
 def _edit() -> None:
     path = preferences_path()
     if not path.exists():
         write_default_preferences(path)
-    editor = os.environ.get("EDITOR") or ("vi" if shutil.which("vi") else "")
+    editor = _default_editor()
     if not editor:
-        click.echo("没有 $EDITOR 也没有 vi，直接编辑文件吧:", err=True)
+        click.echo("找不到 $EDITOR / vi / nano / notepad，直接编辑文件吧:", err=True)
         click.echo(str(path), err=True)
         return
     subprocess.call([editor, str(path)])

@@ -102,6 +102,17 @@ agent-reach install --channels youtube,github,reddit
 
 Agent-Reach 是上游 installer/doctor 工具, 完全可选 — omnireach 自己 doctor/search 都不依赖它。
 
+## 🪟 平台支持
+
+| 平台 | 状态 | 说明 |
+|---|---|---|
+| macOS | ✅ 主要开发平台 | 全部源测试过 (HN/RSS/youtube/github/reddit/twitter/xhs + 4 booster + wechat/bilibili) |
+| Linux | 🟡 best-effort | 应能 work；setup 流程对 `apt`/`pacman` 不自动 |
+| WSL2 | 🟡 best-effort | 跟 Linux 一样 |
+| Windows (原生 PowerShell) | 🟡 实验性 (v0.6.3+) | 代码已 macOS-假设解耦：secrets.env 不再调 POSIX chmod；preferences edit fallback notepad；setup github 提示加 `winget install GitHub.cli`；OpenCLI 类源 (twitter/xhs) 跨平台理论可用但未实测。**遇到问题请提 issue**。 |
+
+跑 `omnireach doctor` 会在顶部打印一行 platform / Python 版本，方便提 issue 时附上。
+
 ## 💎 付费 booster (v0.4)
 
 omnireach 默认完全免费。如果你愿意配置付费 API Key，结果质量会更高：
