@@ -54,10 +54,25 @@ def test_registry_loads_trust_field():
 
 
 def test_registry_loads_booster_tier():
+    """v0.9: wechat/bilibili promoted from booster → ready (have free fallbacks now)."""
     from omnireach.registry import load_registry
     reg = load_registry()
     boosters = [s for s in reg.sources if s.tier == "booster"]
-    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity", "exa", "wechat", "bilibili"}
+    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity", "exa"}
+
+
+def test_registry_enhanced_with_field_populated_for_dual_backend_sources():
+    """v0.9: wechat/bilibili have free defaults + EXA_API_KEY enhanced backend."""
+    from omnireach.registry import load_registry
+    reg = load_registry()
+    by_id = {s.id: s for s in reg.sources}
+    assert by_id["wechat"].tier == "ready"
+    assert by_id["wechat"].enhanced_with == "EXA_API_KEY"
+    assert by_id["bilibili"].tier == "ready"
+    assert by_id["bilibili"].enhanced_with == "EXA_API_KEY"
+    # Sources without enhancement field stay None
+    assert by_id["hackernews"].enhanced_with is None
+    assert by_id["exa"].enhanced_with is None
 
 
 def test_registry_includes_wip_tier():
