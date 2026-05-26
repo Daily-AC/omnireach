@@ -3,23 +3,27 @@ import json
 import pytest
 
 from omnireach.adapters.base import AdapterUnavailable
-from omnireach.adapters.xiaohongshu import XiaohongshuAdapter
+from omnireach.adapters.xiaohongshu import XiaohongshuAdapter, _parse_likes
 
 
-async def test_xhs_search_parses_opencli_json_array(monkeypatch):
-    """v0.5.2 hotfix: opencli v1.7.22 returns a JSON ARRAY, not a dict."""
-    fake = json.dumps([
-        {
-            "title": "Claude 4.7 上手 5 分钟入门",
-            "url": "https://xiaohongshu.com/discovery/item/abc",
-            "author": "AI小白",
-            "content": "今天试了一下 Claude 4.7 …",
-            "published_at": "2026-05-21T08:00:00Z",
-            "like_count": 4200,
-            "comment_count": 87,
-            "collect_count": 256,
-        }
-    ])
+# OpenCLI v1.7.22+ xhs search keys (real E2E observed 2026-05-27, v0.8.1 hotfix):
+# rank (int), author (str), author_url (str), likes (str like "102"),
+# title (str), url (str), published_at (str like "2026-04-30").
+# body / comment_count / collect_count are NOT exposed — content stays "".
+_REAL_OPENCLI_ITEM = {
+    "rank": 1,
+    "author": "AI小白",
+    "author_url": "https://www.xiaohongshu.com/user/profile/abc",
+    "likes": "4200",
+    "title": "Claude 4.7 上手 5 分钟入门",
+    "url": "https://xiaohongshu.com/discovery/item/abc",
+    "published_at": "2026-05-21",
+}
+
+
+async def test_xhs_search_parses_real_opencli_shape(monkeypatch):
+    """v0.8.1 hotfix: adapter maps real OpenCLI search-result keys."""
+    fake = json.dumps([_REAL_OPENCLI_ITEM])
 
     async def fake_exec(*args, **kwargs):
         class P:
@@ -36,27 +40,21 @@ async def test_xhs_search_parses_opencli_json_array(monkeypatch):
     out = await XiaohongshuAdapter().search("claude", limit=3)
     assert len(out) == 1
     assert out[0].source == "xiaohongshu"
+    assert out[0].title == "Claude 4.7 上手 5 分钟入门"
     assert out[0].author == "AI小白"
+    assert out[0].ts == "2026-05-21"
+    # likes is a string in real OpenCLI output → parsed to int by adapter
     assert out[0].engagement.likes == 4200
-    assert out[0].engagement.comments == 87
-    assert out[0].engagement.shares == 256
+    # OpenCLI doesn't expose comments/shares in search results
+    assert out[0].engagement.comments is None
+    assert out[0].engagement.shares is None
+    # OpenCLI doesn't return post body either → content stays ""
+    assert out[0].content == ""
 
 
 async def test_xhs_search_back_compat_dict_response(monkeypatch):
-    """Defensive: if opencli ever returns the old {"results": [...]} dict, still works."""
-    fake = json.dumps({
-        "results": [
-            {
-                "title": "hi",
-                "url": "https://xiaohongshu.com/x",
-                "author": "u",
-                "content": "...",
-                "like_count": 1,
-                "comment_count": 0,
-                "collect_count": 0,
-            }
-        ]
-    })
+    """Defensive: if opencli ever returns the old {"results": [...]} dict shape, still parses."""
+    fake = json.dumps({"results": [_REAL_OPENCLI_ITEM]})
 
     async def fake_exec(*args, **kwargs):
         class P:
@@ -72,7 +70,7 @@ async def test_xhs_search_back_compat_dict_response(monkeypatch):
 
     out = await XiaohongshuAdapter().search("hi")
     assert len(out) == 1
-    assert out[0].author == "u"
+    assert out[0].author == "AI小白"
 
 
 async def test_xhs_search_invokes_opencli_with_format_json(monkeypatch):
@@ -120,37 +118,11 @@ async def test_xhs_is_ready_requires_opencli(monkeypatch):
     assert await XiaohongshuAdapter().is_ready() is False
 
 
-async def test_xhs_truncates_content_but_preserves_full_in_raw(monkeypatch):
-    """v0.8: long xhs post body gets truncated in content, full kept in raw."""
-    long_body = "种" * 1500
-    fake = json.dumps([
-        {
-            "title": "长种草笔记",
-            "url": "https://xiaohongshu.com/discovery/item/long",
-            "author": "AI小白",
-            "content": long_body,
-            "published_at": "2026-05-21T08:00:00Z",
-            "like_count": 1,
-            "comment_count": 0,
-            "collect_count": 0,
-        }
-    ])
-
-    async def fake_exec(*args, **kwargs):
-        class P:
-            returncode = 0
-
-            async def communicate(self):
-                return (fake.encode(), b"")
-
-        return P()
-
-    monkeypatch.setattr("omnireach.adapters.xiaohongshu.asyncio.create_subprocess_exec", fake_exec)
-    monkeypatch.setattr("omnireach.adapters.xiaohongshu.shutil.which", lambda n: "/usr/bin/" + n)
-
-    out = await XiaohongshuAdapter().search("q")
-    assert len(out) == 1
-    assert out[0].content == "种" * 500 + "…"
-    assert len(out[0].content) == 501
-    assert out[0].raw["content"] == long_body
-    assert len(out[0].raw["content"]) == 1500
+def test_parse_likes_handles_string_int_none_and_garbage():
+    """v0.8.1: OpenCLI returns likes as a string; helper coerces or returns None."""
+    assert _parse_likes("102") == 102
+    assert _parse_likes("0") == 0
+    assert _parse_likes(4200) == 4200
+    assert _parse_likes(None) is None
+    assert _parse_likes("1.2k") is None  # non-numeric string → None, not raise
+    assert _parse_likes("") is None
