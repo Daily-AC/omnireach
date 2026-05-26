@@ -174,7 +174,10 @@ def test_tty_skips_unavailable_errors_and_prints_footer(monkeypatch):
     from click.testing import CliRunner
     from omnireach.cli import main
 
-    # Strip everything except HN — opencli is installed on dev machines, neuter it
+    # v0.9.2: cli auto-emits JSON when stdout is non-TTY. CliRunner's stdout
+    # is BytesIO so we'd hit the JSON branch — force the TTY-render branch
+    # by overriding _should_emit_json since this test checks rich.Table output.
+    monkeypatch.setattr("omnireach.cli._should_emit_json", lambda flag: flag)
     monkeypatch.setattr("shutil.which", lambda b: None)
     for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):
         monkeypatch.delenv(env, raising=False)
@@ -207,3 +210,54 @@ def test_json_output_keeps_unavailable_errors(monkeypatch):
     data = _json.loads(json_line)
     cats = {e["category"] for e in data.get("errors", [])}
     assert "unavailable" in cats
+
+
+def test_v092_search_auto_json_when_stdout_not_tty(monkeypatch):
+    """v0.9.2: `omnireach search` without --json still emits JSON when stdout
+    is not a TTY (Agent subprocess / pipe). Forces consumers to never have
+    to deal with rich.Table output programmatically."""
+    import json as _json
+    from click.testing import CliRunner
+    from omnireach.cli import main
+
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):
+        monkeypatch.delenv(env, raising=False)
+    runner = CliRunner()  # CliRunner stdout is BytesIO, isatty()=False
+    result = runner.invoke(main, ["search", "--on", "hackernews", "--limit", "1", "claude"])
+    json_line = next((ln for ln in result.output.splitlines() if ln.strip().startswith("{")), None)
+    assert json_line is not None, f"expected JSON in non-TTY output; got: {result.output!r}"
+    data = _json.loads(json_line)
+    assert "query" in data and "results" in data
+
+
+def test_v092_doctor_auto_json_when_stdout_not_tty():
+    """v0.9.2: doctor auto-JSON in non-TTY (same as search)."""
+    import json as _json
+    from click.testing import CliRunner
+    from omnireach.cli import main
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["doctor"])
+    json_line = next((ln for ln in result.output.splitlines() if ln.strip().startswith("{")), None)
+    assert json_line is not None, f"expected JSON; got: {result.output!r}"
+    data = _json.loads(json_line)
+    assert "sources" in data
+    assert "omnireach_version" in data
+    assert isinstance(data["sources"], list) and len(data["sources"]) > 0
+
+
+def test_v092_sources_auto_json_when_stdout_not_tty():
+    """v0.9.2: sources auto-JSON in non-TTY (same as search/doctor)."""
+    import json as _json
+    from click.testing import CliRunner
+    from omnireach.cli import main
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["sources"])
+    json_line = next((ln for ln in result.output.splitlines() if ln.strip().startswith("{")), None)
+    assert json_line is not None
+    data = _json.loads(json_line)
+    assert "sources" in data
+    ids = {s["id"] for s in data["sources"]}
+    assert {"hackernews", "wechat", "bilibili"} <= ids
