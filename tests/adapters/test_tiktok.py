@@ -7,17 +7,21 @@ from omnireach.adapters.tiktok import TikTokAdapter
 
 
 async def test_tiktok_search_parses_opencli_json_array(monkeypatch):
-    """opencli v1.7.22+ returns a JSON ARRAY directly."""
+    """opencli v1.7.22 tiktok search returns: author/desc/url/likes/plays/comments/shares/rank.
+
+    Field shape captured from a real `opencli tiktok search "claude code" --format json`
+    run on 2026-05-26 against opencli v1.7.22.
+    """
     fake = json.dumps([
         {
             "url": "https://www.tiktok.com/@dev/video/7234",
             "desc": "Quick tour of Claude 4.7 — 60 sec demo of the new editor #ai #claude",
             "author": "dev",
-            "created_at": "2026-05-20T03:00:00Z",
-            "play_count": 120000,
-            "digg_count": 8400,
-            "comment_count": 312,
-            "share_count": 540,
+            "plays": 120000,
+            "likes": 8400,
+            "comments": 312,
+            "shares": 540,
+            "rank": 1,
         }
     ])
 
@@ -52,7 +56,7 @@ async def test_tiktok_search_back_compat_dict_response(monkeypatch):
                 "url": "https://www.tiktok.com/@u/video/1",
                 "desc": "hi",
                 "author": "u",
-                "play_count": 10,
+                "plays": 10,
             }
         ]
     })
