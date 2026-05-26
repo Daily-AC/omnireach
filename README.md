@@ -8,6 +8,20 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
 
+## 关于命名: omnireach 是工具集 (suite), 不是单一工具
+
+**omnireach** = `omni` (全部) + `reach` (触达)。完整的"触达全网"语义其实需要三层能力组合, 我们把它拆成三个独立工具:
+
+| 层 | 工具 | 职责 | 状态 |
+|---|---|---|---|
+| **search** | `omnireach` (本仓库) | 全网定位 — 返 metadata + URL, 不取内容 | ✅ v0.7+ 在用 |
+| **fetch** | `omnifetch` | 给定 URL 取全文 markdown | 🔜 未来 sister repo |
+| **parse** | `omniparse` | 视频/音频内容解析 (字幕/STT/逐帧) | 🔜 未来 sister repo |
+
+本仓库的 `omnireach` binary **只负责 search 这一层** — 你拿到 metadata + URL 后, 想要全文请等 `omnifetch`, 想解析视频请等 `omniparse`。三层独立, 各干各的, 组合起来才是完整的"全网触达"。
+
+这样拆是有意为之 (对照 Anthropic Claude 自己的 [WebSearch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search) + [WebFetch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-fetch) 拆分): 每层 do one thing well, 不让 search 工具被解析任务拖累 token 和延迟, 也让 Agent 调用方有自由组合的空间。`omnifetch` / `omniparse` 等到真有用户需求才开 repo (YAGNI), 暂未启动。
+
 ## 为什么需要 omnireach
 
 中转站 (cliproxy / anyrouter / 各种 OpenAI 兼容代理) 让国内同学绕开付费、能调多模型, 但代价是丢掉了 Anthropic 服务端工具, 其中 **WebSearch** 是损失最重的一项:
