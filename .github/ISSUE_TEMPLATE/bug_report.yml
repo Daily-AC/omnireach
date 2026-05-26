@@ -1,0 +1,82 @@
+name: 🐛 Bug 报告
+description: 命令崩了 / 输出不对 / 适配器报错。
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报 bug。先两件事节省双方时间:
+        1. 跑一下 `omnireach check-update` 确保你不是踩在旧版本上的已知坑
+        2. 跑一下 `omnireach doctor` 把输出贴下面 — 90% 的「源不能用」其实是配置 / 上游 binary 没装
+
+  - type: input
+    id: version
+    attributes:
+      label: omnireach 版本
+      description: 跑 `omnireach --version` 拿
+      placeholder: 例如 0.6.1-alpha
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 操作系统
+      placeholder: macOS 15.0 / Ubuntu 24.04 / Windows 11 + WSL2
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: 你跑了什么命令
+      description: 把 `omnireach ...` 那行完整贴进来 (省略敏感 Key)
+      render: shell
+      placeholder: omnireach search "vibe coding" --limit 5
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际输出
+      description: 完整的终端输出 (stdout + stderr 都贴)。如果是 traceback, 不要截断。
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 你期望发生的
+      description: 简短一两句够了
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: `omnireach doctor` 输出
+      description: 把整张表贴进来 (它告诉我们哪些源 / Key / binary 在不在)
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 影响范围
+      options:
+        - 只有这一个源 / 命令
+        - 多个源 / 整体跑不起来
+        - 安装阶段就失败 (uv tool install / pip install)
+        - 不确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他线索 (可选)
+      description: 重现步骤、最近改了什么环境、相关 issue 链接等
