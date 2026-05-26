@@ -26,6 +26,8 @@ from omnireach.secrets_env import load_secrets_env
 _SECRETS_PATH = Path.home() / ".omnireach" / "secrets.env"
 load_secrets_env(_SECRETS_PATH)
 
+ISSUE_URL = "https://github.com/Daily-AC/omnireach/issues/new/choose"
+
 console = Console()
 
 
@@ -118,6 +120,10 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
     unavailable = [e for e in errors if e.category == "unavailable"]
     for err in failed:
         console.print(f"[red]✗ {err.source}: {err.error}[/red]")
+    if failed:
+        console.print(
+            f"[dim]💬 觉得是 bug? 提 issue: {ISSUE_URL}[/dim]"
+        )
     if unavailable:
         n = len(unavailable)
         console.print(f"[dim]ℹ️  {n} 个源未配置 (跑 `omnireach doctor` 查看修复建议)[/dim]")
@@ -147,5 +153,25 @@ main.add_command(sources_cmd)
 main.add_command(preferences_cmd)
 main.add_command(check_update_cmd)
 
+
+def _entrypoint() -> None:
+    """Console-script wrapper that catches unhandled exceptions and points users at issues."""
+    try:
+        main.main(standalone_mode=True)
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        console.print("\n[yellow]中断[/yellow]")
+        raise SystemExit(130)
+    except Exception as exc:  # noqa: BLE001
+        import traceback
+        console.print(f"\n[red]omnireach 内部错误: {exc.__class__.__name__}: {exc}[/red]")
+        console.print("[dim]" + traceback.format_exc() + "[/dim]")
+        console.print(
+            f"\n[bold]💬 请把上面这段 traceback + `omnireach --version` 一起提 issue:[/bold]\n   {ISSUE_URL}"
+        )
+        raise SystemExit(2)
+
+
 if __name__ == "__main__":
-    main()
+    _entrypoint()
