@@ -69,12 +69,15 @@ omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 | reddit | 🟡 one_step | `rdt-cli` + `rdt login` | `omnireach setup reddit` |
 | twitter | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
 | xiaohongshu | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
+| tiktok | 🔴 heavy | OpenCLI + Chrome 扩展 | TikTok 国际版 (v0.7); 抖音见下方 issue #12 |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | 付费 (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | 付费 (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | 付费 (v0.4) |
 | 💎 exa | booster | env `EXA_API_KEY` | 付费 web search (v0.5) |
-| 🚧 wechat | wip | — | v0.6 重写中 |
-| 🚧 bilibili | wip | — | v0.6 重写中 |
+| 💎 wechat | booster | env `EXA_API_KEY` | 微信公众号 (Exa domain-filtered, v0.6) |
+| 💎 bilibili | booster | env `EXA_API_KEY` | B站 (Exa domain-filtered, v0.6) |
+
+> **抖音 (douyin.com)**: 暂未直接支持。OpenCLI 现有 `douyin` adapter 只覆盖创作者后台 (creator.douyin.com)，没有 keyword search。我们正在给 OpenCLI 提 douyin search PR，merge 后会跟进加进来 (issue #12)。要海外短视频可以先用 tiktok。
 
 > v0.4 及之前曾把 `web` 列为零配置, 实际不可用 (v0.1 起就是 architecture bug — 详见 `docs/superpowers/specs/2026-05-26-omnireach-v0.5-design.md`)。v0.5 起 web search 走 💎 exa booster (或任一付费 booster)。
 
