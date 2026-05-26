@@ -153,11 +153,17 @@ omnireach 是 search 层, `content` 字段始终是 SERP snippet (≤ 500 字 + 
 但对于 wechat / xiaohongshu / exa / tavily 这 4 个上游本身就返全文的源, **完整原始 payload 保留在 `result.raw` 字典里**, Agent 想要全文时直接取:
 
 ```python
-# Python (调用方)
-from omnireach.api import search   # 假设你以库方式集成
-env = await search("query", on=["wechat"])
-snippet = env.results[0].content        # 500 字 + "…"
-full    = env.results[0].raw["text"]    # Exa/wechat 全文
+# Python (调用 CLI + 解析 JSON envelope)
+import json
+import subprocess
+
+out = subprocess.run(
+    ["omnireach", "search", "--json", "--on", "wechat", "claude 4.7"],
+    check=True, capture_output=True, text=True,
+)
+env = json.loads(out.stdout)
+snippet = env["results"][0]["content"]        # 500 字 + "…"
+full    = env["results"][0]["raw"]["text"]    # Exa/wechat 全文
 # xiaohongshu / tavily 对应 raw["content"]
 ```
 
@@ -175,6 +181,8 @@ omnireach search --json --on tavily "claude 4.7" | \
 | exa | snippet | `raw["text"]` |
 | xiaohongshu | snippet | `raw["content"]` |
 | tavily | snippet | `raw["content"]` |
+
+`raw[...]` 的具体 key 名跟上游 API schema 直接对应 (Exa/wechat 是 `text`, Tavily/xhs 是 `content`)，上游若改 schema 这里也得跟着调；如果担心可以先 `print(result.raw.keys())` 探一下。
 
 其他源 (HN / GitHub / RSS / YouTube / 等) 的 content 本身就 < 500 字, 不会被截断, 也不需要 raw 兜底。
 
