@@ -4,12 +4,24 @@ This file is loaded automatically when Claude Code starts in this repo. It carri
 
 ## 项目是什么
 
-omnireach 是给中转站（cliproxy / anyrouter / 各类 OpenAI 兼容代理）的 Agent 用户的「全网通搜索」工具，因为他们用不了 Anthropic 原生 WebSearch。CLI + Claude Code Skill 双形态。
+**omnireach 是工具集 (suite) 名 + suite 里 search 层 binary 同名**, 不是单一工具。完整"触达全网"语义由三层组合实现:
 
-**Why**: 中转站丢掉的服务端工具里 WebSearch 损失最重 —— Twitter / Reddit / 小红书 / B站 / 抖音 / 微信 全够不着。用户痛点是这个，不是 web 搜索本身。
+- **`omnireach`** (本仓库): search 层 — 全网定位 metadata + URL, **不取内容**
+- **`omnifetch`** (未来 sister repo): fetch 层 — 给定 URL 取全文 markdown
+- **`omniparse`** (未来 sister repo): parse 层 — 视频/音频内容解析
+
+类比 `git` (项目名 + 核心 binary 同名, 还有 git-lfs / git-flow 等姊妹工具)。reach 的英文本义是"触达 / 够到", 严格按语义 reach 需要三层都到位; 但 binary 命名沿用 omnireach 而不改成 omnisearch, 是因为 v0.7 已 ship + 改名破坏成本太高, 选择"项目名 = suite 愿景, binary 名 = suite 起点"的双重定位。
+
+本 binary 只做 search。用户问"加 fetch/parse 能力到 omnireach 里"时**应拒绝**并指向未来 sister repo (见下方"架构边界")。
+
+## 目标用户与痛点
+
+omnireach 是给中转站 (cliproxy / anyrouter / 各类 OpenAI 兼容代理) 的 Agent 用户的工具, 因为他们用不了 Anthropic 原生 WebSearch。CLI + Claude Code Skill 双形态。
+
+**Why**: 中转站丢掉的服务端工具里 WebSearch 损失最重 —— Twitter / Reddit / 小红书 / B站 / 抖音 / 微信 全够不着。用户痛点是这个, 不是 web 搜索本身。
 
 - 位置: `~/Projects/omnireach`
-- GitHub: https://github.com/Daily-AC/omnireach（Public，MIT，归属 Daily-AC）
+- GitHub: https://github.com/Daily-AC/omnireach (Public, MIT, 归属 Daily-AC)
 
 ## 架构核心 — Umbrella + 适配器壳（v0.5 修订）
 
