@@ -58,3 +58,22 @@ def test_search_raises_without_key(monkeypatch):
     monkeypatch.delenv("EXA_API_KEY", raising=False)
     with pytest.raises(AdapterUnavailable):
         asyncio.run(ExaAdapter().search("q"))
+
+
+def test_search_truncates_content_but_preserves_full_in_raw(monkeypatch):
+    """v0.8: long Exa text gets truncated in content, full kept in raw['text']."""
+    monkeypatch.setenv("EXA_API_KEY", "exa-x")
+    long_text = "a" * 1024
+    payload = {"results": [
+        {"title": "Long article", "url": "https://e/long",
+         "text": long_text, "author": "n"}
+    ]}
+    real_client = httpx.AsyncClient(transport=_mock_transport(200, payload))
+    with patch("omnireach.adapters.exa.httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value.__aenter__.return_value = real_client
+        out = asyncio.run(ExaAdapter().search("q", limit=5))
+    assert len(out) == 1
+    assert out[0].content == "a" * 500 + "…"
+    assert len(out[0].content) == 501
+    assert out[0].raw["text"] == long_text
+    assert len(out[0].raw["text"]) == 1024
