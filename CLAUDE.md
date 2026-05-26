@@ -107,6 +107,8 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `omnireach diagnose --autopr` (用户 agent 自动 fix upstream bug 后自动 PR 回 repo)
 - e2e CI matrix 装真实 yt-dlp/gh/rdt-cli/opencli docker images
 - 公开发布到 Claude Marketplace
+- **omnifetch sister repo 启动时, default backend 候选**: [unclecode/crawl4ai](https://github.com/unclecode/crawl4ai) (66K stars, Apache-2.0, Python+Playwright, 输出 Markdown, 内置反爬绕过 Cloudflare/Akamai/PerimeterX/DataDome) + [jina-ai/reader](https://github.com/jina-ai/reader) (10K stars, `r.jina.ai/<url>` 极简 SaaS, 免费额度大) 作 SaaS fallback。**注意 Crawl4AI 代码结构有 monolith 倾向** (extraction_strategy.py 120KB / async_crawler_strategy.py 118KB), omnifetch 立项时主动避免这个坑。当前 session 的临时方案是 README「如何取全文」里写的 `omnireach + crwl` 手动 pipeline。
+- omnifetch / omniparse 启动时 License 考虑改用 Apache-2.0 (Crawl4AI 同 license + 企业集成场景更友好) — omnireach 本身保留 MIT
 
 ## 外部 issue 历史
 

@@ -190,6 +190,32 @@ omnireach search --json --on tavily "claude 4.7" | \
 
 其他源 (HN / GitHub / RSS / YouTube / 等) 的 content 一般 < 500 字, 多半 validator no-op, 但不保证 —— 真要全文兜底, 看 `result.raw` 有没有对应 key。
 
+### 真要全文怎么办 → omnireach + Crawl4AI pipeline
+
+omnireach 是 search 层不抓全文。在 omnifetch sister repo 还没启动前 (YAGNI), 推荐手动 pipeline 用 [Crawl4AI](https://github.com/unclecode/crawl4ai) 的 `crwl` CLI 拉全文:
+
+```bash
+# 一次装 Crawl4AI
+pip install -U crawl4ai && crawl4ai-setup
+
+# omnireach 拿 URL → crwl 抓干净 Markdown
+omnireach search --on wechat "claude 4.7" \
+  | jq -r '.results[].url' \
+  | xargs -I{} crwl {} -o markdown
+
+# 单条文章直接
+crwl "https://mp.weixin.qq.com/s/..." -o markdown > article.md
+
+# 整站深度抓 (BFS, 限 10 页)
+crwl https://docs.crawl4ai.com --deep-crawl bfs --max-pages 10
+```
+
+Crawl4AI (66K ⭐, Apache-2.0, 基于 Playwright) 内置 Cloudflare / Akamai / PerimeterX / DataDome 反爬绕过, Sogou wechat 返的 `/link?url=...` redirect 也能直接拉穿到 mp.weixin.qq.com 出干净 Markdown。
+
+SaaS 替代: [Jina Reader](https://r.jina.ai/) — 在任意 URL 前面拼 `https://r.jina.ai/`, 免费额度够个人项目用 (`curl https://r.jina.ai/https://example.com/article`)。
+
+> ℹ️  未来 omnireach 会有 sister repo `omnifetch` 把这条 pipeline 工具化, 但 YAGNI: 真有用户喊"我要直接拿全文"再开仓库。当前手动 pipe 完全够用。
+
 ## ⚙️ 用户偏好 (v0.4)
 
 `~/.omnireach/preferences.toml` 可配置默认源、语言、输出格式、source_trust 覆盖。
