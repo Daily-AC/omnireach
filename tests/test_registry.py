@@ -13,7 +13,8 @@ def test_load_registry_returns_all_sources():
     assert "reddit" in ids
     assert "twitter" in ids
     assert "xiaohongshu" in ids
-    assert len(reg.sources) == 13
+    assert "tiktok" in ids
+    assert len(reg.sources) == 14
 
 
 def test_get_by_id():

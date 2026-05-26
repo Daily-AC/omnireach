@@ -16,6 +16,7 @@ declare -A ADAPTERS=(
     ["rdt-cli:search"]="--json --limit"
     ["opencli:twitter search"]="--format --limit"
     ["opencli:xiaohongshu search"]="--format --limit"
+    ["opencli:tiktok search"]="--format --limit"
 )
 
 EXIT=0
