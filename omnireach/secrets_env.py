@@ -17,16 +17,18 @@ def load_secrets_env(path: Path) -> None:
     if not path.exists():
         return
 
-    try:
-        mode = path.stat().st_mode
-        if mode & (stat.S_IRWXG | stat.S_IRWXO):
-            print(
-                f"warning: {path} permissions are loose ({oct(mode & 0o777)}); "
-                "请运行 `chmod 600` 限制可读权限",
-                file=sys.stderr,
-            )
-    except OSError:
-        pass
+    # POSIX permission check; on Windows mode bits don't map to chmod semantics
+    if os.name != "nt":
+        try:
+            mode = path.stat().st_mode
+            if mode & (stat.S_IRWXG | stat.S_IRWXO):
+                print(
+                    f"warning: {path} permissions are loose ({oct(mode & 0o777)}); "
+                    "请运行 `chmod 600` 限制可读权限",
+                    file=sys.stderr,
+                )
+        except OSError:
+            pass
 
     for raw in path.read_text().splitlines():
         line = raw.strip()
