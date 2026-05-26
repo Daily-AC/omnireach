@@ -84,6 +84,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `v0.7.2-alpha` (2026-05-26): **douyin via OpenCLI fork** — 不等上游, omnireach 切到 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)。OpenCLI 系 4 源全切 fork; 上游 merge 后切回, adapter 不动。`plays/comments/shares` zero→None normalize (DOM 卡片只暴露 likes)。E2E 实测 likes=40000。PR #15, **closes issue #12**。209 tests
 - `v0.8.0-alpha` (2026-05-27): **架构修复** — `SearchResult.content` 在 contract 层 (pydantic `field_validator`) 强制截到 500 字 + "…"; 全文保留在 `result.raw` (4 个长文本源 wechat/xhs/exa/tavily 上游 payload 本就存了)。零 adapter 改动, 单一实现点防未来 adapter 漂移。218 tests。PR #18
 - `v0.8.1-alpha` (2026-05-27): **xhs adapter 字段映射 hotfix** — 真 E2E 时发现 OpenCLI v1.7.22+ 真实 xhs 输出 key 是 `likes(string)/title/url/published_at/rank/author/author_url`, 没有 `content / like_count / comment_count / collect_count`。adapter 自 v0.5.2 起就在猜 key 名（同 v0.7.0→v0.7.1 同类 bug）, engagement 一直全 None。v0.8.0 README 文档里"xhs 全文在 raw['content']"的话也是错的（OpenCLI 搜索不返正文）。修：`likes:str→int` via `_parse_likes()`, 删 comment_count/collect_count map, 测试 fixture 改用真 OpenCLI shape。README "如何取全文" 表加 twitter 行(长 thread 触发 validator), 删 xhs 行(无全文)。E2E 实测 likes=83/102/45 (was None)。PR #19
+- `v0.9.0-alpha` (2026-05-27): **wechat/bilibili 解锁免费路径** — 两源从 💎 booster 升 ✅ ready, 默认走 Sogou 微信搜索 (httpx + lxml 直抓) 与 B站官方 search API (httpx + json, 仅需 `Referer: search.bilibili.com`)。`EXA_API_KEY` 不再必需, 设置后作为 enhanced backend 提供语义增强 (优先级 Exa > 免费 fallback)。新增 `SourceSpec.enhanced_with: str | None` 字段表达"可选环境变量启用增强"语义。`default_in_auto` 翻为 false (Sogou ~3s 延迟拖累 auto fanout, 走 query hint 或 --on)。新依赖: `lxml`, `cssselect`。新文件: `_wechat_sogou.py`, `_bilibili_api.py`, 两个真实 fixture。Scrapling 仍可选作 Sogou 的 stealth 增强 (import 检测式, 不强依赖)。源调研由 omnireach 自己搜 Twitter+GitHub 完成 (Agent-Reach wechat.py 也是 Exa, wewe-rss/wechat-article-exporter 是订阅/导出不是搜索, 真路径只能是 Scrapling/Camoufox/Sogou)。25x tests。PR #__TBD__ <!-- TODO: fill before squash-merge -->
 
 ## v0.7 后续 (开着的)
 
@@ -93,11 +94,11 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 ## v0.8 候选
 
 - ~~4 个长文本源 content 字段截断到 ~500 字 snippet~~ ✅ done in v0.8.0-alpha
+- ~~Scrapling 给 wechat/bilibili 做"无 EXA Key 也能跑"的免费降级路径~~ ✅ done in v0.9.0-alpha (实际未用 Scrapling, 用 httpx+lxml; Scrapling 仍可选作 Sogou stealth 增强)
 - 跨平台 setup wizard (gh on Linux/Windows)
 - usage tracking + monthly budget cap for boosters
 - xhs-cli 替换 OpenCLI 小红书路径 (agent-reach references 推荐 xhs)
 - `omnireach search` query-aware mode selection (URL → rss only 等)
-- Scrapling 给 wechat/bilibili 做"无 EXA Key 也能跑"的免费降级路径
 
 ## v1.x wishlist
 
@@ -115,6 +116,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - 历史 plans: `docs/superpowers/plans/2026-05-25-omnireach-v0.{1,2,3,4}.md` + `2026-05-26-omnireach-v0.{5,6}.md` + `2026-05-27-omnireach-v0.8.md`
 - v0.6 retrospective: `docs/retrospectives/2026-05-26-v0.3-v0.5-lessons.md`
 - v0.8 spec: `docs/superpowers/specs/2026-05-27-omnireach-v0.8-design.md`
+- v0.9 spec: `docs/superpowers/specs/2026-05-27-omnireach-v0.9-design.md`
 - 2026-05-26 session handoff: `docs/handoff/2026-05-26-session-handoff.md`
 - README: `README.md`
 
