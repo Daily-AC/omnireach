@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 import stat
 import subprocess
@@ -68,7 +69,11 @@ BINARY_GUIDES = {
         "binary": "gh",
         "install": None,
         "label": "GitHub CLI",
-        "manual_hint": "macOS: `brew install gh` ; Linux/Windows: https://cli.github.com",
+        "manual_hint": (
+            "macOS: `brew install gh`  ·  "
+            "Windows: `winget install --id GitHub.cli` (或 https://cli.github.com)  ·  "
+            "Linux: 看 https://github.com/cli/cli/blob/trunk/docs/install_linux.md"
+        ),
     },
     "reddit": {
         "binary": "rdt-cli",
@@ -88,7 +93,8 @@ def _setup_booster(source_id: str) -> None:
     g = BOOSTER_GUIDES[source_id]
     click.echo(f"{g['label']} 是付费 API ({g['note']})")
     click.echo("Agent 能做的:")
-    click.echo("  ✅ 把你粘贴的 Key 写入 ~/.omnireach/secrets.env (chmod 600)")
+    perm_note = "chmod 600" if os.name != "nt" else "限制为当前用户"
+    click.echo(f"  ✅ 把你粘贴的 Key 写入 ~/.omnireach/secrets.env ({perm_note})")
     click.echo("你需要做的:")
     click.echo(f"  👤 去 {g['signup_url']} 注册/登录, 复制 API Key")
     if not click.confirm("开始吗?", default=True):
@@ -103,7 +109,9 @@ def _setup_booster(source_id: str) -> None:
     lines = [ln for ln in existing.splitlines() if not ln.startswith(f"{g['env']}=")]
     lines.append(f"{g['env']}={key}")
     secrets_path.write_text("\n".join(lines) + "\n")
-    secrets_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    if os.name != "nt":
+        # POSIX chmod 600; on Windows file ACL is more involved and Path.chmod is a partial map
+        secrets_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
     click.echo(f"✓ 已写入 {secrets_path}")
 
 
