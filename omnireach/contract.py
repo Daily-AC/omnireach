@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# v0.8: SERP-snippet rule enforced at the contract boundary. Full upstream
+# payloads remain accessible via SearchResult.raw — see
+# docs/superpowers/specs/2026-05-27-omnireach-v0.8-design.md.
+_SNIPPET_MAX = 500
+_ELLIPSIS = "…"
 
 
 class Engagement(BaseModel):
@@ -32,6 +38,13 @@ class SearchResult(BaseModel):
     raw: dict[str, Any] = Field(default_factory=dict)
     cost: Literal["free", "paid"] = "free"
     raw_score: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @field_validator("content")
+    @classmethod
+    def _truncate_content(cls, v: str) -> str:
+        if len(v) <= _SNIPPET_MAX:
+            return v
+        return v[:_SNIPPET_MAX] + _ELLIPSIS
 
 
 class SourceError(BaseModel):
