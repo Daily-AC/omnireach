@@ -75,6 +75,8 @@ def test_search_renders_issue_hint_when_failed_errors(monkeypatch):
         return original_load(self)
 
     monkeypatch.setattr(reg_mod.SourceSpec, "load_adapter_class", fake_load)
+    # v0.9.2: force TTY-render branch (CliRunner stdout is non-TTY by default)
+    monkeypatch.setattr("omnireach.cli._should_emit_json", lambda flag: flag)
     # Also strip every other source so HN is the only path
     monkeypatch.setattr("shutil.which", lambda b: None)
     for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):

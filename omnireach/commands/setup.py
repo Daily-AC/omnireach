@@ -183,6 +183,12 @@ def _run_verify(cmd: str) -> tuple[int, str]:
 @click.option("--yes", "-y", is_flag=True, help="跳过所有确认 (CI / 自动化)")
 def setup_cmd(source_id: str, yes: bool) -> None:
     """配置一个源 (装上游工具 + 引导用户登录)."""
+    # v0.9.2 note: setup is interactive (uses click.confirm / click.prompt).
+    # If an Agent invokes this from a subprocess with empty/closed stdin,
+    # Click's prompt naturally raises Abort on EOF — no deadlock, just an
+    # "Aborted!" message. We don't pre-check isatty here because CliRunner
+    # tests legitimately feed stdin via BytesIO (also non-TTY) and would
+    # falsely trip.
     reg = load_registry()
     try:
         spec = reg.get(source_id)

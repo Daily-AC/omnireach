@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 from pathlib import Path
 
 import click
@@ -29,6 +30,18 @@ load_secrets_env(_SECRETS_PATH)
 ISSUE_URL = "https://github.com/Daily-AC/omnireach/issues/new/choose"
 
 console = Console()
+
+
+def _should_emit_json(explicit_flag: bool) -> bool:
+    """v0.9.2: auto-JSON when stdout is piped/captured (Agent caller).
+
+    Explicit --json always wins. When unset, fall back to JSON if stdout
+    is not a TTY (Agent subprocess, redirect, pipe). Human at terminal
+    keeps the rich.Table UX.
+    """
+    if explicit_flag:
+        return True
+    return not sys.stdout.isatty()
 
 
 _BOOSTER_KEY_ENV = {
@@ -104,7 +117,7 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
     ranked = rank(results, trust_map=trust_map)
     envelope = build_envelope(query=query, results=ranked, errors=errors)
 
-    if json_out:
+    if _should_emit_json(json_out):
         click.echo(envelope.model_dump_json())
         return
 
@@ -130,21 +143,34 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
 
 
 @main.command("doctor")
-def doctor_cmd() -> None:
+@click.option("--json", "json_out", is_flag=True, help="输出 JSON, 适合下游 pipe")
+def doctor_cmd(json_out: bool) -> None:
     """检查每个源的就绪状态."""
     import platform
-    import sys
+    import json as _json
 
     from omnireach.doctor import run_doctor
 
-    # Platform info — useful for bug reports and Windows debugging
     plat = f"{platform.system()} {platform.release()} ({platform.machine()})"
     pyver = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    console.print(
-        f"[dim]omnireach {__version__} · {pyver} · {plat}[/dim]"
-    )
 
     statuses = asyncio.run(run_doctor())
+
+    if _should_emit_json(json_out):
+        payload = {
+            "omnireach_version": __version__,
+            "python": pyver,
+            "platform": plat,
+            "sources": [
+                {"id": s.id, "tier": s.tier, "ok": s.ok,
+                 "detail": s.detail, "fix_hint": s.fix_hint}
+                for s in statuses
+            ],
+        }
+        click.echo(_json.dumps(payload, ensure_ascii=False))
+        return
+
+    console.print(f"[dim]omnireach {__version__} · {pyver} · {plat}[/dim]")
     table = Table(title="omnireach doctor")
     table.add_column("源", style="cyan")
     table.add_column("tier")
