@@ -128,6 +128,21 @@
       - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
       - { step: "在 Chrome 中登录 小红书 账号 (打开 xiaohongshu.com 完成登录)", verify: "opencli xiaohongshu state" }
 
+- id: tiktok
+  tier: heavy
+  adapter: omnireach.adapters.tiktok.TikTokAdapter
+  description: TikTok 视频搜索 (国际版, 登录态 Chrome, 通过 OpenCLI)
+  query_hints: [tiktok, "海外短视频"]
+  default_in_auto: false
+  trust: 0.55
+  timeout_seconds: 30
+  deps:
+    auto:
+      - { kind: npm, name: "@jackwener/opencli" }
+    manual:
+      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
+      - { step: "在 Chrome 中登录 TikTok 账号 (打开 tiktok.com 完成登录)", verify: "opencli tiktok explore --limit 1 --format json" }
+
 - id: tavily
   tier: booster
   adapter: omnireach.adapters.tavily.TavilyAdapter

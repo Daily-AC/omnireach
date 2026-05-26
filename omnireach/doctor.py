@@ -71,7 +71,7 @@ async def run_doctor() -> list[SourceStatus]:
                     detail=f"{env} 未配",
                     fix_hint=f"omnireach setup {sid}"))
             continue
-        if sid in ("twitter", "xiaohongshu"):
+        if sid in ("twitter", "xiaohongshu", "tiktok"):
             # v0.3 OpenCLI path — check for OpenCLI binary
             for candidate in ("openrouter", "opencli", "opencli-search"):
                 if shutil.which(candidate):

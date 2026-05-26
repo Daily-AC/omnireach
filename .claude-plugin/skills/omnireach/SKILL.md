@@ -1,6 +1,6 @@
 ---
 name: omnireach
-description: Use when the user needs to search the web or read content from Twitter / Reddit / YouTube / Bilibili / 小红书 / HackerNews / GitHub / 微信公众号 / RSS, especially when the built-in WebSearch is unavailable (proxy/relay stations). Provides a unified search across multiple platforms with a single command.
+description: Use when the user needs to search the web or read content from Twitter / Reddit / YouTube / Bilibili / 小红书 / TikTok / HackerNews / GitHub / 微信公众号 / RSS, especially when the built-in WebSearch is unavailable (proxy/relay stations). Provides a unified search across multiple platforms with a single command.
 ---
 
 # omnireach — 全网通搜索

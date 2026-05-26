@@ -202,7 +202,7 @@ def setup_cmd(source_id: str, yes: bool) -> None:
         _setup_binary(source_id)
         return
 
-    if source_id in ("twitter", "xiaohongshu"):
+    if source_id in ("twitter", "xiaohongshu", "tiktok"):
         adapter = spec.load_adapter_class()()
         report = asyncio.run(
             wizard.run_setup(
