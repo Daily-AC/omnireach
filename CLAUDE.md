@@ -82,7 +82,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `v0.7.0-alpha` (2026-05-26): **tiktok** (🔴 heavy) — TikTok 国际版视频搜索, 走 OpenCLI 登录态 Chrome, pattern 同 twitter/xiaohongshu。204 tests。PR #13
 - `v0.7.1-alpha` (2026-05-26): **hotfix tiktok 字段映射** — engagement 字段名是猜的, 真实 opencli output 是 plays/likes/comments/shares 而非 play_count/digg_count 等, 用户拿到的 engagement 全 None。E2E 修正后实测 likes=1291/views=24500。PR #14
 - `v0.7.2-alpha` (2026-05-26): **douyin via OpenCLI fork** — 不等上游, omnireach 切到 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)。OpenCLI 系 4 源全切 fork; 上游 merge 后切回, adapter 不动。`plays/comments/shares` zero→None normalize (DOM 卡片只暴露 likes)。E2E 实测 likes=40000。PR #15, **closes issue #12**。209 tests
-- `v0.8.0-alpha` (2026-05-27): **架构修复** — `SearchResult.content` 在 contract 层 (pydantic `field_validator`) 强制截到 500 字 + "…"; 全文保留在 `result.raw` (4 个长文本源 wechat/xhs/exa/tavily 上游 payload 本就存了)。零 adapter 改动, 单一实现点防未来 adapter 漂移。218 tests。PR #__TBD__
+- `v0.8.0-alpha` (2026-05-27): **架构修复** — `SearchResult.content` 在 contract 层 (pydantic `field_validator`) 强制截到 500 字 + "…"; 全文保留在 `result.raw` (4 个长文本源 wechat/xhs/exa/tavily 上游 payload 本就存了)。零 adapter 改动, 单一实现点防未来 adapter 漂移。218 tests。PR #__TBD__ <!-- TODO: replace PR number before squash-merge -->
 
 ## v0.7 后续 (开着的)
 
@@ -111,8 +111,9 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 ## 关键文档 (绝对路径)
 
 - 设计 spec: `docs/superpowers/specs/2026-05-25-omnireach-design.md` (甲方决策全锁在 §3)
-- 历史 plans: `docs/superpowers/plans/2026-05-25-omnireach-v0.{1,2,3,4}.md` + `2026-05-26-omnireach-v0.{5,6}.md`
+- 历史 plans: `docs/superpowers/plans/2026-05-25-omnireach-v0.{1,2,3,4}.md` + `2026-05-26-omnireach-v0.{5,6}.md` + `2026-05-27-omnireach-v0.8.md`
 - v0.6 retrospective: `docs/retrospectives/2026-05-26-v0.3-v0.5-lessons.md`
+- v0.8 spec: `docs/superpowers/specs/2026-05-27-omnireach-v0.8-design.md`
 - 2026-05-26 session handoff: `docs/handoff/2026-05-26-session-handoff.md`
 - README: `README.md`
 
