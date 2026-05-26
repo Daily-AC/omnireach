@@ -52,32 +52,28 @@
   deps: { auto: [], manual: [] }
 
 - id: wechat
-  tier: booster
+  tier: ready
   adapter: omnireach.adapters.wechat.WeChatAdapter
-  description: 微信公众号 (Exa domain-filtered, 需 EXA_API_KEY)
+  description: 微信公众号 (Sogou 免费搜索, EXA_API_KEY 可选启用语义增强)
   query_hints: [微信, 公众号, wechat]
-  default_in_auto: true
-  trust: 0.65
-  timeout_seconds: 15
-  deps:
-    auto: []
-    manual:
-      - step: "去 https://exa.ai 拿 EXA_API_KEY"
-        verify: "echo $EXA_API_KEY 非空"
+  # default_in_auto: false because Sogou search adds ~3s latency to every
+  # auto fanout. Users discover via query hint or explicit --on wechat.
+  default_in_auto: false
+  trust: 0.55
+  timeout_seconds: 20
+  enhanced_with: EXA_API_KEY
+  deps: { auto: [], manual: [] }
 
 - id: bilibili
-  tier: booster
+  tier: ready
   adapter: omnireach.adapters.bilibili.BilibiliAdapter
-  description: B站视频/笔记 (Exa domain-filtered, 需 EXA_API_KEY)
+  description: B站视频/笔记 (B站官方 search API, EXA_API_KEY 可选启用语义增强)
   query_hints: [b站, bilibili, 哔哩哔哩]
-  default_in_auto: true
-  trust: 0.60
+  default_in_auto: false
+  trust: 0.55
   timeout_seconds: 15
-  deps:
-    auto: []
-    manual:
-      - step: "去 https://exa.ai 拿 EXA_API_KEY"
-        verify: "echo $EXA_API_KEY 非空"
+  enhanced_with: EXA_API_KEY
+  deps: { auto: [], manual: [] }
 
 - id: reddit
   tier: one_step

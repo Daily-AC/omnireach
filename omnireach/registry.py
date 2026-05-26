@@ -31,6 +31,9 @@ class SourceSpec:
     timeout_seconds: float | None = None
     deps_auto: list[Dep] = field(default_factory=list)
     deps_manual: list[Dep] = field(default_factory=list)
+    # v0.9: optional env var name; if set, the adapter switches to an enhanced
+    # backend (e.g. Exa semantic search). For TTY hint + doctor reporting only.
+    enhanced_with: str | None = None
 
     def load_adapter_class(self):
         module_path, _, cls_name = self.adapter.rpartition(".")
@@ -79,6 +82,7 @@ def load_registry(path: Path | None = None) -> Registry:
             timeout_seconds=timeout_seconds,
             deps_auto=[Dep(**d) for d in (deps.get("auto") or [])],
             deps_manual=[Dep(**d) for d in (deps.get("manual") or [])],
+            enhanced_with=entry.get("enhanced_with"),
         )
         sources.append(spec)
     return Registry(sources=sources)

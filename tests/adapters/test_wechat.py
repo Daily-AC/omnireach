@@ -1,82 +1,70 @@
 import asyncio
-import json
-from unittest.mock import patch
-
-import httpx
+import os
+from unittest.mock import AsyncMock
 import pytest
 
 from omnireach.adapters.base import AdapterUnavailable
 from omnireach.adapters.wechat import WeChatAdapter
+from omnireach.contract import SearchResult
 
 
-def _mock_transport(status, body=None):
-    def handler(request):
-        return httpx.Response(status, json=body or {})
-    return httpx.MockTransport(handler)
+def _fake_sogou_result(title="sogou hit"):
+    return SearchResult(source="wechat", adapter="sogou", title=title,
+                        url="https://weixin.sogou.com/link?url=abc",
+                        content="snippet", cost="free")
 
 
-def test_is_ready_false_without_key(monkeypatch):
+def _fake_exa_result(title="exa hit"):
+    return SearchResult(source="wechat", adapter="exa-api", title=title,
+                        url="https://mp.weixin.qq.com/s/xyz",
+                        content="text", cost="paid")
+
+
+def test_wechat_is_ready_always_true(monkeypatch):
     monkeypatch.delenv("EXA_API_KEY", raising=False)
-    assert asyncio.run(WeChatAdapter().is_ready()) is False
+    assert asyncio.run(WeChatAdapter().is_ready()) is True
 
 
-def test_is_ready_true_with_key(monkeypatch):
+def test_wechat_is_ready_true_with_key(monkeypatch):
     monkeypatch.setenv("EXA_API_KEY", "exa-x")
     assert asyncio.run(WeChatAdapter().is_ready()) is True
 
 
-def test_search_sends_include_domains(monkeypatch):
+def test_wechat_prefers_exa_when_key_present(monkeypatch):
     monkeypatch.setenv("EXA_API_KEY", "exa-x")
-    captured = {}
-
-    def handler(request):
-        captured["body"] = request.read()
-        return httpx.Response(200, json={"results": [
-            {"title": "公众号 1", "url": "https://mp.weixin.qq.com/s/abc",
-             "publishedDate": "2026-05-22T10:00:00Z", "text": "正文"}
-        ]})
-
-    real_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    with patch("omnireach.adapters.wechat.httpx.AsyncClient") as mock_cls:
-        mock_cls.return_value.__aenter__.return_value = real_client
-        out = asyncio.run(WeChatAdapter().search("q", limit=5))
-    body = json.loads(captured["body"])
-    assert body["includeDomains"] == ["mp.weixin.qq.com"]
-    assert len(out) == 1
-    assert out[0].source == "wechat"
-    assert out[0].cost == "paid"
-    assert "mp.weixin.qq.com" in out[0].url
+    fake_exa = AsyncMock(return_value=[_fake_exa_result()])
+    fake_sogou = AsyncMock(return_value=[_fake_sogou_result()])
+    monkeypatch.setattr("omnireach.adapters.wechat._search_exa", fake_exa)
+    monkeypatch.setattr("omnireach.adapters.wechat.search_sogou", fake_sogou)
+    out = asyncio.run(WeChatAdapter().search("q"))
+    assert len(out) == 1 and out[0].adapter == "exa-api"
+    fake_exa.assert_awaited_once()
+    fake_sogou.assert_not_awaited()
 
 
-def test_search_raises_on_401(monkeypatch):
-    monkeypatch.setenv("EXA_API_KEY", "bad")
-    real_client = httpx.AsyncClient(transport=_mock_transport(401))
-    with patch("omnireach.adapters.wechat.httpx.AsyncClient") as mock_cls:
-        mock_cls.return_value.__aenter__.return_value = real_client
-        with pytest.raises(AdapterUnavailable):
-            asyncio.run(WeChatAdapter().search("q"))
+def test_wechat_falls_back_to_sogou_when_exa_fails(monkeypatch):
+    monkeypatch.setenv("EXA_API_KEY", "exa-x")
+    fake_exa = AsyncMock(side_effect=AdapterUnavailable("wechat:exa", "401"))
+    fake_sogou = AsyncMock(return_value=[_fake_sogou_result()])
+    monkeypatch.setattr("omnireach.adapters.wechat._search_exa", fake_exa)
+    monkeypatch.setattr("omnireach.adapters.wechat.search_sogou", fake_sogou)
+    out = asyncio.run(WeChatAdapter().search("q"))
+    assert len(out) == 1 and out[0].adapter == "sogou"
+    fake_exa.assert_awaited_once()
+    fake_sogou.assert_awaited_once()
 
 
-def test_search_raises_without_key(monkeypatch):
+def test_wechat_uses_sogou_when_no_exa_key(monkeypatch):
     monkeypatch.delenv("EXA_API_KEY", raising=False)
+    fake_sogou = AsyncMock(return_value=[_fake_sogou_result()])
+    monkeypatch.setattr("omnireach.adapters.wechat.search_sogou", fake_sogou)
+    out = asyncio.run(WeChatAdapter().search("q"))
+    assert len(out) == 1 and out[0].adapter == "sogou"
+
+
+def test_wechat_propagates_sogou_failure_when_no_exa_key(monkeypatch):
+    monkeypatch.delenv("EXA_API_KEY", raising=False)
+    fake_sogou = AsyncMock(side_effect=AdapterUnavailable("wechat:sogou", "503"))
+    monkeypatch.setattr("omnireach.adapters.wechat.search_sogou", fake_sogou)
     with pytest.raises(AdapterUnavailable):
         asyncio.run(WeChatAdapter().search("q"))
-
-
-def test_search_truncates_content_but_preserves_full_in_raw(monkeypatch):
-    """v0.8: contract validator truncates content to 500 + '…'; raw['text'] keeps full."""
-    monkeypatch.setenv("EXA_API_KEY", "exa-x")
-    long_text = "啊" * 1200
-    payload = {"results": [
-        {"title": "长文公众号", "url": "https://mp.weixin.qq.com/s/long",
-         "publishedDate": "2026-05-22T10:00:00Z", "text": long_text}
-    ]}
-    real_client = httpx.AsyncClient(transport=_mock_transport(200, payload))
-    with patch("omnireach.adapters.wechat.httpx.AsyncClient") as mock_cls:
-        mock_cls.return_value.__aenter__.return_value = real_client
-        out = asyncio.run(WeChatAdapter().search("q", limit=5))
-    assert len(out) == 1
-    assert out[0].content == "啊" * 500 + "…"
-    assert len(out[0].content) == 501
-    assert out[0].raw["text"] == long_text
-    assert len(out[0].raw["text"]) == 1200

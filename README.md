@@ -89,8 +89,8 @@ omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 | 💎 brave | booster | env `BRAVE_API_KEY` | 付费 (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | 付费 (v0.4) |
 | 💎 exa | booster | env `EXA_API_KEY` | 付费 web search (v0.5) |
-| 💎 wechat | booster | env `EXA_API_KEY` | 微信公众号 (Exa domain-filtered, v0.6) |
-| 💎 bilibili | booster | env `EXA_API_KEY` | B站 (Exa domain-filtered, v0.6) |
+| wechat | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | 微信公众号 — v0.9 起默认走 Sogou 免费搜索; `EXA_API_KEY` 可选启用语义增强 |
+| bilibili | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | B站 — v0.9 起默认走 B站官方 search API; `EXA_API_KEY` 可选启用语义增强 |
 
 > **抖音 (douyin.com)** (v0.7.2): 走 `omnireach setup douyin`, 装 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI) (上游 PR [jackwener/OpenCLI#1759](https://github.com/jackwener/OpenCLI/pull/1759) 还在 review, 上游 merge + 发版后会切回 `@jackwener/opencli`)。需要在 Chrome 登录 www.douyin.com。`engagement.likes` 有真实数据 (DOM 抽取); `plays/comments/shares` 在搜索卡片上不暴露, 已 normalize 成 `null` 让下游 Agent 识别 unknown。
 
@@ -173,15 +173,18 @@ omnireach search --json --on tavily "claude 4.7" | \
   jq '.results[] | {title, snippet: .content, full: .raw.content}'
 ```
 
-字段对应表 (经 v0.8.1 真实 E2E 校正):
+字段对应表 (经 v0.8.1 + v0.9 真实 E2E 校正):
 
-| 源 | `result.content` | `result.raw[...]` 取全文 |
-|---|---|---|
-| wechat | snippet | `raw["text"]` |
-| exa | snippet | `raw["text"]` |
-| tavily | snippet | `raw["content"]` |
-| twitter | snippet (长 thread 会触发) | `raw["text"]` |
-| xiaohongshu | 空 — OpenCLI 搜索结果不含正文 | n/a (search 层无全文) |
+| 源 | `result.adapter` | `result.content` | `result.raw[...]` 取全文/原始 |
+|---|---|---|---|
+| wechat (默认 Sogou) | `sogou` | snippet (Sogou SERP 摘要) | `raw["item_html"]` (完整 Sogou 卡片 HTML) — 真要全文要进 mp.weixin.qq.com |
+| wechat (EXA_API_KEY 启用) | `exa-api` | snippet | `raw["text"]` (Exa 全文) |
+| bilibili (默认 B站 API) | `bilibili-api` | 视频 description (≤500) | `raw` 整个 video item dict, 含 desc/cover/aid/bvid |
+| bilibili (EXA_API_KEY 启用) | `exa-api` | snippet | `raw["text"]` |
+| exa | `exa-api` | snippet | `raw["text"]` |
+| tavily | `tavily-api` | snippet | `raw["content"]` |
+| twitter | `opencli` | snippet (长 thread 会触发截断) | `raw["text"]` |
+| xiaohongshu | `opencli` | 空 — OpenCLI 搜索结果不含正文 | n/a (search 层无全文) |
 
 `raw[...]` 的具体 key 名跟上游 API schema 直接对应, 上游若改 schema 这里也得跟着调；不确定可以先 `print(result.raw.keys())` 探一下。
 

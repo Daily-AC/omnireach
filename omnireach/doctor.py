@@ -29,8 +29,14 @@ ENV_FOR_BOOSTER = {
     "brave": "BRAVE_API_KEY",
     "perplexity": "PERPLEXITY_API_KEY",
     "exa": "EXA_API_KEY",
-    "wechat": "EXA_API_KEY",
-    "bilibili": "EXA_API_KEY",
+}
+
+# v0.9: sources that have a free default backend + an optional enhancement
+# triggered by an env var (e.g. EXA_API_KEY). The base detail describes the
+# free path; if the env var is present, " + <enhanced>" is appended.
+FREE_BACKEND_DETAIL = {
+    "wechat": "Sogou 免费搜索 (httpx)",
+    "bilibili": "B站官方 search API",
 }
 
 
@@ -60,6 +66,17 @@ async def run_doctor() -> list[SourceStatus]:
                 statuses.append(SourceStatus(sid, spec.tier, ok=False,
                     detail=f"{binary} 不在 PATH",
                     fix_hint=f"omnireach setup {sid}"))
+            continue
+        if sid in FREE_BACKEND_DETAIL:
+            # v0.9: always ok (free backend works); env var is optional enhancement
+            base = FREE_BACKEND_DETAIL[sid]
+            if spec.enhanced_with and os.environ.get(spec.enhanced_with):
+                detail = f"{base} + {spec.enhanced_with} 语义增强"
+            elif spec.enhanced_with:
+                detail = f"{base} ({spec.enhanced_with} 可选启用增强)"
+            else:
+                detail = base
+            statuses.append(SourceStatus(sid, spec.tier, ok=True, detail=detail))
             continue
         if sid in ENV_FOR_BOOSTER:
             env = ENV_FOR_BOOSTER[sid]
