@@ -118,3 +118,39 @@ async def test_xhs_is_ready_requires_opencli(monkeypatch):
 
     monkeypatch.setattr("omnireach.adapters.xiaohongshu.shutil.which", lambda n: None)
     assert await XiaohongshuAdapter().is_ready() is False
+
+
+async def test_xhs_truncates_content_but_preserves_full_in_raw(monkeypatch):
+    """v0.8: long xhs post body gets truncated in content, full kept in raw."""
+    long_body = "种" * 1500
+    fake = json.dumps([
+        {
+            "title": "长种草笔记",
+            "url": "https://xiaohongshu.com/discovery/item/long",
+            "author": "AI小白",
+            "content": long_body,
+            "published_at": "2026-05-21T08:00:00Z",
+            "like_count": 1,
+            "comment_count": 0,
+            "collect_count": 0,
+        }
+    ])
+
+    async def fake_exec(*args, **kwargs):
+        class P:
+            returncode = 0
+
+            async def communicate(self):
+                return (fake.encode(), b"")
+
+        return P()
+
+    monkeypatch.setattr("omnireach.adapters.xiaohongshu.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters.xiaohongshu.shutil.which", lambda n: "/usr/bin/" + n)
+
+    out = await XiaohongshuAdapter().search("q")
+    assert len(out) == 1
+    assert out[0].content == "种" * 500 + "…"
+    assert len(out[0].content) == 501
+    assert out[0].raw["content"] == long_body
+    assert len(out[0].raw["content"]) == 1500
