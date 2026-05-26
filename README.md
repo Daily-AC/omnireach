@@ -148,9 +148,9 @@ omnireach setup exa          # v0.5 新增 (替代旧 web 源)
 
 ## 📄 如何取全文 (v0.8)
 
-omnireach 是 search 层, `content` 字段始终是 SERP snippet (≤ 500 字 + `…`)。这是有意为之 —— 全文留给未来 `omnifetch` 层处理 (见上方 [关于命名](#关于命名-omnireach-是工具集-suite-不是单一工具))。
+omnireach 是 search 层, `content` 字段统一截到 ≤ 500 字 + `…`。Validator 在 contract 层（`SearchResult.content` pydantic field_validator）对**所有源**生效, 任何源的 content 超过 500 都会被截。这是有意为之 —— 全文留给未来 `omnifetch` 层处理 (见上方 [关于命名](#关于命名-omnireach-是工具集-suite-不是单一工具))。
 
-但对于 wechat / xiaohongshu / exa / tavily 这 4 个上游本身就返全文的源, **完整原始 payload 保留在 `result.raw` 字典里**, Agent 想要全文时直接取:
+对于上游本身就返全文的源 (wechat / exa / tavily) 或返长 thread 的源 (twitter), **完整原始 payload 保留在 `result.raw` 字典里**, Agent 想要全文时直接取:
 
 ```python
 # Python (调用 CLI + 解析 JSON envelope)
@@ -163,8 +163,8 @@ out = subprocess.run(
 )
 env = json.loads(out.stdout)
 snippet = env["results"][0]["content"]        # 500 字 + "…"
-full    = env["results"][0]["raw"]["text"]    # Exa/wechat 全文
-# xiaohongshu / tavily 对应 raw["content"]
+full    = env["results"][0]["raw"]["text"]    # Exa / wechat / twitter 全文
+# tavily 对应 raw["content"]
 ```
 
 ```bash
@@ -173,18 +173,19 @@ omnireach search --json --on tavily "claude 4.7" | \
   jq '.results[] | {title, snippet: .content, full: .raw.content}'
 ```
 
-字段对应表:
+字段对应表 (经 v0.8.1 真实 E2E 校正):
 
 | 源 | `result.content` | `result.raw[...]` 取全文 |
 |---|---|---|
 | wechat | snippet | `raw["text"]` |
 | exa | snippet | `raw["text"]` |
-| xiaohongshu | snippet | `raw["content"]` |
 | tavily | snippet | `raw["content"]` |
+| twitter | snippet (长 thread 会触发) | `raw["text"]` |
+| xiaohongshu | 空 — OpenCLI 搜索结果不含正文 | n/a (search 层无全文) |
 
-`raw[...]` 的具体 key 名跟上游 API schema 直接对应 (Exa/wechat 是 `text`, Tavily/xhs 是 `content`)，上游若改 schema 这里也得跟着调；如果担心可以先 `print(result.raw.keys())` 探一下。
+`raw[...]` 的具体 key 名跟上游 API schema 直接对应, 上游若改 schema 这里也得跟着调；不确定可以先 `print(result.raw.keys())` 探一下。
 
-其他源 (HN / GitHub / RSS / YouTube / 等) 的 content 本身就 < 500 字, 不会被截断, 也不需要 raw 兜底。
+其他源 (HN / GitHub / RSS / YouTube / 等) 的 content 一般 < 500 字, 多半 validator no-op, 但不保证 —— 真要全文兜底, 看 `result.raw` 有没有对应 key。
 
 ## ⚙️ 用户偏好 (v0.4)
 

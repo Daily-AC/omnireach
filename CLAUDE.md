@@ -83,6 +83,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `v0.7.1-alpha` (2026-05-26): **hotfix tiktok 字段映射** — engagement 字段名是猜的, 真实 opencli output 是 plays/likes/comments/shares 而非 play_count/digg_count 等, 用户拿到的 engagement 全 None。E2E 修正后实测 likes=1291/views=24500。PR #14
 - `v0.7.2-alpha` (2026-05-26): **douyin via OpenCLI fork** — 不等上游, omnireach 切到 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)。OpenCLI 系 4 源全切 fork; 上游 merge 后切回, adapter 不动。`plays/comments/shares` zero→None normalize (DOM 卡片只暴露 likes)。E2E 实测 likes=40000。PR #15, **closes issue #12**。209 tests
 - `v0.8.0-alpha` (2026-05-27): **架构修复** — `SearchResult.content` 在 contract 层 (pydantic `field_validator`) 强制截到 500 字 + "…"; 全文保留在 `result.raw` (4 个长文本源 wechat/xhs/exa/tavily 上游 payload 本就存了)。零 adapter 改动, 单一实现点防未来 adapter 漂移。218 tests。PR #18
+- `v0.8.1-alpha` (2026-05-27): **xhs adapter 字段映射 hotfix** — 真 E2E 时发现 OpenCLI v1.7.22+ 真实 xhs 输出 key 是 `likes(string)/title/url/published_at/rank/author/author_url`, 没有 `content / like_count / comment_count / collect_count`。adapter 自 v0.5.2 起就在猜 key 名（同 v0.7.0→v0.7.1 同类 bug）, engagement 一直全 None。v0.8.0 README 文档里"xhs 全文在 raw['content']"的话也是错的（OpenCLI 搜索不返正文）。修：`likes:str→int` via `_parse_likes()`, 删 comment_count/collect_count map, 测试 fixture 改用真 OpenCLI shape。README "如何取全文" 表加 twitter 行(长 thread 触发 validator), 删 xhs 行(无全文)。E2E 实测 likes=83/102/45 (was None)。PR #19
 
 ## v0.7 后续 (开着的)
 
@@ -126,7 +127,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 ## 工作偏好 (来自用户跨项目 feedback memory, 这里只记跟 omnireach 有关的部分)
 
 - **甲方模式**: 中长项目走「甲方模式」, ≤4 个真甲方决策批量问, 技术/流程细节默默执行。PR "一气呵成"已授权, 不要每步停下问。
-- **真实 E2E 才能 ship**: 新加 adapter 必须真跑过 `omnireach search --on <src> --json "<query>"` 看上游真实返回字段, mock test 通过不算完成。v0.7.0 → v0.7.1 hotfix 就是因为字段名是猜的没真跑过。
+- **真实 E2E 才能 ship**: 新加 adapter 必须真跑过 `omnireach search --on <src> --json "<query>"` 看上游真实返回字段, mock test 通过不算完成。v0.7.0 → v0.7.1 hotfix 就是因为字段名是猜的没真跑过; v0.8.0 → v0.8.1 hotfix 又踩同坑（contract 层 validator spec 写「不需要 E2E」, 但 E2E 时发现 v0.5.2 起的 xhs adapter pre-existing 字段映射 bug 一直没人测出来）。**规则升级**: 即使本次改动只动 contract / normalizer 这类"远离上游"的层, 也要 E2E 一遍受影响的源（包括"应该没事"的源）来验证 mock fixture 跟现实没漂移。spec 写「不需要 E2E」时主动挑战自己。
 - **外部 issue 不让 reporter 做技术决策**: 自己调研 + 自己拍方向 + 简短礼貌回复 + 加 milestone。
 - **新源 adapter 流程**: 通常按 brainstorming → writing-plans → subagent-driven-development 推进。每个 milestone 走 push → PR → squash merge → 删 feat 分支 → tag → gh release create 流程。
 
