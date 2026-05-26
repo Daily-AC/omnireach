@@ -21,6 +21,8 @@ def test_sources_command_shows_booster_section(monkeypatch):
     from click.testing import CliRunner
     from omnireach.cli import main
 
+    # v0.9.2: force TTY-render branch (CliRunner stdout is non-TTY by default)
+    monkeypatch.setattr("omnireach.commands.sources._should_emit_json", lambda flag: flag)
     monkeypatch.setenv("TAVILY_API_KEY", "x")
     monkeypatch.delenv("BRAVE_API_KEY", raising=False)
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
