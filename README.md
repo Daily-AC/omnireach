@@ -69,7 +69,8 @@ omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 | reddit | 🟡 one_step | `rdt-cli` + `rdt login` | `omnireach setup reddit` |
 | twitter | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
 | xiaohongshu | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
-| tiktok | 🔴 heavy | OpenCLI + Chrome 扩展 | TikTok 国际版 (v0.7); 抖音见下方 issue #12 |
+| tiktok | 🔴 heavy | OpenCLI + Chrome 扩展 | TikTok 国际版 (v0.7) |
+| douyin | 🔴 heavy | OpenCLI fork + Chrome 扩展 | 抖音 (v0.7.2, 走 Daily-AC/OpenCLI fork) |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | 付费 (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | 付费 (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | 付费 (v0.4) |
@@ -77,7 +78,7 @@ omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 | 💎 wechat | booster | env `EXA_API_KEY` | 微信公众号 (Exa domain-filtered, v0.6) |
 | 💎 bilibili | booster | env `EXA_API_KEY` | B站 (Exa domain-filtered, v0.6) |
 
-> **抖音 (douyin.com)**: 暂未直接支持。OpenCLI 现有 `douyin` adapter 只覆盖创作者后台 (creator.douyin.com)，没有 keyword search。我们正在给 OpenCLI 提 douyin search PR，merge 后会跟进加进来 (issue #12)。要海外短视频可以先用 tiktok。
+> **抖音 (douyin.com)** (v0.7.2): 走 `omnireach setup douyin`, 装 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI) (上游 PR [jackwener/OpenCLI#1759](https://github.com/jackwener/OpenCLI/pull/1759) 还在 review, 上游 merge + 发版后会切回 `@jackwener/opencli`)。需要在 Chrome 登录 www.douyin.com。`engagement.likes` 有真实数据 (DOM 抽取); `plays/comments/shares` 在搜索卡片上不暴露, 已 normalize 成 `null` 让下游 Agent 识别 unknown。
 
 > v0.4 及之前曾把 `web` 列为零配置, 实际不可用 (v0.1 起就是 architecture bug — 详见 `docs/superpowers/specs/2026-05-26-omnireach-v0.5-design.md`)。v0.5 起 web search 走 💎 exa booster (或任一付费 booster)。
 

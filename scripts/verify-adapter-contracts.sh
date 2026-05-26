@@ -17,6 +17,7 @@ declare -A ADAPTERS=(
     ["opencli:twitter search"]="--format --limit"
     ["opencli:xiaohongshu search"]="--format --limit"
     ["opencli:tiktok search"]="--format --limit"
+    ["opencli:douyin search"]="--format --limit"
 )
 
 EXIT=0
