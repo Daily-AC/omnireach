@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json as _json
 import os
+import sys
 
 import click
 from rich.console import Console
@@ -11,6 +13,13 @@ from rich.table import Table
 
 from omnireach.doctor import run_doctor
 from omnireach.registry import load_registry
+
+
+def _should_emit_json(explicit_flag: bool) -> bool:
+    """v0.9.2 same helper as cli.py — auto-JSON for Agent callers."""
+    if explicit_flag:
+        return True
+    return not sys.stdout.isatty()
 
 console = Console()
 
@@ -47,14 +56,32 @@ def _booster_key_status(source_id: str) -> str:
 
 @click.command("sources")
 @click.option("--probe", is_flag=True, help="实际跑 is_ready 探测每个源 (慢一点)")
-def sources_cmd(probe: bool) -> None:
+@click.option("--json", "json_out", is_flag=True, help="输出 JSON, 适合下游 pipe")
+def sources_cmd(probe: bool, json_out: bool) -> None:
     """列出所有源 + 心愿单状态."""
     reg = load_registry()
 
     statuses: dict[str, bool] = {}
     if probe:
         for s in asyncio.run(run_doctor()):
-            statuses[s.source] = s.ok
+            statuses[s.id] = s.ok
+
+    if _should_emit_json(json_out):
+        payload = {
+            "sources": [
+                {
+                    "id": s.id,
+                    "tier": s.tier,
+                    "description": s.description,
+                    "enhanced_with": s.enhanced_with,
+                    "probe_ok": statuses.get(s.id) if probe else None,
+                }
+                for s in reg.sources
+            ],
+            "probed": probe,
+        }
+        click.echo(_json.dumps(payload, ensure_ascii=False))
+        return
 
     by_tier: dict[str, list] = {
         "ready": [],
