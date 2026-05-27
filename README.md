@@ -22,7 +22,7 @@
 
 这样拆是有意为之 (对照 Anthropic Claude 自己的 [WebSearch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search) + [WebFetch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-fetch) 拆分): 每层 do one thing well, 不让 search 工具被解析任务拖累 token 和延迟, 也让 Agent 调用方有自由组合的空间。fetch / parse binary 等到真有用户需求才在本 repo 加 (YAGNI)。
 
-> ℹ️  `omnireach` binary 本身是否改名 (e.g. `omnisearch`, 因为它语义上只做 search 不做完整 reach) 暂未决, 等专门讨论。
+> ℹ️  曾考虑把 `omnireach` binary 改名 `omnisearch`, 但 v0.10 落地 `omnireach fetch` subcommand 后该问题消解 —— `omnireach search` (触达 = 找) + `omnireach fetch` (触达 = 取) 都是 reach 的合理子动作, umbrella 名留给项目愿景。**不改名** (2026-05-27 decided).
 
 ## 为什么需要 omnireach
 
