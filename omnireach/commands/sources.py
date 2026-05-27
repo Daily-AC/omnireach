@@ -16,8 +16,10 @@ from omnireach.registry import load_registry
 
 
 def _should_emit_json(explicit_flag: bool) -> bool:
-    """v0.9.2 same helper as cli.py — auto-JSON for Agent callers."""
+    """v0.9.2 + v0.10 same helper as cli.py — OMNIREACH_FORCE_JSON=1 also forces JSON."""
     if explicit_flag:
+        return True
+    if os.environ.get("OMNIREACH_FORCE_JSON", "").lower() in ("1", "true", "yes"):
         return True
     return not sys.stdout.isatty()
 

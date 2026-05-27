@@ -13,6 +13,7 @@ from rich.table import Table
 
 from omnireach import __version__
 from omnireach.commands.check_update import check_update_cmd
+from omnireach.commands.fetch import fetch_cmd
 from omnireach.commands.init import init_cmd
 from omnireach.commands.setup import setup_cmd
 from omnireach.commands.preferences import preferences_cmd
@@ -33,13 +34,17 @@ console = Console()
 
 
 def _should_emit_json(explicit_flag: bool) -> bool:
-    """v0.9.2: auto-JSON when stdout is piped/captured (Agent caller).
+    """v0.9.2 + v0.10: explicit flag → JSON; OMNIREACH_FORCE_JSON=1 → JSON;
+    else isatty-based detection.
 
-    Explicit --json always wins. When unset, fall back to JSON if stdout
-    is not a TTY (Agent subprocess, redirect, pipe). Human at terminal
-    keeps the rich.Table UX.
+    The env var is a v0.10 addition for Agent harnesses (e.g. Antigravity)
+    that allocate a real PTY for subprocess stdout — isatty() returns True
+    in those, defeating the v0.9.2 auto-JSON trick. Agents should set
+    OMNIREACH_FORCE_JSON=1 once in their harness env.
     """
     if explicit_flag:
+        return True
+    if os.environ.get("OMNIREACH_FORCE_JSON", "").lower() in ("1", "true", "yes"):
         return True
     return not sys.stdout.isatty()
 
@@ -205,6 +210,7 @@ main.add_command(setup_cmd)
 main.add_command(sources_cmd)
 main.add_command(preferences_cmd)
 main.add_command(check_update_cmd)
+main.add_command(fetch_cmd)
 
 
 def _entrypoint() -> None:
