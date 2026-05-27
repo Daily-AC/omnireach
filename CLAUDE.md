@@ -4,15 +4,17 @@ This file is loaded automatically when Claude Code starts in this repo. It carri
 
 ## 项目是什么
 
-**omnireach 是工具集 (suite) 名 + suite 里 search 层 binary 同名**, 不是单一工具。完整"触达全网"语义由三层组合实现:
+**omnireach 是项目名, 同 repo 内会出多个 sibling binary**, 不是单一工具。完整"触达全网"语义由三层职责实现, 三层都会作为同 repo 的 sibling binary 存在（**不开 sister repo**, 拍板于 2026-05-27 session）:
 
-- **`omnireach`** (本仓库): search 层 — 全网定位 metadata + URL, **不取内容**
-- **`omnifetch`** (未来 sister repo): fetch 层 — 给定 URL 取全文 markdown
-- **`omniparse`** (未来 sister repo): parse 层 — 视频/音频内容解析
+- **`omnireach`** (当前 binary): search 层 — 全网定位 metadata + URL, **不取内容**
+- **fetch binary** (暂未实现, 未来加在本 repo): fetch 层 — 给定 URL 取全文 markdown
+- **parse binary** (暂未实现, 未来加在本 repo): parse 层 — 视频/音频内容解析
 
-类比 `git` (项目名 + 核心 binary 同名, 还有 git-lfs / git-flow 等姊妹工具)。reach 的英文本义是"触达 / 够到", 严格按语义 reach 需要三层都到位; 但 binary 命名沿用 omnireach 而不改成 omnisearch, 是因为 v0.7 已 ship + 改名破坏成本太高, 选择"项目名 = suite 愿景, binary 名 = suite 起点"的双重定位。
+类比 `cargo` (一个 repo 下 `cargo` / `rustc` / `rustfmt` 多个 sibling binary, 共享一个项目愿景) 而不是 `git` + `git-lfs` (后者是 standalone separate repo)。**Why monorepo 而非 multirepo**: 2026-05-27 session 调研 Crawl4AI 时验证 —— 收纳 `crwl` 作为 fetch 工具不影响 search 行为, 只补齐 search 结果, 完全没有 sister repo 的耦合协调成本。一个 release 频道 + 一个 issue tracker + 一份 README 就够。
 
-本 binary 只做 search。用户问"加 fetch/parse 能力到 omnireach 里"时**应拒绝**并指向未来 sister repo (见下方"架构边界")。
+**search binary 名是否改名**: 当前 `omnireach` 这个 binary 名既是项目名又是 search binary, 长期语义上不准 (reach 是触达, search 只是触达的第一步)。是否改 binary 名 (e.g. `omnisearch`) 至今未决, 2026-05-27 session 显式 parked, 等专门讨论。
+
+本 binary 只做 search。用户问"加 fetch/parse 能力到 omnireach 里"时**应拒绝** (但拒绝的方向不是"去开 sister repo", 而是"等本 repo 加 sibling binary"); 见下方"架构边界"。
 
 ## 目标用户与痛点
 
@@ -58,13 +60,13 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - 不要在 omnireach adapter 里跑 LLM call 做 summary (会引入 LLM 依赖, 让工具变"小 Agent")
 - 视频源 (youtube / bilibili / tiktok / douyin) 只返 metadata, **不抓视频直链 mp4 CDN**
 - 长文本源 (wechat / xhs / exa / tavily) content 字段应截到 ~500 字 snippet (v0.8 起由 `SearchResult` validator 强制), 全文保留在 `result.raw` 中, Agent 按需取用; 真要 omnifetch 才能拿的是 omnireach 本来就没全文的场景 (HN/GH/Twitter thread 等)
-- 用户问"加 X 功能"时, 先判断 X 属于 search / fetch / parse 哪层, 不属于 search 就拒绝并指向未来 sister repo
+- 用户问"加 X 功能"时, 先判断 X 属于 search / fetch / parse 哪层, 不属于 search 就拒绝**并指向本 repo 未来 sibling binary** (v0.8 之前的措辞是"指向未来 sister repo", 2026-05-27 改成 monorepo 模型 — 见上方"项目是什么"节)
 
 **~~当前违规~~已修** (v0.8 修复): 4 个长文本源 (wechat/xiaohongshu/exa/tavily) 在 `SearchResult.content` 上的全文塞入由 contract 层 `field_validator` 截到 500 字 + "…"; 全文保留在 `result.raw` 中。见 `docs/superpowers/specs/2026-05-27-omnireach-v0.8-design.md`。
 
 **为什么 v0.8 不抄 Claude Code 的 LLM-summarized snippet**: Claude Code 用 sub-LLM (Haiku) 压缩 snippet 是因为 user-facing 直接看; omnireach 用户 = Agent (本身就是 LLM), 拿到截断 raw 自己能消化, 不需要 omnireach 替它压缩。抄了反而让 omnireach 从"纯多源汇聚 + 零 LLM 依赖"变成"小 Agent + LLM key 必需", 边界模糊化。
 
-**omnifetch / omniparse 启动时机**: 等用户提"我要全文" / "我要视频内容"的真 issue 再开 repo (YAGNI), 不为想象需求建仓库。
+**fetch / parse binary 启动时机**: 等用户提"我要全文" / "我要视频内容"的真 issue 再在本 repo 加新 binary (YAGNI), **不开 sister repo** (2026-05-27 拍板)。当前临时方案: README「如何取全文」段写了 `omnireach + crwl` 手动 pipeline; 等真要做 fetch binary 时, 它可能就是个 crwl 的 thin orchestrator。
 
 ## 已发布版本
 
@@ -84,6 +86,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `v0.7.2-alpha` (2026-05-26): **douyin via OpenCLI fork** — 不等上游, omnireach 切到 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)。OpenCLI 系 4 源全切 fork; 上游 merge 后切回, adapter 不动。`plays/comments/shares` zero→None normalize (DOM 卡片只暴露 likes)。E2E 实测 likes=40000。PR #15, **closes issue #12**。209 tests
 - `v0.8.0-alpha` (2026-05-27): **架构修复** — `SearchResult.content` 在 contract 层 (pydantic `field_validator`) 强制截到 500 字 + "…"; 全文保留在 `result.raw` (4 个长文本源 wechat/xhs/exa/tavily 上游 payload 本就存了)。零 adapter 改动, 单一实现点防未来 adapter 漂移。218 tests。PR #18
 - `v0.8.1-alpha` (2026-05-27): **xhs adapter 字段映射 hotfix** — 真 E2E 时发现 OpenCLI v1.7.22+ 真实 xhs 输出 key 是 `likes(string)/title/url/published_at/rank/author/author_url`, 没有 `content / like_count / comment_count / collect_count`。adapter 自 v0.5.2 起就在猜 key 名（同 v0.7.0→v0.7.1 同类 bug）, engagement 一直全 None。v0.8.0 README 文档里"xhs 全文在 raw['content']"的话也是错的（OpenCLI 搜索不返正文）。修：`likes:str→int` via `_parse_likes()`, 删 comment_count/collect_count map, 测试 fixture 改用真 OpenCLI shape。README "如何取全文" 表加 twitter 行(长 thread 触发 validator), 删 xhs 行(无全文)。E2E 实测 likes=83/102/45 (was None)。PR #19
+- `v0.9.3-alpha` (2026-05-27): **monorepo 方向 + doctor 加 fetch backend 段** — 2026-05-27 session 拍板**不开 sister repo**, 改用 monorepo + sibling binary 模型 (类 cargo/rustc/rustfmt, 不类 git+git-lfs)。CLAUDE.md / README 全文把"未来 sister repo"措辞换成"本 repo 未来 sibling binary"。doctor 新加 `fetch_backends` 段, 当前唯一 backend 是 `crwl` (Crawl4AI) — 检测 PATH 在不在, 不在则给 `pip install -U crawl4ai && crawl4ai-setup` install hint。JSON shape 新增 `fetch_backends: [{tool, ok, detail, fix_hint}]`。**search binary 是否改名 (e.g. omnisearch) 仍 parked**, 等专门讨论。243 tests。PR #__TBD__ <!-- TODO: fill before squash-merge -->
 - `v0.9.2-alpha` (2026-05-27): **Agent-first CLI UX — auto JSON when stdout 非 TTY** — Antigravity session 截图发现另一个 Claude 在 omnireach 无 `--json` 时 cli 出 rich Table, URL 在表格 wrap 后难抠, 它选择重跑 `--json` 而不是从 context 拷; 但根因是 omnireach 默认按"人坐在 terminal"渲染。修: `cli.py` 加 `_should_emit_json(flag)` helper — `flag or not sys.stdout.isatty()`。`search` / `doctor` / `sources` 三处都走它; `doctor` / `sources` 新加 `--json` flag (此前不存在)。`setup` **不**做 isatty 检测因 Click 的 prompt/confirm 在 EOF stdin 上已会自然 Abort, 不真死锁, 且 CliRunner 测试也走 BytesIO (isatty=False) 加严格检测会假 trip。240 tests。PR #22
 - `v0.9.1-alpha` (2026-05-27): **Exa `contents.text` hotfix** — 自 v0.5 起 Exa 调用一直没传 `contents` 参数, 导致 `--on exa/wechat/bilibili` 的 `result.content` 永远是 ""；只有 v0.9 用 EXA_API_KEY 增强路径才 E2E 暴露这个尾巴。补 `"contents": {"text": {"maxCharacters": 2000}}` 三处 (exa/wechat/bilibili adapter)。maxCharacters=2000 是 4× SearchResult snippet 上限, 单结果 raw 控在 ~2KB 避免 envelope 爆 (不限的话 Exa 单条返 10–60KB)。E2E 验: content_len=501, raw_text_len≈2000。PR #21
 - `v0.9.0-alpha` (2026-05-27): **wechat/bilibili 解锁免费路径** — 两源从 💎 booster 升 ✅ ready, 默认走 Sogou 微信搜索 (httpx + lxml 直抓) 与 B站官方 search API (httpx + json, 仅需 `Referer: search.bilibili.com`)。`EXA_API_KEY` 不再必需, 设置后作为 enhanced backend 提供语义增强 (优先级 Exa > 免费 fallback)。新增 `SourceSpec.enhanced_with: str | None` 字段表达"可选环境变量启用增强"语义。`default_in_auto` 翻为 false (Sogou ~3s 延迟拖累 auto fanout, 走 query hint 或 --on)。新依赖: `lxml`, `cssselect`。新文件: `_wechat_sogou.py`, `_bilibili_api.py`, 两个真实 fixture。Scrapling 仍可选作 Sogou 的 stealth 增强 (import 检测式, 不强依赖)。源调研由 omnireach 自己搜 Twitter+GitHub 完成 (Agent-Reach wechat.py 也是 Exa, wewe-rss/wechat-article-exporter 是订阅/导出不是搜索, 真路径只能是 Scrapling/Camoufox/Sogou)。25x tests。PR #20
@@ -107,8 +110,8 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `omnireach diagnose --autopr` (用户 agent 自动 fix upstream bug 后自动 PR 回 repo)
 - e2e CI matrix 装真实 yt-dlp/gh/rdt-cli/opencli docker images
 - 公开发布到 Claude Marketplace
-- **omnifetch sister repo 启动时, default backend 候选**: [unclecode/crawl4ai](https://github.com/unclecode/crawl4ai) (66K stars, Apache-2.0, Python+Playwright, 输出 Markdown, 内置反爬绕过 Cloudflare/Akamai/PerimeterX/DataDome) + [jina-ai/reader](https://github.com/jina-ai/reader) (10K stars, `r.jina.ai/<url>` 极简 SaaS, 免费额度大) 作 SaaS fallback。**注意 Crawl4AI 代码结构有 monolith 倾向** (extraction_strategy.py 120KB / async_crawler_strategy.py 118KB), omnifetch 立项时主动避免这个坑。当前 session 的临时方案是 README「如何取全文」里写的 `omnireach + crwl` 手动 pipeline。
-- omnifetch / omniparse 启动时 License 考虑改用 Apache-2.0 (Crawl4AI 同 license + 企业集成场景更友好) — omnireach 本身保留 MIT
+- **本 repo 加 fetch binary 时, default backend 候选**: [unclecode/crawl4ai](https://github.com/unclecode/crawl4ai) (66K stars, Apache-2.0, Python+Playwright, 输出 Markdown, 内置反爬绕过 Cloudflare/Akamai/PerimeterX/DataDome) + [jina-ai/reader](https://github.com/jina-ai/reader) (10K stars, `r.jina.ai/<url>` 极简 SaaS, 免费额度大) 作 SaaS fallback。**注意 Crawl4AI 代码结构有 monolith 倾向** (extraction_strategy.py 120KB / async_crawler_strategy.py 118KB), fetch binary 立项时主动避免这个坑。当前临时方案: README「如何取全文」里写的 `omnireach + crwl` 手动 pipeline + doctor 报 crwl 是否在 PATH (v0.9.3 起)。
+- (Apache-2.0 License 切换问题不再适用 — monorepo 模型下整个仓库统一 MIT)
 
 ## 外部 issue 历史
 
