@@ -4,17 +4,17 @@ This file is loaded automatically when Claude Code starts in this repo. It carri
 
 ## 项目是什么
 
-**omnireach 是项目名, 同 repo 内会出多个 sibling binary**, 不是单一工具。完整"触达全网"语义由三层职责实现, 三层都会作为同 repo 的 sibling binary 存在（**不开 sister repo**, 拍板于 2026-05-27 session）:
+**omnireach 是项目名, 同 repo 内多个职责子命令 (subcommand 形态, 落地后再判断要不要拆 binary)**, 不是单一工具。完整"触达全网"语义由三层职责实现, 都在同 repo（**不开 sister repo**, 拍板于 2026-05-27 session）:
 
-- **`omnireach`** (当前 binary): search 层 — 全网定位 metadata + URL, **不取内容**
-- **fetch binary** (暂未实现, 未来加在本 repo): fetch 层 — 给定 URL 取全文 markdown
-- **parse binary** (暂未实现, 未来加在本 repo): parse 层 — 视频/音频内容解析
+- **`omnireach search`** (v0.1+ 起在用): search 层 — 全网定位 metadata + URL, **不取内容**
+- **`omnireach fetch`** (v0.10 起 ship 为 subcommand): fetch 层 — 给定 URL 取全文 markdown; v0.10.1 起 host-aware (`mp.weixin.qq.com` → OpenCLI 登录态, 其它 host → crwl/jina)
+- **parse** (暂未实现): parse 层 — 视频/音频内容解析 (字幕/STT/逐帧), 真有 issue 才加
 
 类比 `cargo` (一个 repo 下 `cargo` / `rustc` / `rustfmt` 多个 sibling binary, 共享一个项目愿景) 而不是 `git` + `git-lfs` (后者是 standalone separate repo)。**Why monorepo 而非 multirepo**: 2026-05-27 session 调研 Crawl4AI 时验证 —— 收纳 `crwl` 作为 fetch 工具不影响 search 行为, 只补齐 search 结果, 完全没有 sister repo 的耦合协调成本。一个 release 频道 + 一个 issue tracker + 一份 README 就够。
 
 **search binary 名是否改名**: ~~曾经考虑改成 `omnisearch` 因为"reach 是触达, search 只是触达的第一步"~~ — **2026-05-27 拍板不改**。Rationale: v0.10 ship 了 `omnireach fetch` 后, `omnireach` 这个名字反而契合 umbrella 定位 —— `omnireach search` (触达 = 找) + `omnireach fetch` (触达 = 取) 都是 reach 的合理子动作, subcommand 分担具体语义, 项目名留给愿景。改名得不偿失。
 
-本 binary 只做 search。用户问"加 fetch/parse 能力到 omnireach 里"时**应拒绝** (但拒绝的方向不是"去开 sister repo", 而是"等本 repo 加 sibling binary"); 见下方"架构边界"。
+本 repo 当前覆盖 search (v0.1+) + fetch (v0.10+) 两层。用户问"加 parse 能力到 omnireach 里"时按"等本 repo 加 sibling subcommand/binary, 不开 sister repo"处理; 视频解析这类大依赖立项前先看真 issue (YAGNI)。见下方"架构边界"。
 
 ## 目标用户与痛点
 
@@ -66,7 +66,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 
 **为什么 v0.8 不抄 Claude Code 的 LLM-summarized snippet**: Claude Code 用 sub-LLM (Haiku) 压缩 snippet 是因为 user-facing 直接看; omnireach 用户 = Agent (本身就是 LLM), 拿到截断 raw 自己能消化, 不需要 omnireach 替它压缩。抄了反而让 omnireach 从"纯多源汇聚 + 零 LLM 依赖"变成"小 Agent + LLM key 必需", 边界模糊化。
 
-**fetch / parse binary 启动时机**: 等用户提"我要全文" / "我要视频内容"的真 issue 再在本 repo 加新 binary (YAGNI), **不开 sister repo** (2026-05-27 拍板)。当前临时方案: README「如何取全文」段写了 `omnireach + crwl` 手动 pipeline; 等真要做 fetch binary 时, 它可能就是个 crwl 的 thin orchestrator。
+**fetch 状态** (2026-05-27): v0.10 已 ship 为 `omnireach fetch <url>` subcommand, v0.10.1 加 host-aware routing 让 `mp.weixin.qq.com` 走 OpenCLI 登录态。**parse 启动时机**: 等用户提"我要视频/音频内容解析"真 issue 再在本 repo 加 subcommand 或新 binary (YAGNI), **不开 sister repo**。
 
 ## 已发布版本
 
@@ -112,7 +112,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `omnireach diagnose --autopr` (用户 agent 自动 fix upstream bug 后自动 PR 回 repo)
 - e2e CI matrix 装真实 yt-dlp/gh/rdt-cli/opencli docker images
 - 公开发布到 Claude Marketplace
-- **本 repo 加 fetch binary 时, default backend 候选**: [unclecode/crawl4ai](https://github.com/unclecode/crawl4ai) (66K stars, Apache-2.0, Python+Playwright, 输出 Markdown, 内置反爬绕过 Cloudflare/Akamai/PerimeterX/DataDome) + [jina-ai/reader](https://github.com/jina-ai/reader) (10K stars, `r.jina.ai/<url>` 极简 SaaS, 免费额度大) 作 SaaS fallback。**注意 Crawl4AI 代码结构有 monolith 倾向** (extraction_strategy.py 120KB / async_crawler_strategy.py 118KB), fetch binary 立项时主动避免这个坑。当前临时方案: README「如何取全文」里写的 `omnireach + crwl` 手动 pipeline + doctor 报 crwl 是否在 PATH (v0.9.3 起)。
+- ~~**本 repo 加 fetch binary 时, default backend 候选**~~ — ✅ 已落地 v0.10 / v0.10.1: `omnireach fetch` 走 crwl ([unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)) 优先 + jina ([jina-ai/reader](https://github.com/jina-ai/reader)) fallback, mp.weixin.qq.com 加 OpenCLI 登录态 backend。**注意 Crawl4AI 代码结构有 monolith 倾向** (extraction_strategy.py 120KB / async_crawler_strategy.py 118KB), 但 omnireach 用的是 `crwl` CLI 不直接调 Python API, monolith 不影响我们。doctor 检测 crwl 在 PATH (v0.9.3+) + opencli `weixin download --stdout` 在 PATH (v0.10.1+)。
 - (Apache-2.0 License 切换问题不再适用 — monorepo 模型下整个仓库统一 MIT)
 
 ## 外部 issue 历史
