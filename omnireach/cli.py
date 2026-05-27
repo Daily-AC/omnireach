@@ -145,16 +145,17 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
 @main.command("doctor")
 @click.option("--json", "json_out", is_flag=True, help="输出 JSON, 适合下游 pipe")
 def doctor_cmd(json_out: bool) -> None:
-    """检查每个源的就绪状态."""
+    """检查每个源 + fetch backend 的就绪状态."""
     import platform
     import json as _json
 
-    from omnireach.doctor import run_doctor
+    from omnireach.doctor import run_doctor, run_fetch_backend_doctor
 
     plat = f"{platform.system()} {platform.release()} ({platform.machine()})"
     pyver = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
     statuses = asyncio.run(run_doctor())
+    fetch_backends = run_fetch_backend_doctor()
 
     if _should_emit_json(json_out):
         payload = {
@@ -166,12 +167,17 @@ def doctor_cmd(json_out: bool) -> None:
                  "detail": s.detail, "fix_hint": s.fix_hint}
                 for s in statuses
             ],
+            "fetch_backends": [
+                {"tool": b.tool, "ok": b.ok,
+                 "detail": b.detail, "fix_hint": b.fix_hint}
+                for b in fetch_backends
+            ],
         }
         click.echo(_json.dumps(payload, ensure_ascii=False))
         return
 
     console.print(f"[dim]omnireach {__version__} · {pyver} · {plat}[/dim]")
-    table = Table(title="omnireach doctor")
+    table = Table(title="omnireach doctor — sources")
     table.add_column("源", style="cyan")
     table.add_column("tier")
     table.add_column("状态")
@@ -181,6 +187,17 @@ def doctor_cmd(json_out: bool) -> None:
         icon = "✅" if s.ok else "❌"
         table.add_row(s.id, s.tier, icon, s.detail, s.fix_hint)
     console.print(table)
+
+    # v0.9.3: separate panel for fetch backends (URL → 全文 工具, omnireach 自己不做)
+    fb_table = Table(title="fetch backends — 把 search URL 拉成全文 (可选, 自动检测 PATH)")
+    fb_table.add_column("工具", style="cyan")
+    fb_table.add_column("状态")
+    fb_table.add_column("说明", style="dim")
+    fb_table.add_column("修复")
+    for b in fetch_backends:
+        icon = "✅" if b.ok else "❌"
+        fb_table.add_row(b.tool, icon, b.detail, b.fix_hint)
+    console.print(fb_table)
 
 
 main.add_command(init_cmd)

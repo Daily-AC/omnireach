@@ -8,19 +8,21 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
 
-## 关于命名: omnireach 是工具集 (suite), 不是单一工具
+## 关于命名: omnireach 是项目名, 同 repo 会出多个 sibling binary
 
-**omnireach** = `omni` (全部) + `reach` (触达)。完整的"触达全网"语义其实需要三层能力组合, 我们把它拆成三个独立工具:
+**omnireach** = `omni` (全部) + `reach` (触达)。完整的"触达全网"语义其实需要三层能力, 三层都会作为**本 repo 内的 sibling binary** 存在 (类比 `cargo` / `rustc` / `rustfmt` 同 Rust repo 模式, **不开 sister repo**):
 
-| 层 | 工具 | 职责 | 状态 |
+| 层 | binary | 职责 | 状态 |
 |---|---|---|---|
-| **search** | `omnireach` (本仓库) | 全网定位 — 返 metadata + URL, 不取内容 | ✅ v0.7+ 在用 |
-| **fetch** | `omnifetch` | 给定 URL 取全文 markdown | 🔜 未来 sister repo |
-| **parse** | `omniparse` | 视频/音频内容解析 (字幕/STT/逐帧) | 🔜 未来 sister repo |
+| **search** | `omnireach` | 全网定位 — 返 metadata + URL, 不取内容 | ✅ v0.7+ 在用 |
+| **fetch** | (暂未实现, 未来加在本 repo) | 给定 URL 取全文 markdown — 大概率 thin wrapper 套 [Crawl4AI](https://github.com/unclecode/crawl4ai) | 🔜 临时方案见下方「如何取全文」 |
+| **parse** | (暂未实现, 未来加在本 repo) | 视频/音频内容解析 (字幕/STT/逐帧) | 🔜 未启动 |
 
-本仓库的 `omnireach` binary **只负责 search 这一层** — 你拿到 metadata + URL 后, 想要全文请等 `omnifetch`, 想解析视频请等 `omniparse`。三层独立, 各干各的, 组合起来才是完整的"全网触达"。
+当前 `omnireach` binary **只负责 search 这一层** — 你拿到 metadata + URL 后, 想要全文请用 `omnireach + crwl` pipeline (Crawl4AI 的 `crwl` CLI), 想解析视频暂时也走 yt-dlp / whisper 这类外部工具组合。
 
-这样拆是有意为之 (对照 Anthropic Claude 自己的 [WebSearch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search) + [WebFetch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-fetch) 拆分): 每层 do one thing well, 不让 search 工具被解析任务拖累 token 和延迟, 也让 Agent 调用方有自由组合的空间。`omnifetch` / `omniparse` 等到真有用户需求才开 repo (YAGNI), 暂未启动。
+这样拆是有意为之 (对照 Anthropic Claude 自己的 [WebSearch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search) + [WebFetch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-fetch) 拆分): 每层 do one thing well, 不让 search 工具被解析任务拖累 token 和延迟, 也让 Agent 调用方有自由组合的空间。fetch / parse binary 等到真有用户需求才在本 repo 加 (YAGNI)。
+
+> ℹ️  `omnireach` binary 本身是否改名 (e.g. `omnisearch`, 因为它语义上只做 search 不做完整 reach) 暂未决, 等专门讨论。
 
 ## 为什么需要 omnireach
 
@@ -214,7 +216,7 @@ Crawl4AI (66K ⭐, Apache-2.0, 基于 Playwright) 内置 Cloudflare / Akamai / P
 
 SaaS 替代: [Jina Reader](https://r.jina.ai/) — 在任意 URL 前面拼 `https://r.jina.ai/`, 免费额度够个人项目用 (`curl https://r.jina.ai/https://example.com/article`)。
 
-> ℹ️  未来 omnireach 会有 sister repo `omnifetch` 把这条 pipeline 工具化, 但 YAGNI: 真有用户喊"我要直接拿全文"再开仓库。当前手动 pipe 完全够用。
+> ℹ️  未来本 repo 会加 fetch sibling binary 把这条 pipeline 工具化 (2026-05-27 拍板: 不开 sister repo, 都在本 repo 出 sibling binary), 但 YAGNI: 真有用户喊"我要直接拿全文"再加。当前手动 pipe 完全够用。
 
 ## ⚙️ 用户偏好 (v0.4)
 

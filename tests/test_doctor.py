@@ -71,3 +71,32 @@ def test_doctor_marks_bilibili_ok_with_exa_key(monkeypatch):
     statuses = asyncio.run(run_doctor())
     bili = next(s for s in statuses if s.id == "bilibili")
     assert bili.ok is True
+
+
+def test_v093_fetch_backend_doctor_lists_crwl():
+    """v0.9.3: doctor probes external fetch backends (currently just crwl)."""
+    from omnireach.doctor import run_fetch_backend_doctor
+    out = run_fetch_backend_doctor()
+    tools = [b.tool for b in out]
+    assert "crwl" in tools
+
+
+def test_v093_fetch_backend_doctor_ok_when_binary_present(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: f"/usr/bin/{b}" if b == "crwl" else None)
+    from omnireach.doctor import run_fetch_backend_doctor
+    out = run_fetch_backend_doctor()
+    crwl = next(b for b in out if b.tool == "crwl")
+    assert crwl.ok is True
+    assert "PATH" in crwl.detail
+    assert crwl.fix_hint == ""
+
+
+def test_v093_fetch_backend_doctor_fail_with_install_hint(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    from omnireach.doctor import run_fetch_backend_doctor
+    out = run_fetch_backend_doctor()
+    crwl = next(b for b in out if b.tool == "crwl")
+    assert crwl.ok is False
+    assert "不在 PATH" in crwl.detail
+    assert "crawl4ai" in crwl.fix_hint
+    assert "crawl4ai-setup" in crwl.fix_hint
