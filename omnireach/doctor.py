@@ -1,4 +1,4 @@
-"""Doctor — per-source readiness check."""
+"""Doctor — per-source readiness check + fetch-backend probe."""
 
 from __future__ import annotations
 
@@ -16,6 +16,51 @@ class SourceStatus:
     ok: bool
     detail: str
     fix_hint: str = ""
+
+
+@dataclass
+class FetchBackendStatus:
+    """v0.9.3: external fetch tool that complements omnireach's search layer.
+
+    omnireach returns metadata + URL only. To get full article content from
+    those URLs, users pipe into a fetch tool (currently Crawl4AI's `crwl`).
+    Doctor reports presence/absence so Agents know whether the full-content
+    pipeline is wired.
+    """
+
+    tool: str
+    ok: bool
+    detail: str
+    fix_hint: str = ""
+
+
+# v0.9.3: known fetch backends — currently just crwl, but designed for growth
+# (jina via curl, firecrawl, etc. could be added later).
+FETCH_BACKENDS = [
+    {
+        "tool": "crwl",
+        "purpose": "Crawl4AI — URL → 干净 Markdown (反爬绕 Cloudflare/Akamai 等)",
+        "fix_hint": "pip install -U crawl4ai && crawl4ai-setup",
+    },
+]
+
+
+def run_fetch_backend_doctor() -> list[FetchBackendStatus]:
+    """Probe each known fetch backend (binary on PATH)."""
+    out: list[FetchBackendStatus] = []
+    for b in FETCH_BACKENDS:
+        if shutil.which(b["tool"]):
+            out.append(FetchBackendStatus(
+                tool=b["tool"], ok=True,
+                detail=f"{b['purpose']} — 在 PATH",
+            ))
+        else:
+            out.append(FetchBackendStatus(
+                tool=b["tool"], ok=False,
+                detail=f"{b['purpose']} — 不在 PATH",
+                fix_hint=b["fix_hint"],
+            ))
+    return out
 
 
 BINARY_FOR_SOURCE = {
