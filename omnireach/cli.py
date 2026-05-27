@@ -154,13 +154,18 @@ def doctor_cmd(json_out: bool) -> None:
     import platform
     import json as _json
 
-    from omnireach.doctor import run_doctor, run_fetch_backend_doctor
+    from omnireach.doctor import (
+        run_doctor,
+        run_fetch_backend_doctor,
+        run_wechat_backend_doctor,
+    )
 
     plat = f"{platform.system()} {platform.release()} ({platform.machine()})"
     pyver = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
     statuses = asyncio.run(run_doctor())
     fetch_backends = run_fetch_backend_doctor()
+    wechat_backends = run_wechat_backend_doctor()
 
     if _should_emit_json(json_out):
         payload = {
@@ -176,6 +181,11 @@ def doctor_cmd(json_out: bool) -> None:
                 {"tool": b.tool, "ok": b.ok,
                  "detail": b.detail, "fix_hint": b.fix_hint}
                 for b in fetch_backends
+            ],
+            "wechat_backends": [
+                {"tool": b.tool, "ok": b.ok,
+                 "detail": b.detail, "fix_hint": b.fix_hint}
+                for b in wechat_backends
             ],
         }
         click.echo(_json.dumps(payload, ensure_ascii=False))
@@ -203,6 +213,17 @@ def doctor_cmd(json_out: bool) -> None:
         icon = "✅" if b.ok else "❌"
         fb_table.add_row(b.tool, icon, b.detail, b.fix_hint)
     console.print(fb_table)
+
+    # v0.10.1: host-specific cookie-strategy backend for mp.weixin.qq.com
+    wb_table = Table(title="wechat backends — mp.weixin.qq.com 登录态全文 (可选, 检测 OpenCLI + --stdout flag)")
+    wb_table.add_column("工具", style="cyan")
+    wb_table.add_column("状态")
+    wb_table.add_column("说明", style="dim")
+    wb_table.add_column("修复")
+    for b in wechat_backends:
+        icon = "✅" if b.ok else "❌"
+        wb_table.add_row(b.tool, icon, b.detail, b.fix_hint)
+    console.print(wb_table)
 
 
 main.add_command(init_cmd)
