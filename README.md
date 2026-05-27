@@ -12,15 +12,15 @@
 
 **omnireach** = `omni` (全部) + `reach` (触达)。完整的"触达全网"语义其实需要三层能力, 三层都会作为**本 repo 内的 sibling binary** 存在 (类比 `cargo` / `rustc` / `rustfmt` 同 Rust repo 模式, **不开 sister repo**):
 
-| 层 | binary | 职责 | 状态 |
+| 层 | 实现 | 职责 | 状态 |
 |---|---|---|---|
-| **search** | `omnireach` | 全网定位 — 返 metadata + URL, 不取内容 | ✅ v0.7+ 在用 |
-| **fetch** | (暂未实现, 未来加在本 repo) | 给定 URL 取全文 markdown — 大概率 thin wrapper 套 [Crawl4AI](https://github.com/unclecode/crawl4ai) | 🔜 临时方案见下方「如何取全文」 |
+| **search** | `omnireach search` subcommand | 全网定位 — 返 metadata + URL, 不取内容 | ✅ v0.7+ 在用 |
+| **fetch** | `omnireach fetch` subcommand | 给定 URL 取全文 markdown — host-aware: `mp.weixin.qq.com` 走 OpenCLI 登录态, 其它走 [Crawl4AI](https://github.com/unclecode/crawl4ai) → [Jina Reader](https://r.jina.ai/) | ✅ v0.10+ (wechat 路径 v0.10.1+) |
 | **parse** | (暂未实现, 未来加在本 repo) | 视频/音频内容解析 (字幕/STT/逐帧) | 🔜 未启动 |
 
-当前 `omnireach` binary **只负责 search 这一层** — 你拿到 metadata + URL 后, 想要全文请用 `omnireach + crwl` pipeline (Crawl4AI 的 `crwl` CLI), 想解析视频暂时也走 yt-dlp / whisper 这类外部工具组合。
+v0.10 起 `omnireach` 同时负责 search + fetch 两层 (subcommand 形式), 不再是单一 search 工具。想解析视频暂时仍走 yt-dlp / whisper 这类外部工具组合, parse binary 等真有用户需求才在本 repo 加 (YAGNI)。
 
-这样拆是有意为之 (对照 Anthropic Claude 自己的 [WebSearch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search) + [WebFetch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-fetch) 拆分): 每层 do one thing well, 不让 search 工具被解析任务拖累 token 和延迟, 也让 Agent 调用方有自由组合的空间。fetch / parse binary 等到真有用户需求才在本 repo 加 (YAGNI)。
+这样拆是有意为之 (对照 Anthropic Claude 自己的 [WebSearch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search) + [WebFetch](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-fetch) 拆分): 每层 do one thing well, 不让 search 被解析任务拖累 token 和延迟, 也让 Agent 调用方有自由组合的空间。
 
 > ℹ️  曾考虑把 `omnireach` binary 改名 `omnisearch`, 但 v0.10 落地 `omnireach fetch` subcommand 后该问题消解 —— `omnireach search` (触达 = 找) + `omnireach fetch` (触达 = 取) 都是 reach 的合理子动作, umbrella 名留给项目愿景。**不改名** (2026-05-27 decided).
 
@@ -32,7 +32,7 @@
 - 想看 Reddit / HN 的深度评论? 拿不到
 - 想读 YouTube 字幕、小红书种草、B 站技术视频? 完全不可达
 
-omnireach 把社区里已经成熟的三个上游工具 (**Agent-Reach** / **OpenCLI** / **last30days**) 当可插拔引擎调用, 对外只暴露一个轻量 CLI + 一个 Claude Skill, 实现 **3 分钟内**装好就能搜全网.
+omnireach 把成熟的上游工具 (**OpenCLI** Chrome 桥 + `yt-dlp` / `gh` / `rdt-cli` / `feedparser` / 各付费 search API) 当可插拔引擎调用, 对外只暴露一个轻量 CLI + 一个 Claude Skill, 实现 **3 分钟内**装好就能搜全网.
 
 ## 快速开始
 
@@ -72,7 +72,7 @@ omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 | **`omnireach fetch <url>`** (v0.10, v0.10.1) | **URL → 全文 markdown** — `mp.weixin.qq.com` 走 OpenCLI 登录态 Chrome (v0.10.1+), 其它 host 走 crwl → jina fallback |
 | `omnireach fetch <url> --backend jina` | 强制走 Jina Reader SaaS (零本地依赖) |
 | `omnireach fetch <url> --backend opencli` | 强制走 OpenCLI weixin 登录态路径 (v0.10.1+) |
-| `omnireach init` | 安装零配置依赖 |
+| `omnireach init` | 写默认 `~/.omnireach/preferences.toml` |
 | `omnireach sources` | 列出所有源 + 心愿单状态 |
 | `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 |
 | `omnireach doctor` | 健康检查 (含 sources / fetch backends / wechat backends) |
@@ -109,10 +109,12 @@ v0.9.2 加的 `not isatty()` 自动 JSON 在大多数场景够用, 但有些 Age
 | 💎 brave | booster | env `BRAVE_API_KEY` | 付费 (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | 付费 (v0.4) |
 | 💎 exa | booster | env `EXA_API_KEY` | 付费 web search (v0.5) |
-| wechat | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | 微信公众号 — v0.9 起默认走 Sogou 免费搜索; `EXA_API_KEY` 可选启用语义增强 |
+| wechat | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | 微信公众号 — search 走 Sogou 免费搜索 (`EXA_API_KEY` 可选启用语义增强); v0.10.1 起 `omnireach fetch <wechat-url>` 自动走 OpenCLI 登录态 Chrome 拿正文 |
 | bilibili | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | B站 — v0.9 起默认走 B站官方 search API; `EXA_API_KEY` 可选启用语义增强 |
 
 > **抖音 (douyin.com)** (v0.7.2): 走 `omnireach setup douyin`, 装 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI) (上游 PR [jackwener/OpenCLI#1759](https://github.com/jackwener/OpenCLI/pull/1759) 还在 review, 上游 merge + 发版后会切回 `@jackwener/opencli`)。需要在 Chrome 登录 www.douyin.com。`engagement.likes` 有真实数据 (DOM 抽取); `plays/comments/shares` 在搜索卡片上不暴露, 已 normalize 成 `null` 让下游 Agent 识别 unknown。
+
+> **微信公众号 fetch** (v0.10.1): `omnireach fetch <mp.weixin.qq.com URL>` 走同一个 Daily-AC/OpenCLI fork (`weixin download --stdout`, 上游 PR [jackwener/OpenCLI#1770](https://github.com/jackwener/OpenCLI/pull/1770) 跟 #1759 同状态等 review)。需要在 Chrome 打开过任一 mp.weixin.qq.com 文章 (无显式 login step, 浏览器 cookies 已存)。详见下方 [如何取全文](#如何取全文-v08) 段。
 
 > v0.4 及之前曾把 `web` 列为零配置, 实际不可用 (v0.1 起就是 architecture bug — 详见 `docs/superpowers/specs/2026-05-26-omnireach-v0.5-design.md`)。v0.5 起 web search 走 💎 exa booster (或任一付费 booster)。
 
@@ -144,7 +146,7 @@ Agent-Reach 是上游 installer/doctor 工具, 完全可选 — omnireach 自己
 
 | 平台 | 状态 | 说明 |
 |---|---|---|
-| macOS | ✅ 主要开发平台 | 全部源测试过 (HN/RSS/youtube/github/reddit/twitter/xhs + 4 booster + wechat/bilibili) |
+| macOS | ✅ 主要开发平台 | 全部源测试过 (HN/RSS/youtube/github/reddit/twitter/xhs/tiktok/douyin + 4 booster + wechat/bilibili); `omnireach fetch` 三 backend (crwl/jina/opencli) 都跑过 |
 | Linux | 🟡 best-effort | 应能 work；setup 流程对 `apt`/`pacman` 不自动 |
 | WSL2 | 🟡 best-effort | 跟 Linux 一样 |
 | Windows (原生 PowerShell) | 🟡 实验性 (v0.6.3+) | 代码已 macOS-假设解耦：secrets.env 不再调 POSIX chmod；preferences edit fallback notepad；setup github 提示加 `winget install GitHub.cli`；OpenCLI 类源 (twitter/xhs) 跨平台理论可用但未实测。**遇到问题请提 issue**。 |
