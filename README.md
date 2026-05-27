@@ -64,15 +64,32 @@ omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 
 | 命令 | 干嘛 |
 |---|---|
-| `omnireach search "<query>"` | 搜索 |
+| `omnireach search "<query>"` | 搜索 (SERP: metadata + URL) |
 | `omnireach search --on twitter,reddit "..."` | 指定源 |
-| `omnireach search --mode quick "..."` | 只查 web + hn |
+| `omnireach search --mode quick "..."` | 只查 hn |
 | `omnireach search --mode deep "..."` | 查所有就绪源 |
-| `omnireach search --json "..."` | 输出 JSON 给下游 pipe |
+| `omnireach search --json "..."` | 显式 JSON 输出 |
+| **`omnireach fetch <url>`** (v0.10) | **URL → 全文 markdown** (crwl 优先, jina fallback) |
+| `omnireach fetch <url> --backend jina` | 强制走 Jina Reader SaaS (零本地依赖) |
 | `omnireach init` | 安装零配置依赖 |
 | `omnireach sources` | 列出所有源 + 心愿单状态 |
-| `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 (Agent 装上游 + 你完成认证) |
-| `omnireach doctor` | 健康检查 |
+| `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 |
+| `omnireach doctor` | 健康检查 (含 fetch backend) |
+
+### Agent 调用约定 (v0.10)
+
+作为 Agent 调用 omnireach 时, **永远显式拿 JSON**, 防止 TTY 表格 wrap 让你抠不到字段:
+
+```bash
+# 方式 1: 每条命令加 --json
+omnireach search --json "..."
+omnireach fetch  --json "<url>"
+
+# 方式 2: 一次性 env (整个 Agent harness 生效, 推荐)
+export OMNIREACH_FORCE_JSON=1
+```
+
+v0.9.2 加的 `not isatty()` 自动 JSON 在大多数场景够用, 但有些 Agent 终端 (如 Antigravity) 给子进程分配真 PTY 让 isatty()=True, 自动检测失效 —— 显式 `--json` 或 env var 是 always-works 保险。
 
 ## 支持的源
 
