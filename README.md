@@ -69,12 +69,13 @@ omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 | `omnireach search --mode quick "..."` | 只查 hn |
 | `omnireach search --mode deep "..."` | 查所有就绪源 |
 | `omnireach search --json "..."` | 显式 JSON 输出 |
-| **`omnireach fetch <url>`** (v0.10) | **URL → 全文 markdown** (crwl 优先, jina fallback) |
+| **`omnireach fetch <url>`** (v0.10, v0.10.1) | **URL → 全文 markdown** — `mp.weixin.qq.com` 走 OpenCLI 登录态 Chrome (v0.10.1+), 其它 host 走 crwl → jina fallback |
 | `omnireach fetch <url> --backend jina` | 强制走 Jina Reader SaaS (零本地依赖) |
+| `omnireach fetch <url> --backend opencli` | 强制走 OpenCLI weixin 登录态路径 (v0.10.1+) |
 | `omnireach init` | 安装零配置依赖 |
 | `omnireach sources` | 列出所有源 + 心愿单状态 |
 | `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 |
-| `omnireach doctor` | 健康检查 (含 fetch backend) |
+| `omnireach doctor` | 健康检查 (含 sources / fetch backends / wechat backends) |
 
 ### Agent 调用约定 (v0.10)
 
@@ -209,31 +210,39 @@ omnireach search --json --on tavily "claude 4.7" | \
 
 其他源 (HN / GitHub / RSS / YouTube / 等) 的 content 一般 < 500 字, 多半 validator no-op, 但不保证 —— 真要全文兜底, 看 `result.raw` 有没有对应 key。
 
-### 真要全文怎么办 → omnireach + Crawl4AI pipeline
+### 真要全文怎么办 → `omnireach fetch <url>` (v0.10+)
 
-omnireach 是 search 层不抓全文。在 omnifetch sister repo 还没启动前 (YAGNI), 推荐手动 pipeline 用 [Crawl4AI](https://github.com/unclecode/crawl4ai) 的 `crwl` CLI 拉全文:
+v0.10 起 `omnireach fetch <url>` 是 search → 全文 pipeline 的官方收敛形态, **host-aware** 自动选 backend:
 
 ```bash
-# 一次装 Crawl4AI
-pip install -U crawl4ai && crawl4ai-setup
+# 任意网页 → crwl (本地 Crawl4AI) 优先, jina (r.jina.ai SaaS) fallback
+omnireach fetch https://example.com/article --json
 
-# omnireach 拿 URL → crwl 抓干净 Markdown
-omnireach search --on wechat "claude 4.7" \
+# 微信公众号 → 自动走 OpenCLI 登录态 Chrome (v0.10.1+), 绕过验证码
+omnireach fetch https://mp.weixin.qq.com/s/<token> --json
+
+# search → fetch pipeline 一气呵成
+omnireach search --on wechat "claude 4.7" --json \
   | jq -r '.results[].url' \
-  | xargs -I{} crwl {} -o markdown
-
-# 单条文章直接
-crwl "https://mp.weixin.qq.com/s/..." -o markdown > article.md
-
-# 整站深度抓 (BFS, 限 10 页)
-crwl https://docs.crawl4ai.com --deep-crawl bfs --max-pages 10
+  | xargs -I{} omnireach fetch --json {}
 ```
 
-Crawl4AI (66K ⭐, Apache-2.0, 基于 Playwright) 内置 Cloudflare / Akamai / PerimeterX / DataDome 反爬绕过, Sogou wechat 返的 `/link?url=...` redirect 也能直接拉穿到 mp.weixin.qq.com 出干净 Markdown。
+Backend 矩阵:
 
-SaaS 替代: [Jina Reader](https://r.jina.ai/) — 在任意 URL 前面拼 `https://r.jina.ai/`, 免费额度够个人项目用 (`curl https://r.jina.ai/https://example.com/article`)。
+| URL host | `--backend auto` 走 | 备注 |
+|---|---|---|
+| `mp.weixin.qq.com` | **opencli** (登录态 cookie-strategy) | 装 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI) 拿 `weixin download --stdout` flag (v0.10.1 commit fe28823+); 直接 `crwl` / `jina` 会被微信"环境异常"验证码拦 |
+| 其它 host | **crwl → jina** | Crawl4AI 优先, 失败/没装走 Jina Reader SaaS fallback |
 
-> ℹ️  未来本 repo 会加 fetch sibling binary 把这条 pipeline 工具化 (2026-05-27 拍板: 不开 sister repo, 都在本 repo 出 sibling binary), 但 YAGNI: 真有用户喊"我要直接拿全文"再加。当前手动 pipe 完全够用。
+显式 `--backend` 覆盖 auto:
+
+| Flag | 行为 |
+|---|---|
+| `--backend crwl` | 强制走 Crawl4AI 本地 (66K ⭐ Apache-2.0, 内置 Cloudflare/Akamai/DataDome 反爬绕过) |
+| `--backend jina` | 强制走 [Jina Reader](https://r.jina.ai/) SaaS — 零本地依赖, 免费额度大 |
+| `--backend opencli` | 强制走 OpenCLI weixin 登录态路径 (仅 mp.weixin.qq.com 有意义) |
+
+v0.10.1 给所有 backend 加 **CAPTCHA 启发式兜底**: 命中 `环境异常 / 完成验证后即可继续访问 / Cloudflare / Just a moment` 等关键词时, envelope `errors[]` 加一条 `captcha_suspected: ...`, markdown 字段保留 (graceful degrade — Agent 自己读 errors 决定信不信)。`omnireach doctor` 的 `wechat_backends` 段会 surface OpenCLI + `--stdout` 是否就绪。
 
 ## ⚙️ 用户偏好 (v0.4)
 

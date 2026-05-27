@@ -100,3 +100,71 @@ def test_v093_fetch_backend_doctor_fail_with_install_hint(monkeypatch):
     assert "不在 PATH" in crwl.detail
     assert "crawl4ai" in crwl.fix_hint
     assert "crawl4ai-setup" in crwl.fix_hint
+
+
+# ============================================================
+# v0.10.1: wechat backend (OpenCLI weixin download --stdout) doctor
+# ============================================================
+
+
+def test_v0101_wechat_backend_doctor_opencli_missing(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda b: None)
+    from omnireach.doctor import run_wechat_backend_doctor
+    out = run_wechat_backend_doctor()
+    assert len(out) == 1
+    wb = out[0]
+    assert wb.tool == "opencli weixin"
+    assert wb.ok is False
+    assert "不在 PATH" in wb.detail
+    assert "Daily-AC/OpenCLI" in wb.fix_hint
+
+
+def test_v0101_wechat_backend_doctor_opencli_present_with_stdout(monkeypatch):
+    """opencli on PATH AND --stdout flag in help output → ok=True."""
+    monkeypatch.setattr("shutil.which", lambda b: f"/usr/local/bin/{b}" if b == "opencli" else None)
+    from unittest.mock import MagicMock
+    proc = MagicMock()
+    proc.returncode = 0
+    proc.stdout = "Usage: opencli weixin download [options]\nOptions:\n  --url <url>\n  --stdout  Print markdown to stdout\n"
+    proc.stderr = ""
+    monkeypatch.setattr("subprocess.run", lambda *a, **kw: proc)
+    from omnireach.doctor import run_wechat_backend_doctor
+    out = run_wechat_backend_doctor()
+    wb = out[0]
+    assert wb.ok is True
+    assert "--stdout" in wb.detail or "在 PATH" in wb.detail
+
+
+def test_v0101_wechat_backend_doctor_opencli_missing_stdout_flag(monkeypatch):
+    """opencli installed but old build without --stdout flag → ok=False with fork hint."""
+    monkeypatch.setattr("shutil.which", lambda b: f"/usr/local/bin/{b}" if b == "opencli" else None)
+    from unittest.mock import MagicMock
+    proc = MagicMock()
+    proc.returncode = 0
+    # Old build help text — no --stdout option listed
+    proc.stdout = "Usage: opencli weixin download [options]\nOptions:\n  --url <url>\n  --output <dir>\n"
+    proc.stderr = ""
+    monkeypatch.setattr("subprocess.run", lambda *a, **kw: proc)
+    from omnireach.doctor import run_wechat_backend_doctor
+    out = run_wechat_backend_doctor()
+    wb = out[0]
+    assert wb.ok is False
+    assert "--stdout" in wb.detail
+    assert "Daily-AC/OpenCLI" in wb.fix_hint
+
+
+def test_v0101_wechat_backend_doctor_opencli_help_nonzero(monkeypatch):
+    """opencli installed but `weixin download` subcommand absent → ok=False."""
+    monkeypatch.setattr("shutil.which", lambda b: f"/usr/local/bin/{b}" if b == "opencli" else None)
+    from unittest.mock import MagicMock
+    proc = MagicMock()
+    proc.returncode = 1
+    proc.stdout = ""
+    proc.stderr = "unknown command: weixin"
+    monkeypatch.setattr("subprocess.run", lambda *a, **kw: proc)
+    from omnireach.doctor import run_wechat_backend_doctor
+    out = run_wechat_backend_doctor()
+    wb = out[0]
+    assert wb.ok is False
+    assert "weixin download" in wb.detail
+    assert "Daily-AC/OpenCLI" in wb.fix_hint

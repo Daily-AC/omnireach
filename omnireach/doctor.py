@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass
 
 from omnireach.registry import load_registry
@@ -26,6 +27,23 @@ class FetchBackendStatus:
     those URLs, users pipe into a fetch tool (currently Crawl4AI's `crwl`).
     Doctor reports presence/absence so Agents know whether the full-content
     pipeline is wired.
+    """
+
+    tool: str
+    ok: bool
+    detail: str
+    fix_hint: str = ""
+
+
+@dataclass
+class WechatBackendStatus:
+    """v0.10.1: host-specific cookie-strategy backend for mp.weixin.qq.com.
+
+    Generic web fetchers (crwl, jina) get verification-page-trapped on
+    WeChat article URLs. OpenCLI's `weixin download --stdout` uses the
+    user's logged-in Chrome profile to bypass this. Doctor reports whether
+    OpenCLI is on PATH AND whether the `--stdout` flag is available
+    (M2 added it; older OpenCLI builds may not have it).
     """
 
     tool: str
@@ -60,6 +78,59 @@ def run_fetch_backend_doctor() -> list[FetchBackendStatus]:
                 detail=f"{b['purpose']} — 不在 PATH",
                 fix_hint=b["fix_hint"],
             ))
+    return out
+
+
+def run_wechat_backend_doctor() -> list[WechatBackendStatus]:
+    """v0.10.1: probe OpenCLI + verify it has the `weixin download --stdout` flag.
+
+    Three states:
+    - opencli not on PATH → ok=False, install hint
+    - opencli on PATH but `weixin download --help` lacks `--stdout` → ok=False,
+      fork-update hint (their build is older than Daily-AC fork commit fe28823)
+    - opencli on PATH AND `--stdout` present → ok=True
+    """
+    out: list[WechatBackendStatus] = []
+    install_hint = "npm i -g github:Daily-AC/OpenCLI"
+    purpose = "OpenCLI weixin download — mp.weixin.qq.com 登录态全文抓取"
+    if not shutil.which("opencli"):
+        out.append(WechatBackendStatus(
+            tool="opencli weixin", ok=False,
+            detail=f"{purpose} — opencli 不在 PATH",
+            fix_hint=install_hint,
+        ))
+        return out
+    try:
+        proc = subprocess.run(
+            ["opencli", "weixin", "download", "--help"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        out.append(WechatBackendStatus(
+            tool="opencli weixin", ok=False,
+            detail=f"{purpose} — `opencli weixin download --help` 未响应",
+            fix_hint=install_hint,
+        ))
+        return out
+    help_text = (proc.stdout or "") + (proc.stderr or "")
+    if proc.returncode != 0:
+        out.append(WechatBackendStatus(
+            tool="opencli weixin", ok=False,
+            detail=f"{purpose} — `weixin download` 子命令不存在",
+            fix_hint=install_hint,
+        ))
+        return out
+    if "--stdout" not in help_text:
+        out.append(WechatBackendStatus(
+            tool="opencli weixin", ok=False,
+            detail=f"{purpose} — 缺 `--stdout` flag (build 早于 Daily-AC fork commit fe28823)",
+            fix_hint=install_hint,
+        ))
+        return out
+    out.append(WechatBackendStatus(
+        tool="opencli weixin", ok=True,
+        detail=f"{purpose} — opencli + `weixin download --stdout` 在 PATH",
+    ))
     return out
 
 
