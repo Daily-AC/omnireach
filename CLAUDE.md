@@ -18,9 +18,18 @@ This file is loaded automatically when Claude Code starts in this repo. It carri
 
 ## 目标用户与痛点
 
-omnireach 是给中转站 (cliproxy / anyrouter / 各类 OpenAI 兼容代理) 的 Agent 用户的工具, 因为他们用不了 Anthropic 原生 WebSearch。CLI + Claude Code Skill 双形态。
+omnireach 是给**任何 Claude Code WebSearch 不可用**的用户的工具 — 受众比"中转站"宽得多。
 
-**Why**: 中转站丢掉的服务端工具里 WebSearch 损失最重 —— Twitter / Reddit / 小红书 / B站 / 抖音 / 微信 全够不着。用户痛点是这个, 不是 web 搜索本身。
+**真根因** (查 `~/claude-code-source/src/tools/WebSearchTool/WebSearchTool.ts` 的 `isEnabled()`): Claude Code 客户端只给三种 provider 开 WebSearch:
+- `firstParty` (Anthropic 直连)
+- `vertex` (Vertex AI + Claude 4+ model)
+- `foundry` (Azure AI Foundry)
+
+**其它一律 return false**, 包括 AWS Bedrock / 自托管 gateway / 改了 `ANTHROPIC_BASE_URL` 的任何场景 / OpenAI 兼容中转站。中转站只是最 visible 的一类, 不是唯一。
+
+**Why omnireach 不止补缺**: 即使 provider 在 allowlist 里 WebSearch 也开了, 它也搜不全 — Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok 这些纵向源服务端 WebSearch 几乎都够不着。omnireach 双重价值: (1) 给 isEnabled=false 的人**补缺**; (2) 给 isEnabled=true 的人**补纵向**。CLI + Claude Code Skill 双形态。
+
+**历史措辞修订** (2026-06-03): 之前 README / SKILL / 本文件都把痛点描述成"中转站丢 WebSearch", 这是 narrow framing。真根因是 Claude Code 客户端 `isEnabled()` 的 provider allowlist, 中转站是其中一个 instance。受众/文案 reframe 后涵盖 Bedrock + 自托管 + 各类 proxy 全场景。
 
 - 位置: `~/Projects/omnireach`
 - GitHub: https://github.com/Daily-AC/omnireach (Public, MIT, 归属 Daily-AC)

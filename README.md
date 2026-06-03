@@ -26,13 +26,27 @@ v0.10 起 `omnireach` 同时负责 search + fetch 两层 (subcommand 形式), �
 
 ## 为什么需要 omnireach
 
-中转站 (cliproxy / anyrouter / 各种 OpenAI 兼容代理) 让国内同学绕开付费、能调多模型, 但代价是丢掉了 Anthropic 服务端工具, 其中 **WebSearch** 是损失最重的一项:
+Claude Code 的 WebSearch / WebFetch 是**服务端工具**, 但客户端 `WebSearchTool.isEnabled()` (见 [`tools/WebSearchTool/WebSearchTool.ts`](https://github.com/anthropics/claude-code/) 同名文件) 把它限制在三种 provider:
 
-- 想搜 Twitter 上的实时讨论? 原生 WebSearch 几乎抓不到
-- 想看 Reddit / HN 的深度评论? 拿不到
-- 想读 YouTube 字幕、小红书种草、B 站技术视频? 完全不可达
+- `firstParty` (Anthropic 直连 API)
+- `vertex` (Google Vertex AI, 且必须 Claude 4+ model)
+- `foundry` (Azure AI Foundry)
 
-omnireach 把成熟的上游工具 (**OpenCLI** Chrome 桥 + `yt-dlp` / `gh` / `rdt-cli` / `feedparser` / 各付费 search API) 当可插拔引擎调用, 对外只暴露一个轻量 CLI + 一个 Claude Skill, 实现 **3 分钟内**装好就能搜全网.
+走 **其它任何** provider 时 WebSearch 一律不开, 受影响人群比想象中广:
+
+- AWS **Bedrock** 用户 (大量企业内部场景)
+- 任何**自托管 gateway** (合规 / 安全 / 内网代理 / 流量审计需求)
+- 改了 `ANTHROPIC_BASE_URL` 的场景 (debug proxy / 社区 fork / 临时调试)
+- 各种 OpenAI 兼容**中转站** (cliproxy / anyrouter 等) — 最常见但只是冰山一角
+
+而且即使你**有** WebSearch, 它也搜不全 — Twitter 实时讨论 / Reddit 深度评论 / 小红书种草 / 微信公众号文章 / 抖音 / B站技术视频 这些纵向源, 服务端 WebSearch 几乎都够不着。
+
+omnireach 就为这两件事写:
+
+1. 给**任何 provider** (不管 Claude Code `isEnabled()` 怎么 gate) 补一个轻量 search + fetch CLI
+2. 同时把 Twitter / Reddit / 小红书 / 抖音 / B站 / 微信公众号 等纵向源接进来
+
+把成熟的上游工具 (**OpenCLI** Chrome 桥 + `yt-dlp` / `gh` / `rdt-cli` / `feedparser` / 各付费 search API) 当可插拔引擎调用, 对外只暴露一个轻量 CLI + 一个 Claude Skill, **3 分钟内**装好就能用。
 
 ## 快速开始
 
