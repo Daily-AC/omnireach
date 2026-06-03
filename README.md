@@ -26,27 +26,28 @@ v0.10 起 `omnireach` 同时负责 search + fetch 两层 (subcommand 形式), �
 
 ## 为什么需要 omnireach
 
-Claude Code 的 WebSearch / WebFetch 是**服务端工具**, 但客户端 `WebSearchTool.isEnabled()` (见 [`tools/WebSearchTool/WebSearchTool.ts`](https://github.com/anthropics/claude-code/) 同名文件) 把它限制在三种 provider:
+Claude Code 的 WebSearch 是**服务端 server tool** (`web_search_20250305`), 真实可用性其实经过 **两层 gate**:
 
-- `firstParty` (Anthropic 直连 API)
-- `vertex` (Google Vertex AI, 且必须 Claude 4+ model)
-- `foundry` (Azure AI Foundry)
+**1. 客户端 gate** — `WebSearchTool.isEnabled()` 看 `getAPIProvider()`:
+- 默认 `firstParty` (没设 `CLAUDE_CODE_USE_*` env var 时, 包括只改了 `ANTHROPIC_BASE_URL` 的场景) → tool **注册**
+- 显式 `CLAUDE_CODE_USE_BEDROCK=1` → tool 关
+- 显式 `CLAUDE_CODE_USE_VERTEX=1` + Claude 4+ → 注册, 老 Claude → 关
+- 显式 `CLAUDE_CODE_USE_FOUNDRY=1` → 注册
 
-走 **其它任何** provider 时 WebSearch 一律不开, 受影响人群比想象中广:
+**2. 上游服务 gate** — 客户端把 tool schema 发出去后, 上游 API 必须真懂 `web_search_20250305` 这个 Anthropic-native server tool:
+- 真 Anthropic API (api.anthropic.com): ✓ 服务端跑 WebSearch
+- Vertex / Foundry: ✓ (model 在支持列表里时)
+- **OpenAI 兼容中转站** (cliproxy / anyrouter 等): 客户端把它当 firstParty 发 tool, **但上游底层是 OpenAI / Gemini / Claude API wrapper**, 不识 server tool → 失败
+- **自托管 gateway / 任何改 `ANTHROPIC_BASE_URL` 的 proxy**: 取决于 gateway 是否真转发到 Anthropic + 是否保留 server tool 语义 (大多数不保留)
 
-- AWS **Bedrock** 用户 (大量企业内部场景)
-- 任何**自托管 gateway** (合规 / 安全 / 内网代理 / 流量审计需求)
-- 改了 `ANTHROPIC_BASE_URL` 的场景 (debug proxy / 社区 fork / 临时调试)
-- 各种 OpenAI 兼容**中转站** (cliproxy / anyrouter 等) — 最常见但只是冰山一角
+也就是说, 几个常见痛点的**真根因不一样**:
+- 中转站用户: 客户端发了 tool, **上游不是真 Anthropic** 处理不了
+- 显式 Bedrock 用户 / Vertex Claude 3.x 用户: 客户端就关了
+- 自托管 gateway: 看 gateway 实现 (一般不实现)
 
-而且即使你**有** WebSearch, 它也搜不全 — Twitter 实时讨论 / Reddit 深度评论 / 小红书种草 / 微信公众号文章 / 抖音 / B站技术视频 这些纵向源, 服务端 WebSearch 几乎都够不着。
+而且即使你**真有** WebSearch (firstParty 直连或 Vertex 4+), 它也搜不全 — Twitter 实时讨论 / Reddit 深度评论 / 小红书种草 / 微信公众号文章 / 抖音 / B站技术视频 这些纵向源, 服务端 WebSearch 几乎都够不着。
 
-omnireach 就为这两件事写:
-
-1. 给**任何 provider** (不管 Claude Code `isEnabled()` 怎么 gate) 补一个轻量 search + fetch CLI
-2. 同时把 Twitter / Reddit / 小红书 / 抖音 / B站 / 微信公众号 等纵向源接进来
-
-把成熟的上游工具 (**OpenCLI** Chrome 桥 + `yt-dlp` / `gh` / `rdt-cli` / `feedparser` / 各付费 search API) 当可插拔引擎调用, 对外只暴露一个轻量 CLI + 一个 Claude Skill, **3 分钟内**装好就能用。
+omnireach 给所有这些用户补一个**客户端实现的多源 search + fetch CLI** (绕过两层 gate, 直接走 OpenCLI Chrome 桥 / `yt-dlp` / `gh` / 各付费 search API), 对外只暴露一个轻量 CLI + 一个 Claude Skill, **3 分钟内**装好就能用。
 
 ## 快速开始
 

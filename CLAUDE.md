@@ -18,18 +18,33 @@ This file is loaded automatically when Claude Code starts in this repo. It carri
 
 ## 目标用户与痛点
 
-omnireach 是给**任何 Claude Code WebSearch 不可用**的用户的工具 — 受众比"中转站"宽得多。
+omnireach 是给**任何 Claude Code WebSearch 拿不到结果**的用户的工具 — 受众比"中转站"宽得多。
 
-**真根因** (查 `~/claude-code-source/src/tools/WebSearchTool/WebSearchTool.ts` 的 `isEnabled()`): Claude Code 客户端只给三种 provider 开 WebSearch:
-- `firstParty` (Anthropic 直连)
-- `vertex` (Vertex AI + Claude 4+ model)
-- `foundry` (Azure AI Foundry)
+**WebSearch 是 server tool** (`web_search_20250305`), 真实可用性其实经过**两层 gate**, 受影响场景**不同根因不同**:
 
-**其它一律 return false**, 包括 AWS Bedrock / 自托管 gateway / 改了 `ANTHROPIC_BASE_URL` 的任何场景 / OpenAI 兼容中转站。中转站只是最 visible 的一类, 不是唯一。
+**1. 客户端 gate** (`WebSearchTool.isEnabled()` + `getAPIProvider()` 看 `CLAUDE_CODE_USE_*` env var):
+- 默认 `firstParty` (没设 `CLAUDE_CODE_USE_*`, 即便只改了 `ANTHROPIC_BASE_URL` 也归这类) → tool 注册
+- 显式 `CLAUDE_CODE_USE_BEDROCK=1` → 关
+- 显式 `CLAUDE_CODE_USE_VERTEX=1` + Claude 4+ → 注册; 老 Claude → 关
+- 显式 `CLAUDE_CODE_USE_FOUNDRY=1` → 注册
 
-**Why omnireach 不止补缺**: 即使 provider 在 allowlist 里 WebSearch 也开了, 它也搜不全 — Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok 这些纵向源服务端 WebSearch 几乎都够不着。omnireach 双重价值: (1) 给 isEnabled=false 的人**补缺**; (2) 给 isEnabled=true 的人**补纵向**。CLI + Claude Code Skill 双形态。
+**2. 上游服务 gate** (上游 API 必须真实现 `web_search_20250305` server tool):
+- 真 Anthropic (api.anthropic.com): ✓
+- Vertex / Foundry 支持的 model: ✓
+- **OpenAI 兼容中转站** (cliproxy / anyrouter): 客户端把它当 firstParty 发 tool, 上游底层是 OpenAI / Gemini / wrapper → ✗ 失败
+- **自托管 gateway / 任何改 `ANTHROPIC_BASE_URL` 的 proxy**: 看 gateway 是否真转发 + 是否保留 server tool 语义 — 大多数不保留
 
-**历史措辞修订** (2026-06-03): 之前 README / SKILL / 本文件都把痛点描述成"中转站丢 WebSearch", 这是 narrow framing。真根因是 Claude Code 客户端 `isEnabled()` 的 provider allowlist, 中转站是其中一个 instance。受众/文案 reframe 后涵盖 Bedrock + 自托管 + 各类 proxy 全场景。
+**分场景痛点根因**:
+- 中转站用户: **上游不是真 Anthropic**, 客户端发了 tool 但上游处理不了 (不是 isEnabled 关的)
+- 显式 Bedrock 用户 / Vertex Claude 3.x: 客户端 isEnabled 直接关
+- 自托管 gateway: 看 gateway 实现
+
+**Why omnireach 不止补缺**: 即使 WebSearch 可用 (firstParty 直连), 它也搜不全 — Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok 这些纵向源服务端 WebSearch 几乎都够不着。omnireach 三重价值: (1) 给客户端 gate 关掉的用户**补缺**; (2) 给上游不实现 server tool 的用户**补缺**; (3) 给 WebSearch 可用但搜不到纵向源的用户**补纵向**。CLI + Claude Code Skill 双形态。
+
+**历史措辞修订 (2026-06-03 二轮)**:
+- 第一轮 (上午): README/SKILL/本文件痛点写"中转站丢 WebSearch" — narrow
+- 第二轮 (今晚): 把根因改成"Claude Code 客户端 `isEnabled()` allowlist" — 仍然错, 因为 `isEnabled()` 看的是 `CLAUDE_CODE_USE_*` env var, 不是 `ANTHROPIC_BASE_URL`, 中转站用户实际 isEnabled=true
+- 第三轮 (现在): 拆成两层 gate, 客户端 isEnabled 控 Bedrock/Vertex-老; 上游服务 gate 控中转站/gateway。这才是准确的。
 
 - 位置: `~/Projects/omnireach`
 - GitHub: https://github.com/Daily-AC/omnireach (Public, MIT, 归属 Daily-AC)
