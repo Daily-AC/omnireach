@@ -1,11 +1,11 @@
 ---
 name: omnireach
-description: Use when the user needs to search the web or read content from Twitter / Reddit / YouTube / Bilibili / 小红书 / TikTok / 抖音 / HackerNews / GitHub / 微信公众号 / RSS — especially when the built-in WebSearch is unavailable. Claude Code only enables WebSearch for firstParty / Vertex (Claude 4+) / Foundry providers; Bedrock, self-hosted gateways, custom ANTHROPIC_BASE_URL setups, and OpenAI-compatible relay stations all lack it. Provides a unified search command + a unified fetch command (URL → full markdown) across multiple platforms.
+description: Use when the user needs to search the web or read content from Twitter / Reddit / YouTube / Bilibili / 小红书 / TikTok / 抖音 / HackerNews / GitHub / 微信公众号 / RSS — especially when Claude Code's built-in WebSearch is unavailable. WebSearch is a server tool with two layers of gating: client-side (Claude Code disables it for explicit CLAUDE_CODE_USE_BEDROCK / Vertex+Claude3.x), and upstream-service (the API endpoint must implement web_search_20250305 server tool — relay stations / OpenAI-compatible proxies / self-hosted gateways often don't). Provides a unified search command + a unified fetch command (URL → full markdown) across multiple platforms.
 ---
 
 # omnireach — 全网通搜索 + 全文抓取
 
-omnireach 是一个 CLI 工具集, 把 web 搜索 + 多平台读取 (Twitter / Reddit / YouTube / B站 / 小红书 / HN / GitHub / 微信公众号 / RSS) 整合到一条命令里. 对于**任何走 non-firstParty / non-Vertex+4 / non-Foundry provider** 的 Claude Code 用户 (Bedrock / 自托管 gateway / 中转站 / 自定义 ANTHROPIC_BASE_URL), Claude Code 客户端默认不开 WebSearch — omnireach 是给这群用户的"全网通"替代品。同时即使 WebSearch 可用, 它也搜不到 Twitter / 小红书 / 微信公众号 等纵向源, omnireach 也能补齐。
+omnireach 是一个 CLI 工具集, 把 web 搜索 + 多平台读取 (Twitter / Reddit / YouTube / B站 / 小红书 / HN / GitHub / 微信公众号 / RSS) 整合到一条命令里。Claude Code 的 WebSearch 是 server tool, 真实可用性经过两层 gate: (a) 客户端 `isEnabled()` 看 `CLAUDE_CODE_USE_*` env var (默认 firstParty 注册 tool, Bedrock 显式关); (b) 上游 API 必须真实现 `web_search_20250305` (真 Anthropic ✓; OpenAI 兼容中转站 / 大多数 gateway ✗)。omnireach 给两层 gate 任一关掉的用户补一个客户端实现的多源 search + fetch。同时即使 WebSearch 可用, 它也搜不到 Twitter / 小红书 / 微信公众号 等纵向源, omnireach 也能补齐。
 
 v0.10 起两个核心子命令:
 - `omnireach search <query>` → 全网 SERP (metadata + URL)
