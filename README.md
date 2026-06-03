@@ -34,16 +34,19 @@ Claude Code 的 WebSearch 是**服务端 server tool** (`web_search_20250305`), 
 - 显式 `CLAUDE_CODE_USE_VERTEX=1` + Claude 4+ → 注册, 老 Claude → 关
 - 显式 `CLAUDE_CODE_USE_FOUNDRY=1` → 注册
 
-**2. 上游服务 gate** — 客户端把 tool schema 发出去后, 上游 API 必须真懂 `web_search_20250305` 这个 Anthropic-native server tool:
-- 真 Anthropic API (api.anthropic.com): ✓ 服务端跑 WebSearch
-- Vertex / Foundry: ✓ (model 在支持列表里时)
-- **OpenAI 兼容中转站** (cliproxy / anyrouter 等): 客户端把它当 firstParty 发 tool, **但上游底层是 OpenAI / Gemini / Claude API wrapper**, 不识 server tool → 失败
-- **自托管 gateway / 任何改 `ANTHROPIC_BASE_URL` 的 proxy**: 取决于 gateway 是否真转发到 Anthropic + 是否保留 server tool 语义 (大多数不保留)
+**2. 上游 server tool 实现 gate** — 客户端把 tool schema 发出去后, 上游 API 服务**必须专门实现** `web_search_20250305` 这个 server tool (即接收 → 跑搜索 → 返结果给客户端):
+- 真 Anthropic API (api.anthropic.com): ✓ 服务端原生跑
+- Vertex / Foundry: ✓ (各自 backend 实现了)
+- **专门支持 Claude Code 的第三方模型厂** (e.g. DeepSeek 的 Anthropic-compat 端点): ✓ 他们专门做了 server tool 处理, 接到自己的搜索后端
+- **OpenAI 兼容中转站** (cliproxy / anyrouter 等, 把 Claude API → OpenAI Chat Completions 单纯转译): ✗ 不识 server tool 这套语义
+- **自托管 gateway / 大部分 proxy**: ✗ 一般不专门实现
 
-也就是说, 几个常见痛点的**真根因不一样**:
-- 中转站用户: 客户端发了 tool, **上游不是真 Anthropic** 处理不了
-- 显式 Bedrock 用户 / Vertex Claude 3.x 用户: 客户端就关了
-- 自托管 gateway: 看 gateway 实现 (一般不实现)
+也就是说, 上游 gate 看的是**"上游有没有专门做 Claude Code server tool 兼容"**, 不是"是否真 Anthropic"。专门支持 Claude Code 的厂商 (Anthropic / DeepSeek / Foundry / Vertex+Claude4+ / Bedrock-with-special-config) 都实现; 单纯做 API 转译的中转站不实现。
+
+几个常见痛点的**根因不一样**:
+- 用 DeepSeek 等专门支持 Claude Code 的第三方: 两层 gate 都过, WebSearch ✓
+- OpenAI 兼容中转站用户: 客户端发了 tool, **上游没实现 server tool 处理** → 失败
+- 显式 Bedrock 用户 / Vertex Claude 3.x 用户: 客户端 isEnabled 就关
 
 而且即使你**真有** WebSearch (firstParty 直连或 Vertex 4+), 它也搜不全 — Twitter 实时讨论 / Reddit 深度评论 / 小红书种草 / 微信公众号文章 / 抖音 / B站技术视频 这些纵向源, 服务端 WebSearch 几乎都够不着。
 

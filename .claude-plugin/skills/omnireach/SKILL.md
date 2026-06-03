@@ -1,11 +1,11 @@
 ---
 name: omnireach
-description: Use when the user needs to search the web or read content from Twitter / Reddit / YouTube / Bilibili / 小红书 / TikTok / 抖音 / HackerNews / GitHub / 微信公众号 / RSS — especially when Claude Code's built-in WebSearch is unavailable. WebSearch is a server tool with two layers of gating: client-side (Claude Code disables it for explicit CLAUDE_CODE_USE_BEDROCK / Vertex+Claude3.x), and upstream-service (the API endpoint must implement web_search_20250305 server tool — relay stations / OpenAI-compatible proxies / self-hosted gateways often don't). Provides a unified search command + a unified fetch command (URL → full markdown) across multiple platforms.
+description: Use when the user needs to search the web or read content from Twitter / Reddit / YouTube / Bilibili / 小红书 / TikTok / 抖音 / HackerNews / GitHub / 微信公众号 / RSS — especially when Claude Code's built-in WebSearch is unavailable. WebSearch is a server tool with two layers of gating: (1) client-side isEnabled() checks CLAUDE_CODE_USE_* env vars (blocks explicit Bedrock / Vertex+Claude3.x); (2) upstream-service must specifically implement the web_search_20250305 server tool. Providers that explicitly target Claude Code compatibility (Anthropic API, DeepSeek's Anthropic-compat endpoint, Foundry, Vertex+Claude4+) implement it; OpenAI-compatible relay stations and most self-hosted gateways that just transform Claude API → OpenAI Chat Completions don't. Provides a unified search command + fetch command (URL → full markdown) across multiple platforms.
 ---
 
 # omnireach — 全网通搜索 + 全文抓取
 
-omnireach 是一个 CLI 工具集, 把 web 搜索 + 多平台读取 (Twitter / Reddit / YouTube / B站 / 小红书 / HN / GitHub / 微信公众号 / RSS) 整合到一条命令里。Claude Code 的 WebSearch 是 server tool, 真实可用性经过两层 gate: (a) 客户端 `isEnabled()` 看 `CLAUDE_CODE_USE_*` env var (默认 firstParty 注册 tool, Bedrock 显式关); (b) 上游 API 必须真实现 `web_search_20250305` (真 Anthropic ✓; OpenAI 兼容中转站 / 大多数 gateway ✗)。omnireach 给两层 gate 任一关掉的用户补一个客户端实现的多源 search + fetch。同时即使 WebSearch 可用, 它也搜不到 Twitter / 小红书 / 微信公众号 等纵向源, omnireach 也能补齐。
+omnireach 是一个 CLI 工具集, 把 web 搜索 + 多平台读取 (Twitter / Reddit / YouTube / B站 / 小红书 / HN / GitHub / 微信公众号 / RSS) 整合到一条命令里。Claude Code 的 WebSearch 是 server tool, 真实可用性经过两层 gate: (a) 客户端 `isEnabled()` 看 `CLAUDE_CODE_USE_*` env var (默认 firstParty 注册 tool, 显式 Bedrock 关); (b) 上游 API 必须**专门实现** `web_search_20250305` server tool (Anthropic / DeepSeek / Foundry / Vertex+Claude4+ 等专门做 Claude Code 兼容的都实现; 单纯做 API 转译的 OpenAI 兼容中转站和大部分自托管 gateway 不实现)。omnireach 给两层 gate 任一关掉的用户补一个客户端实现的多源 search + fetch。同时即使 WebSearch 可用, 它也搜不到 Twitter / 小红书 / 微信公众号 等纵向源, omnireach 也能补齐。
 
 v0.10 起两个核心子命令:
 - `omnireach search <query>` → 全网 SERP (metadata + URL)
