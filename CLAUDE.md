@@ -28,23 +28,27 @@ omnireach 是给**任何 Claude Code WebSearch 拿不到结果**的用户的工�
 - 显式 `CLAUDE_CODE_USE_VERTEX=1` + Claude 4+ → 注册; 老 Claude → 关
 - 显式 `CLAUDE_CODE_USE_FOUNDRY=1` → 注册
 
-**2. 上游服务 gate** (上游 API 必须真实现 `web_search_20250305` server tool):
-- 真 Anthropic (api.anthropic.com): ✓
-- Vertex / Foundry 支持的 model: ✓
-- **OpenAI 兼容中转站** (cliproxy / anyrouter): 客户端把它当 firstParty 发 tool, 上游底层是 OpenAI / Gemini / wrapper → ✗ 失败
-- **自托管 gateway / 任何改 `ANTHROPIC_BASE_URL` 的 proxy**: 看 gateway 是否真转发 + 是否保留 server tool 语义 — 大多数不保留
+**2. 上游 server tool 实现 gate** (上游 API 必须**专门实现** `web_search_20250305` server tool — 即接 tool call → 跑搜索 → 返结果给客户端):
+- 真 Anthropic (api.anthropic.com): ✓ 原生实现
+- Vertex / Foundry 支持的 model: ✓ 各自 backend 实现了
+- **专门支持 Claude Code 的第三方模型厂** (e.g. DeepSeek 的 Anthropic-compat 端点): ✓ 他们专门做了 server tool 处理, 接到自己的搜索后端 (data point: 2026-06-03 user 实测)
+- **OpenAI 兼容中转站** (cliproxy / anyrouter 等, 把 Claude API → OpenAI Chat Completions 单纯转译): ✗ 不识 server tool 语义
+- **自托管 gateway / 大部分 proxy**: ✗ 一般不专门实现
+
+**关键 insight**: 上游 gate 看的是**"上游有没有专门做 Claude Code server tool 兼容"**, 不是"是否真 Anthropic"。专门支持 Claude Code 的厂商都实现; 单纯做 API 转译的不实现。"上游不是真 Anthropic 所以 fail" 这个 framing 是错的 (e.g. DeepSeek 不是真 Anthropic 但 WebSearch 工作)。
 
 **分场景痛点根因**:
-- 中转站用户: **上游不是真 Anthropic**, 客户端发了 tool 但上游处理不了 (不是 isEnabled 关的)
+- 用 DeepSeek 等专门支持 Claude Code 的第三方: 两层 gate 都过, WebSearch ✓ — **omnireach 对这群人价值是补纵向源 (Twitter/小红书/微信), 不是补 search**
+- OpenAI 兼容中转站用户: **上游没实现 server tool 处理** → 失败
 - 显式 Bedrock 用户 / Vertex Claude 3.x: 客户端 isEnabled 直接关
-- 自托管 gateway: 看 gateway 实现
 
 **Why omnireach 不止补缺**: 即使 WebSearch 可用 (firstParty 直连), 它也搜不全 — Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok 这些纵向源服务端 WebSearch 几乎都够不着。omnireach 三重价值: (1) 给客户端 gate 关掉的用户**补缺**; (2) 给上游不实现 server tool 的用户**补缺**; (3) 给 WebSearch 可用但搜不到纵向源的用户**补纵向**。CLI + Claude Code Skill 双形态。
 
-**历史措辞修订 (2026-06-03 二轮)**:
+**历史措辞修订 (2026-06-03 三轮)**:
 - 第一轮 (上午): README/SKILL/本文件痛点写"中转站丢 WebSearch" — narrow
-- 第二轮 (今晚): 把根因改成"Claude Code 客户端 `isEnabled()` allowlist" — 仍然错, 因为 `isEnabled()` 看的是 `CLAUDE_CODE_USE_*` env var, 不是 `ANTHROPIC_BASE_URL`, 中转站用户实际 isEnabled=true
-- 第三轮 (现在): 拆成两层 gate, 客户端 isEnabled 控 Bedrock/Vertex-老; 上游服务 gate 控中转站/gateway。这才是准确的。
+- 第二轮 (今晚 23:00): 把根因改成"Claude Code 客户端 `isEnabled()` allowlist" — 错, 因为 `isEnabled()` 看的是 `CLAUDE_CODE_USE_*` env var, 不是 `ANTHROPIC_BASE_URL`, 中转站用户实际 isEnabled=true
+- 第三轮 (今晚 23:30): 拆成两层 gate, 客户端 + 上游, 上游说"必须是真 Anthropic" — 错, 因为 DeepSeek 不是真 Anthropic 但 WebSearch 工作
+- 第四轮 (现在 23:44): 上游 gate 准确说法是**"是否专门实现 server tool"**, 跟"是否真 Anthropic"无关。DeepSeek 等专门支持 Claude Code 的第三方都实现; 单纯 API 转译的中转站不实现。这才是准确的。
 
 - 位置: `~/Projects/omnireach`
 - GitHub: https://github.com/Daily-AC/omnireach (Public, MIT, 归属 Daily-AC)
