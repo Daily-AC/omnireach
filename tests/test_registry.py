@@ -12,10 +12,11 @@ def test_load_registry_returns_all_sources():
     assert "bilibili" in ids
     assert "reddit" in ids
     assert "twitter" in ids
+    assert "tweetclaw" in ids
     assert "xiaohongshu" in ids
     assert "tiktok" in ids
     assert "douyin" in ids
-    assert len(reg.sources) == 15
+    assert len(reg.sources) == 16
 
 
 def test_get_by_id():
@@ -58,7 +59,7 @@ def test_registry_loads_booster_tier():
     from omnireach.registry import load_registry
     reg = load_registry()
     boosters = [s for s in reg.sources if s.tier == "booster"]
-    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity", "exa"}
+    assert {s.id for s in boosters} == {"tavily", "brave", "perplexity", "exa", "tweetclaw"}
 
 
 def test_registry_enhanced_with_field_populated_for_dual_backend_sources():
@@ -102,6 +103,7 @@ def test_sources_yml_per_source_timeout():
     by_id = {s.id: s for s in reg.sources}
     assert by_id["hackernews"].timeout_seconds == 10.0
     assert by_id["twitter"].timeout_seconds == 30.0
+    assert by_id["tweetclaw"].timeout_seconds == 12.0
     assert by_id["xiaohongshu"].timeout_seconds == 30.0
 
 

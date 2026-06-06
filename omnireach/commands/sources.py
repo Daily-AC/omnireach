@@ -45,6 +45,7 @@ BOOSTER_KEY_ENV = {
     "brave": "BRAVE_API_KEY",
     "perplexity": "PERPLEXITY_API_KEY",
     "exa": "EXA_API_KEY",
+    "tweetclaw": "XQUIK_API_KEY",
 }
 
 

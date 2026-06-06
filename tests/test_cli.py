@@ -119,6 +119,7 @@ def test_search_includes_active_booster_in_fanout(monkeypatch):
     monkeypatch.delenv("BRAVE_API_KEY", raising=False)
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
     monkeypatch.delenv("EXA_API_KEY", raising=False)
+    monkeypatch.delenv("XQUIK_API_KEY", raising=False)
     reg = load_registry()
     # Simulate router returning 5 non-booster sources
     base = ["hackernews", "youtube", "github", "rss"]
@@ -150,6 +151,7 @@ def test_search_augment_includes_exa(monkeypatch):
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     monkeypatch.delenv("BRAVE_API_KEY", raising=False)
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
+    monkeypatch.delenv("XQUIK_API_KEY", raising=False)
     reg = load_registry()
     out = _augment_with_active_boosters(["hackernews"], reg, explicit_sources=None)
     assert "exa" in out
@@ -160,7 +162,7 @@ def test_search_augment_includes_wechat_bilibili_via_exa_key(monkeypatch):
     from omnireach.registry import load_registry
 
     monkeypatch.setenv("EXA_API_KEY", "x")
-    for k in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY"):
+    for k in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "XQUIK_API_KEY"):
         monkeypatch.delenv(k, raising=False)
     reg = load_registry()
     out = _augment_with_active_boosters(["hackernews"], reg, explicit_sources=None)
@@ -179,7 +181,7 @@ def test_tty_skips_unavailable_errors_and_prints_footer(monkeypatch):
     # by overriding _should_emit_json since this test checks rich.Table output.
     monkeypatch.setattr("omnireach.cli._should_emit_json", lambda flag: flag)
     monkeypatch.setattr("shutil.which", lambda b: None)
-    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):
+    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY", "XQUIK_API_KEY"):
         monkeypatch.delenv(env, raising=False)
     runner = CliRunner()
     result = runner.invoke(main, ["search", "vibe coding", "--limit", "3", "--timeout", "10"])
@@ -200,7 +202,7 @@ def test_json_output_keeps_unavailable_errors(monkeypatch):
     from omnireach.cli import main
 
     monkeypatch.setattr("shutil.which", lambda b: None)
-    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):
+    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY", "XQUIK_API_KEY"):
         monkeypatch.delenv(env, raising=False)
     runner = CliRunner()
     result = runner.invoke(main, ["search", "test", "--limit", "2", "--timeout", "5", "--json"])
@@ -221,7 +223,7 @@ def test_v092_search_auto_json_when_stdout_not_tty(monkeypatch):
     from omnireach.cli import main
 
     monkeypatch.setattr("shutil.which", lambda b: None)
-    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):
+    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY", "XQUIK_API_KEY"):
         monkeypatch.delenv(env, raising=False)
     runner = CliRunner()  # CliRunner stdout is BytesIO, isatty()=False
     result = runner.invoke(main, ["search", "--on", "hackernews", "--limit", "1", "claude"])

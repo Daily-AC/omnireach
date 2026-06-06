@@ -145,6 +145,7 @@ ENV_FOR_BOOSTER = {
     "brave": "BRAVE_API_KEY",
     "perplexity": "PERPLEXITY_API_KEY",
     "exa": "EXA_API_KEY",
+    "tweetclaw": "XQUIK_API_KEY",
 }
 
 # v0.9: sources that have a free default backend + an optional enhancement

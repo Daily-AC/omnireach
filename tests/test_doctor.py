@@ -6,7 +6,7 @@ from omnireach.doctor import run_doctor
 
 def test_doctor_reports_each_source(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda b: None)
-    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY"):
+    for env in ("TAVILY_API_KEY", "BRAVE_API_KEY", "PERPLEXITY_API_KEY", "EXA_API_KEY", "XQUIK_API_KEY"):
         monkeypatch.delenv(env, raising=False)
     statuses = asyncio.run(run_doctor())
     ids = {s.id for s in statuses}
@@ -46,6 +46,7 @@ def test_doctor_marks_booster_ok_with_key(monkeypatch):
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     monkeypatch.delenv("BRAVE_API_KEY", raising=False)
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
+    monkeypatch.delenv("XQUIK_API_KEY", raising=False)
     statuses = asyncio.run(run_doctor())
     exa = next(s for s in statuses if s.id == "exa")
     assert exa.ok is True

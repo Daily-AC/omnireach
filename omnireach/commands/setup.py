@@ -44,6 +44,12 @@ BOOSTER_GUIDES = {
         "label": "Exa Search API",
         "note": "付费 web 搜索, 检测式接入",
     },
+    "tweetclaw": {
+        "env": "XQUIK_API_KEY",
+        "signup_url": "https://dashboard.xquik.com",
+        "label": "TweetClaw / Xquik X Search API",
+        "note": "付费 X/Twitter 搜索, 无需本机浏览器登录态",
+    },
     "wechat": {
         "env": "EXA_API_KEY",
         "signup_url": "https://exa.ai",

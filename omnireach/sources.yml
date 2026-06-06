@@ -109,6 +109,19 @@
       - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk (装完后启用 chrome://extensions 里的开发者模式)", verify: "opencli doctor" }
       - { step: "在 Chrome 中登录 Twitter / X 账号 (打开 twitter.com 完成登录)", verify: "opencli twitter state" }
 
+- id: tweetclaw
+  tier: booster
+  adapter: omnireach.adapters.tweetclaw.TweetClawAdapter
+  description: TweetClaw / Xquik X 搜索 API (付费, 无浏览器登录态)
+  query_hints: [tweetclaw, xquik, "twitter api", "x api", "tweet search", "search tweets", "推特"]
+  default_in_auto: false
+  trust: 0.75
+  timeout_seconds: 12
+  deps:
+    auto: []
+    manual:
+      - step: "在 https://dashboard.xquik.com 创建 Xquik API Key, 然后运行 `omnireach setup tweetclaw` 写入 XQUIK_API_KEY"
+
 - id: xiaohongshu
   tier: heavy
   adapter: omnireach.adapters.xiaohongshu.XiaohongshuAdapter

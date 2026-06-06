@@ -133,3 +133,15 @@ def test_setup_exa_is_booster(tmp_path, monkeypatch):
     secrets = tmp_path / ".omnireach" / "secrets.env"
     if secrets.exists():
         assert "EXA_API_KEY=exa-test-key" in secrets.read_text()
+
+
+def test_setup_tweetclaw_writes_xquik_key(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    from click.testing import CliRunner
+    from omnireach.cli import main
+    runner = CliRunner()
+    result = runner.invoke(main, ["setup", "tweetclaw"], input="y\ntest-api-key\n")
+    assert result.exit_code == 0
+    secrets = tmp_path / ".omnireach" / "secrets.env"
+    assert secrets.exists()
+    assert "XQUIK_API_KEY=test-api-key" in secrets.read_text()

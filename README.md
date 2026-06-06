@@ -66,6 +66,7 @@ omnireach search "vibe coding"  # HN 立即可用 (零配置)
 omnireach setup youtube   # pip install yt-dlp
 omnireach setup github    # 提示 brew install gh (macOS)
 omnireach setup reddit    # uv tool install rdt-cli + rdt login
+omnireach setup tweetclaw # 写 XQUIK_API_KEY, 启用 API-backed X/Twitter 搜索
 omnireach setup exa       # 拿 EXA_API_KEY (付费 web search)
 ```
 
@@ -120,6 +121,7 @@ v0.9.2 加的 `not isatty()` 自动 JSON 在大多数场景够用, 但有些 Age
 | rss | ✅ ready | 内置 feedparser | query 必须是 URL |
 | reddit | 🟡 one_step | `rdt-cli` + `rdt login` | `omnireach setup reddit` |
 | twitter | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
+| tweetclaw | 💎 booster | `XQUIK_API_KEY` | [TweetClaw](https://github.com/Xquik-dev/tweetclaw) / Xquik API-backed X/Twitter search, no local browser login |
 | xiaohongshu | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
 | tiktok | 🔴 heavy | OpenCLI + Chrome 扩展 | TikTok 国际版 (v0.7) |
 | douyin | 🔴 heavy | OpenCLI fork + Chrome 扩展 | 抖音 (v0.7.2, 走 Daily-AC/OpenCLI fork) |
@@ -129,6 +131,13 @@ v0.9.2 加的 `not isatty()` 自动 JSON 在大多数场景够用, 但有些 Age
 | 💎 exa | booster | env `EXA_API_KEY` | 付费 web search (v0.5) |
 | wechat | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | 微信公众号 — search 走 Sogou 免费搜索 (`EXA_API_KEY` 可选启用语义增强); v0.10.1 起 `omnireach fetch <wechat-url>` 自动走 OpenCLI 登录态 Chrome 拿正文 |
 | bilibili | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | B站 — v0.9 起默认走 B站官方 search API; `EXA_API_KEY` 可选启用语义增强 |
+
+> **TweetClaw booster**: `omnireach search --on tweetclaw "agent tools"` calls Xquik's
+> `/api/v1/x/tweets/search` through [TweetClaw](https://github.com/Xquik-dev/tweetclaw) using
+> `XQUIK_API_KEY`. Use it when an Agent needs API-backed X/Twitter search without a local logged-in
+> Chrome session. Keep `twitter` for the existing OpenCLI browser-session path. If you use OpenClaw
+> directly and need the full plugin tools, install with
+> `openclaw plugins install @xquik/tweetclaw`.
 
 > **抖音 (douyin.com)** (v0.7.2): 走 `omnireach setup douyin`, 装 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI) (上游 PR [jackwener/OpenCLI#1759](https://github.com/jackwener/OpenCLI/pull/1759) 还在 review, 上游 merge + 发版后会切回 `@jackwener/opencli`)。需要在 Chrome 登录 www.douyin.com。`engagement.likes` 有真实数据 (DOM 抽取); `plays/comments/shares` 在搜索卡片上不暴露, 已 normalize 成 `null` 让下游 Agent 识别 unknown。
 
