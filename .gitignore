@@ -11,3 +11,8 @@ build/
 *.swp
 .claude/
 .env
+
+# hyperframes skills + scratch (installed via `npx skills add` to author the demo GIF — not part of the project)
+.agents/
+skills-lock.json
+demo-video/
