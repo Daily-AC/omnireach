@@ -1,7 +1,7 @@
 {
   "name": "omnireach",
   "version": "0.1.0",
-  "description": "全网通搜索 Skill: web + Twitter/Reddit/YouTube/B站/小红书/HN/GitHub 一站接入, 中转站用户也能用",
+  "description": "Give your agent the senses of a logged-in human across the whole internet — search & read 15+ platforms (Twitter/Reddit/小红书/微信/抖音/B站/TikTok/YouTube/HN/GitHub/RSS) the web can't reach.",
   "author": "Daily-AC",
   "license": "MIT",
   "homepage": "https://github.com/Daily-AC/omnireach",

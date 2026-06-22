@@ -1,3 +1,3 @@
-"""omnireach: 全网通 — web + multi-platform search for proxy-station agent users."""
+"""omnireach: give your agent the senses of a logged-in human across the whole internet — search + read 15+ platforms incl. login-walled verticals."""
 
-__version__ = "0.10.1-alpha"
+__version__ = "0.11.0-alpha"
