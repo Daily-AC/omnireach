@@ -14,7 +14,7 @@ if command -v shellcheck >/dev/null 2>&1; then
 fi
 
 # 2. Non-interactive: no stdin reads / prompts in the script
-if grep -Eq '(^|[^a-zA-Z_])read[[:space:]]' "$INSTALL"; then
+if grep -Eq '(^|[^a-zA-Z_])read([[:space:]]|$)' "$INSTALL"; then
   fail "install.sh contains an interactive 'read' — must be non-interactive"
 fi
 echo "ok: no interactive read"

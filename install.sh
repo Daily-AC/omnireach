@@ -14,14 +14,21 @@ say() { printf '%s\n' "$*"; }
 if ! command -v uv >/dev/null 2>&1; then
   say "→ installing uv (not found)…"
   curl -LsSf https://astral.sh/uv/install.sh | sh
-  # uv lands in ~/.local/bin or ~/.cargo/bin — make this shell session see it.
-  for d in "${HOME}/.local/bin" "${HOME}/.cargo/bin"; do
-    [ -d "$d" ] && PATH="$d:$PATH"
-  done
-  export PATH
 fi
 
+# Ensure uv's tool-bin dir is on PATH for THIS session — covers both the
+# just-installed uv and the omnireach CLI we're about to install.
+# uv installs to ~/.local/bin; ~/.cargo/bin kept as a harmless fallback.
+for d in "${HOME}/.local/bin" "${HOME}/.cargo/bin"; do
+  if [ -d "$d" ]; then PATH="$d:$PATH"; fi
+done
+export PATH
+
 # 2. Install / update the CLI (force = idempotent: re-running pulls latest).
+if ! command -v git >/dev/null 2>&1; then
+  say "error: git is required to install omnireach. Install git and re-run."
+  exit 1
+fi
 say "→ installing omnireach CLI (ref: ${REF})…"
 uv tool install --force "git+${REPO}@${REF}"
 
