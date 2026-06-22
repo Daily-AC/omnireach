@@ -163,6 +163,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - 推 tag 后**必须** `gh release create vX.Y.Z-alpha --title "..." --notes "..."` 否则 `omnireach check-update` 走 `/releases/latest` 会 404
 - 如果同时创建多个 release, GitHub 把最后创建的标为 Latest, 不是 tag 顺序; 用 `gh release edit vLATEST --latest` 修正
 - check-update 实现走 GitHub Releases API, 见 `omnireach/commands/check_update.py`
+- **版本号有三处源, bump 时三处都要改**: `omnireach/__init__.py __version__` (CLI `--version` 读这里) + `pyproject.toml [project] version` (build/wheel 元数据, static 不是 dynamic) + `uv.lock` (改完跑 `uv lock` 同步)。v0.11.0 踩过: 只改了 `__init__` 导致 build 元数据落在旧版; `omnireach --version` 与 wheel 版本不一致。
 
 ## 工作偏好 (来自用户跨项目 feedback memory, 这里只记跟 omnireach 有关的部分)
 
