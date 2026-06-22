@@ -1,6 +1,6 @@
 ---
 name: omnireach
-description: Use when the user needs to search the web or read content from Twitter / Reddit / YouTube / Bilibili / 小红书 / TikTok / 抖音 / HackerNews / GitHub / 微信公众号 / RSS — especially when Claude Code's built-in WebSearch is unavailable. WebSearch is a server tool with two layers of gating: (1) client-side isEnabled() checks CLAUDE_CODE_USE_* env vars (blocks explicit Bedrock / Vertex+Claude3.x); (2) upstream-service must specifically implement the web_search_20250305 server tool. Providers that explicitly target Claude Code compatibility (Anthropic API, DeepSeek's Anthropic-compat endpoint, Foundry, Vertex+Claude4+) implement it; OpenAI-compatible relay stations and most self-hosted gateways that just transform Claude API → OpenAI Chat Completions don't. Provides a unified search command + fetch command (URL → full markdown) across multiple platforms.
+description: Give your agent the senses of a logged-in human across the whole internet — search AND read 15+ platforms (Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok / YouTube / HackerNews / GitHub / RSS) including the login-walled vertical sources that no web search reaches, via the user's own browser session. Two commands: `omnireach search <query>` (metadata + URL) and `omnireach fetch <url>` (full markdown). Use when the user wants to search or read any of these platforms, shares a URL to read, asks to research a topic, OR when Claude Code's built-in WebSearch is unavailable (proxy / relay-station / Bedrock / Vertex-Claude3.x environments where the web_search_20250305 server tool isn't implemented).
 ---
 
 # omnireach — 全网通搜索 + 全文抓取
@@ -22,13 +22,15 @@ v0.10 起两个核心子命令:
 
 ## 如何使用
 
-### 第一次用 (用户没装过)
+### 第一次用 / step 0 (自愈)
+
+如果 `omnireach` 不在 PATH (skill 在但 CLI 没装), 先跑这一条幂等命令装好 CLI + skill, 然后正常用:
 
 ```bash
-pipx install omnireach && omnireach init
+curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh | sh
 ```
 
-零配置可用: hackernews / rss / wechat (Sogou 免费) / bilibili (B站官方 API)。其他源 (twitter / reddit / xhs / tiktok / douyin / boosters) 跑 `omnireach setup <source>` 解锁。
+零配置即可用: hackernews / rss / wechat (Sogou 免费) / bilibili (B站官方 API)。其他源 (twitter / reddit / xhs / tiktok / douyin / boosters) 跑 `omnireach setup <source>` 解锁 (注意: `setup` 是交互式, 给人用; agent 别直接调)。
 
 ### Search — 拿 URL + metadata
 
