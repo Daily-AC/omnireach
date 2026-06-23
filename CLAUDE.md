@@ -124,7 +124,8 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 
 ## v0.7 后续 (开着的)
 
-- **上游切回**: jackwener 一旦 merge PR #1759 + OpenCLI 发新版, 把 sources.yml 里 4 处 `github:Daily-AC/OpenCLI` 改回 `@jackwener/opencli` (douyin adapter 代码本身不动, 字段 shape 一致)。出 v0.7.3-alpha
+- **上游切回 (2026-06-23 更新, 只对了一半)**: PR #1759 (douyin search) **已 merged** (2026-05-31), 作者 review 时做了质量改进 (`extractDouyinVideoId` 抽取 / `isSearchCardMetadataText` 过滤噪音文本 / `isProjectedRowUsable` 行过滤), 但 **字段契约不变** (`rank/desc/author/url/plays/likes/comments/shares`) —— omnireach `--on douyin` 真 E2E 验过零回归 (返 10 条, likes 真实, 其余 0→None)。**但 PR #1770 (weixin `--stdout`) 仍 OPEN**, upstream 没这个 flag, 而 omnireach wechat fetch (v0.10.1) 依赖它 —— **所以 sources.yml 4 处 `github:Daily-AC/OpenCLI` 暂不能切回 `@jackwener/opencli`** (会丢 --stdout)。等 #1770 也 merged 才能完全切回。当前 fork `main` 已 merge upstream (2026-06-23), 状态 = upstream 全部 + 唯一 delta (weixin `--stdout`); douyin 已 = upstream 版。
+- **twitter delete i18n 修复** (2026-06-23): fork `delete.js` 在中文 X UI 上挂 (`aria-label === 'More'` 精确匹配 miss 了 zh 的「更多」), 加上详情页 article 晚 hydrate。修法: caret 用 `[data-testid="caret"]` + 多语言 aria-label 兜底, `findTargetArticle()` 轮询 ~5s, Delete 菜单项加「删除」。fork 分支 `fix/twitter-delete-i18n` 已 push, upstream issue [jackwener/OpenCLI#2001](https://github.com/jackwener/OpenCLI/issues/2001)。
 - TikHub.io 方向已撤 (用户在 v0.7 session 喊停, 改 OpenCLI 逆向路线)
 
 ## v0.8 候选
@@ -146,7 +147,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 
 ## 外部 issue 历史
 
-- #12 (求抖音源, menoking 提, 2026-05-26): v0.7.2 用 OpenCLI fork 路线解决, 已 close。不走 TikHub.io 付费 API (用户喊停)。OpenCLI 上游 PR #1759 等 review。
+- #12 (求抖音源, menoking 提, 2026-05-26): v0.7.2 用 OpenCLI fork 路线解决, 已 close。不走 TikHub.io 付费 API (用户喊停)。OpenCLI 上游 PR #1759 已 merged (2026-05-31, 见上方「上游切回」节)。
 
 ## 关键文档 (绝对路径)
 
