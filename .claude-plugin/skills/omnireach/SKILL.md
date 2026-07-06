@@ -1,6 +1,6 @@
 ---
 name: omnireach
-description: Give your agent the senses of a logged-in human across the whole internet — search AND read 15+ platforms (Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok / YouTube / HackerNews / GitHub / RSS) including the login-walled vertical sources that no web search reaches, via the user's own browser session. Two commands: `omnireach search <query>` (metadata + URL) and `omnireach fetch <url>` (full markdown). Use when the user wants to search or read any of these platforms, shares a URL to read, asks to research a topic, OR when Claude Code's built-in WebSearch is unavailable (proxy / relay-station / Bedrock / Vertex-Claude3.x environments where the web_search_20250305 server tool isn't implemented).
+description: Search AND read the login-walled Chinese internet — 微信公众号 / 小红书 / 抖音 / B站 / TikTok — plus Twitter / Reddit / YouTube / HackerNews / GitHub / RSS, via the user's own browser session, with one uniform JSON schema across all sources (zero-config WeChat search). Two commands: `omnireach search <query>` (metadata + URL) and `omnireach fetch <url>` (full markdown). Use when the user wants to search or read any of these platforms, shares a URL to read, asks to research a topic, OR when Claude Code's built-in WebSearch is unavailable (proxy / relay-station / Bedrock / Vertex-Claude3.x environments where the web_search_20250305 server tool isn't implemented).
 ---
 
 # omnireach — 全网通搜索 + 全文抓取
