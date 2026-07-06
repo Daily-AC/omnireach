@@ -159,6 +159,16 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - 2026-05-26 session handoff: `docs/handoff/2026-05-26-session-handoff.md`
 - README: `README.md`
 
+## 获客/分发状态 (2026-07-07 session)
+
+- **PyPI 已上线** (0.11.0a0): 发布走 `uv build && uv publish --token "$PYPI_TOKEN"` (token 在 `~/.secrets/vault.env`, 记得 source)。**未来每次 release 除 gh release 外还要 uv publish**。sdist 有 exclude 配置保持 ~51KB。待办: 用户把全账号 token 换成 omnireach 项目级。
+- **定位已换楔子** (PR #28): 弃 "senses/eyes"(与 Agent-Reach 51k★ 撞车) 改 "login-walled Chinese internet + 零配置微信搜索 + 统一 JSON 契约"。README 有 vs Agent-Reach 对比表 (事实依据: 对方 2026-06 PR #347 删除微信/抖音/微博, 无统一 schema 是其设计哲学)。改第一屏前先重验对比表事实是否过期。
+- **demo**: docs/assets/demo-wechat.gif 为真实 VHS 录制 (tape 同目录, 可复现; 需 brew vhs, 渲染时清空 booster env 走免费路径)。
+- **GitHub topics ×12 已挂; repo description 已换楔子。**
+- **awesome 列表 PR**: ComposioHQ/awesome-claude-skills#1239, 1c7/chinese-independent-developer#1062, BehiSecc/awesome-claude-skills#429 (2026-07-07 提交, 定期看是否被 merge)。hesreallyhim/awesome-claude-code 规则要求先有用户量, awesome-cli-apps 要 20★+3 个月 — 都等有量再投。
+- **首发帖**: 文案在 docs/launch-drafts/ (gitignored), 计划 linux.do → V2EX → 即刻/Twitter → Show HN 同周脉冲, 进度见同目录 progress.md。
+- **spam PR 处理先例**: PR #26 (kriptoburak/TweetClaw) 为 5682 连发推广战役一部分, 已关闭并留评。同类供应商自荐付费源集成一律拒。
+
 ## Release 流程 (v0.5.1 起强制)
 
 - 推 tag 后**必须** `gh release create vX.Y.Z-alpha --title "..." --notes "..."` 否则 `omnireach check-update` 走 `/releases/latest` 会 404
