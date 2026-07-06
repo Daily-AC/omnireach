@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "omnireach"
 version = "0.11.0-alpha"
-description = "Give your agent the senses of a logged-in human across the whole internet — search & read 15+ platforms (Twitter/Reddit/小红书/微信/抖音/B站/TikTok/YouTube/HN/GitHub/RSS) incl. login-walled verticals no web search reaches"
+description = "Search & read the login-walled Chinese internet for your AI agent — 微信公众号/小红书/抖音/B站 + Twitter/Reddit/HN/YouTube, one CLI, one JSON schema. Zero-config WeChat search."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Daily-AC", email = "zoned-group@alum.calarts.edu" }]
-keywords = ["claude", "search", "agent", "skill", "cli"]
+keywords = ["claude", "search", "agent", "skill", "cli", "wechat", "xiaohongshu", "douyin", "bilibili"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "License :: OSI Approved :: MIT License",
@@ -39,6 +39,12 @@ dev = [
 
 [project.scripts]
 omnireach = "omnireach.cli:_entrypoint"
+
+[project.urls]
+Homepage = "https://github.com/Daily-AC/omnireach"
+Repository = "https://github.com/Daily-AC/omnireach"
+Issues = "https://github.com/Daily-AC/omnireach/issues"
+Changelog = "https://github.com/Daily-AC/omnireach/releases"
 
 [tool.hatch.build.targets.wheel]
 packages = ["omnireach"]

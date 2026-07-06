@@ -2,11 +2,17 @@
 
 <sub>English · [中文](./README.zh.md)</sub>
 
-**Give your AI agent the senses of a logged-in human — across the entire internet.**
+**Your agent reads Twitter. It still can't read WeChat. omnireach fixes that.**
 
-omnireach lets your agent search and read 15+ platforms — including the login-walled verticals (Twitter · Reddit · 小红书 · 微信 · 抖音 · B站 · TikTok) that every agent web search is blind to — through your own browser session. One uniform interface: `omnireach search` returns normalized metadata + URL, `omnireach fetch` returns clean markdown. Installed as a Claude Code skill, so your agent just knows how to use it next session.
+omnireach searches and reads the login-walled Chinese internet — 微信公众号 · 小红书 · 抖音 · B站 · TikTok — plus Twitter, Reddit, HN, YouTube and more, through one uniform interface: `omnireach search` returns one normalized JSON schema across every source, `omnireach fetch` returns clean markdown for any URL. WeChat search works with **zero config** — no key, no login:
 
-![demo](./docs/assets/demo.gif)
+```bash
+omnireach search --on wechat "Claude Code 技巧"   # works 60 seconds after install
+```
+
+Installed as a Claude Code skill, so your agent just knows how to use it next session. No LLM inside, no per-call scraping fees — the heavy sources reuse your own browser session.
+
+![demo — zero-config WeChat search, uniform JSON across sources](./docs/assets/demo-wechat.gif)
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
@@ -39,6 +45,24 @@ Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok — login-wall
 
 **3. Works even when WebSearch doesn't.**
 On proxy / relay-station / Bedrock / Vertex-Claude-3.x setups where the built-in WebSearch server tool isn't available, omnireach gives search back — it runs entirely on the client side, bypassing both gate layers.
+
+---
+
+## How is this different from Agent-Reach?
+
+[Agent-Reach](https://github.com/Panniantong/Agent-Reach) (51k★) created this category and is excellent at what it does. omnireach makes different trade-offs — these are date-stamped facts, not marketing:
+
+| | omnireach | Agent-Reach (v1.5.0, as of 2026-07) |
+|---|---|---|
+| 微信公众号 WeChat | ✅ zero-config search (Sogou path) + full-text fetch via your logged-in Chrome | ❌ removed 2026-06 ([PR #347](https://github.com/Panniantong/Agent-Reach/pull/347)) after anti-bot breakage |
+| 抖音 Douyin | ✅ search via your logged-in Chrome | ❌ removed 2026-06 (upstream tool archived) |
+| TikTok | ✅ search | ❌ not supported |
+| Output contract | one pydantic JSON schema across all 16 sources; auto-JSON when piped | no wrapper layer by design — each upstream tool's own format (YAML / plain text / subtitle files / raw JSON) |
+| `search` / `fetch` commands | built-in: `omnireach search`, `omnireach fetch <url>` with host-aware routing | no search/read commands — routes your agent to call upstream tools directly |
+| Facebook · Instagram · LinkedIn · 雪球 · podcast transcription | ❌ | ✅ |
+| Community | early — you found us before the crowd | 51k★, 30 contributors |
+
+Pick Agent-Reach if you need Facebook/LinkedIn/transcription. Pick omnireach if you need the Chinese internet — WeChat above all — a machine-stable JSON contract, or a single fetch entrypoint. Both MIT; they compose fine in one agent.
 
 ---
 
