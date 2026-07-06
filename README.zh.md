@@ -2,11 +2,17 @@
 
 <sub>[English](./README.md) · 中文</sub>
 
-**给你的 AI agent 装上一个登录态人类的全套感官 —— 触达整个互联网。**
+**你的 agent 读得了 Twitter，却读不了微信公众号。omnireach 解决这件事。**
 
-omnireach 让你的 agent 能搜索并读取 15+ 平台的内容 —— 包括所有 agent 网络搜索都触达不到的登录墙纵向平台（Twitter · Reddit · 小红书 · 微信 · 抖音 · B站 · TikTok），通过你自己的浏览器会话打通。统一接口：`omnireach search` 返回归一化的 metadata + URL，`omnireach fetch` 返回干净的 markdown 正文。安装为 Claude Code Skill 后，下次会话 agent 自动就知道怎么用了。
+omnireach 让你的 agent 搜索并读取登录墙后的中文互联网 —— 微信公众号 · 小红书 · 抖音 · B站 · TikTok —— 外加 Twitter、Reddit、HN、YouTube 等，统一接口：`omnireach search` 跨全部源返回同一套归一化 JSON schema，`omnireach fetch` 对任意 URL 返回干净 markdown。微信搜索**零配置**开箱即用 —— 无 key、无登录：
 
-![demo](./docs/assets/demo.gif)
+```bash
+omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
+```
+
+安装为 Claude Code Skill 后，下次会话 agent 自动就知道怎么用了。工具内部不调 LLM、重型源复用你自己的浏览器登录态，没有按次付费的爬取 API。
+
+![demo — 零配置微信搜索, 跨源统一 JSON](./docs/assets/demo-wechat.gif)
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
@@ -39,6 +45,24 @@ Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— �
 
 **3. WebSearch 不可用时照样能搜。**
 在 proxy / 中转站 / Bedrock / Vertex-Claude-3.x 等内置 WebSearch server tool 不可用的环境下，omnireach 在客户端直接实现搜索，绕过两层 gate，把搜索能力还给 agent。
+
+---
+
+## 和 Agent-Reach 有什么区别？
+
+[Agent-Reach](https://github.com/Panniantong/Agent-Reach)（51k★）开创了这个品类，它做的事情它做得很好。omnireach 做的是另一组取舍 —— 以下是带日期戳的事实，不是营销话术：
+
+| | omnireach | Agent-Reach（v1.5.0，截至 2026-07） |
+|---|---|---|
+| 微信公众号 | ✅ 零配置搜索（Sogou 路径）+ 登录态 Chrome 全文抓取 | ❌ 2026-06 整体删除（[PR #347](https://github.com/Panniantong/Agent-Reach/pull/347)，反爬失效） |
+| 抖音 | ✅ 登录态 Chrome 搜索 | ❌ 2026-06 删除（上游工具已 archive） |
+| TikTok | ✅ 搜索 | ❌ 从未支持 |
+| 输出契约 | 全部 16 源统一 pydantic JSON schema；管道自动 JSON | 设计上无包装层 —— 各上游工具各自的格式（YAML / 纯文本 / 字幕文件 / 裸 JSON） |
+| `search` / `fetch` 命令 | 内置 `omnireach search` + `omnireach fetch <url>`（host 感知路由） | 无 search/read 命令 —— 引导 agent 直接调各上游工具 |
+| Facebook · Instagram · LinkedIn · 雪球 · 播客转录 | ❌ | ✅ |
+| 社区 | 早期 —— 你比大部队先找到了这里 | 51k★，30 位贡献者 |
+
+需要 Facebook/LinkedIn/转录，选 Agent-Reach。需要中文互联网（尤其微信）、机器稳定的 JSON 契约、或统一的 fetch 入口，这就是 omnireach 存在的原因。两者都是 MIT，在同一个 agent 里并存完全没问题。
 
 ---
 
