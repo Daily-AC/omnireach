@@ -49,6 +49,9 @@ Changelog = "https://github.com/Daily-AC/omnireach/releases"
 [tool.hatch.build.targets.wheel]
 packages = ["omnireach"]
 
+[tool.hatch.build.targets.sdist]
+exclude = ["docs/", ".claude-plugin/", ".github/", ".impeccable/", "tests/", "install.sh", "scripts/", "CLAUDE.md", "uv.lock"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
