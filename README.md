@@ -31,6 +31,8 @@ Your agent runs one command. You copy nothing.
 curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh | sh
 ```
 
+<sub>Also on [PyPI](https://pypi.org/project/omnireach/): `uv tool install omnireach` or `pip install omnireach` (CLI only — the one-liner above additionally registers the Claude Code skill). Try without installing: `uvx omnireach search "vibe coding"`.</sub>
+
 This installs the CLI **and** registers the Claude Code skill (auto-discovered next session). Zero-config sources — HackerNews, RSS, 微信 (Sogou path), B站 — work immediately. Other sources open up after a one-time setup step each.
 
 ---

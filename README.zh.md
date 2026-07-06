@@ -31,6 +31,8 @@ omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
 curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh | sh
 ```
 
+<sub>也上了 [PyPI](https://pypi.org/project/omnireach/)：`uv tool install omnireach` 或 `pip install omnireach`（仅 CLI —— 上面的一键脚本会额外注册 Claude Code skill）。不装先试：`uvx omnireach search "vibe coding"`。</sub>
+
 这条命令会安装 CLI **并且**注册 Claude Code Skill（下次会话自动发现）。零配置源 —— HackerNews、RSS、微信（Sogou 路径）、B站 —— 立即可用。其他源各需一次性配置步骤。
 
 ---
