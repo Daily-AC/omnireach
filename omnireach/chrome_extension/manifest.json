@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Omnireach Native Bridge",
+  "version": "0.1.0",
+  "description": "Read-only Chrome session bridge for Omnireach.",
+  "permissions": ["offscreen", "scripting", "tabs", "windows"],
+  "host_permissions": [
+    "http://127.0.0.1:19826/*",
+    "https://www.douyin.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src http://127.0.0.1:19826"
+  }
+}
