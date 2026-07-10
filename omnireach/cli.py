@@ -57,6 +57,14 @@ def main() -> None:
     """omnireach — 全网通搜索 CLI."""
 
 
+@main.command("mcp")
+def mcp_cmd() -> None:
+    """Run the omnireach MCP server over stdio."""
+    from omnireach.mcp_server import serve_stdio
+
+    serve_stdio()
+
+
 @main.command("search")
 @click.argument("query")
 @click.option("--on", "on_", help="只用这些源, 逗号分隔. 例: --on hackernews,web")
