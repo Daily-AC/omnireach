@@ -1,0 +1,94 @@
+{
+  "generated_at": "2026-07-10T10:26:19.446551Z",
+  "target_url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+  "repetitions": 5,
+  "command": "/Users/e0_7/.cache/uv/builds-v0/.tmp3v5op7/bin/python scripts/benchmark_read_path.py --repeat 5 --json-out docs/benchmarks/read-path-v0.12.json --markdown-out docs/benchmarks/read-path-v0.12.md",
+  "environment": {
+    "os": "macOS-26.0.1-arm64-arm-64bit",
+    "architecture": "arm64",
+    "python": "3.12.13",
+    "omnireach": "0.12.0-alpha",
+    "playwright": "1.61.0",
+    "chrome": "149.0.7827.201"
+  },
+  "results": {
+    "omnireach_mcp_cold": {
+      "median_ms": 1425.26,
+      "min_ms": 1389.18,
+      "max_ms": 1494.21,
+      "samples_ms": [
+        1425.26,
+        1494.21,
+        1389.18,
+        1414.18,
+        1454.9
+      ]
+    },
+    "omnireach_mcp_warm": {
+      "median_ms": 1292.39,
+      "min_ms": 1248.84,
+      "max_ms": 1338.44,
+      "samples_ms": [
+        1295.06,
+        1262.6,
+        1248.84,
+        1292.39,
+        1338.44
+      ]
+    },
+    "playwright_chrome_cold": {
+      "median_ms": 2713.69,
+      "min_ms": 2556.7,
+      "max_ms": 2940.93,
+      "samples_ms": [
+        2940.93,
+        2713.69,
+        2696.14,
+        2829.71,
+        2556.7
+      ]
+    },
+    "playwright_chrome_warm": {
+      "median_ms": 1591.44,
+      "min_ms": 1555.5,
+      "max_ms": 1649.05,
+      "samples_ms": [
+        1624.16,
+        1591.44,
+        1578.44,
+        1555.5,
+        1649.05
+      ]
+    }
+  },
+  "content_characters": {
+    "omnireach_mcp_cold": [
+      734983,
+      734983,
+      734983,
+      734983,
+      734983
+    ],
+    "omnireach_mcp_warm": [
+      734983,
+      734983,
+      734983,
+      734983,
+      734983
+    ],
+    "playwright_chrome_cold": [
+      448944,
+      448944,
+      448944,
+      448944,
+      448944
+    ],
+    "playwright_chrome_warm": [
+      448944,
+      448944,
+      448944,
+      448944,
+      448944
+    ]
+  }
+}
