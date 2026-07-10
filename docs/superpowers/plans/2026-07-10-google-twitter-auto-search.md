@@ -10,6 +10,14 @@
 
 ---
 
+## Execution Order Note
+
+Execute Task 1 first, then Task 3 Steps 1-4 to register Google before running the service
+augmentation tests in Task 2. After Task 2, finish Task 3 Steps 5-9, then Tasks 4 and 5.
+The service helper deliberately verifies that an optional source exists in the registry, so
+running all of Task 2 before the registry slice would make the intended green state
+impossible.
+
 ## File Map
 
 - Create `omnireach/adapters/google.py`: normalize real OpenCLI Google rows into the stable search contract.
