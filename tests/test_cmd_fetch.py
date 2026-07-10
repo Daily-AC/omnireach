@@ -283,6 +283,22 @@ def test_v0101_looks_like_captcha_detects_cloudflare():
     assert kw in ("Just a moment", "Checking your browser")
 
 
+def test_looks_like_captcha_does_not_flag_article_about_cloudflare():
+    body = """# Hacker News
+
+30. [Build your own vulnerability harness]
+(https://blog.cloudflare.com/build-your-own-vulnerability-harness/)
+([cloudflare.com](https://news.ycombinator.com/from?site=cloudflare.com))
+
+47 points by ianrahman | 112 comments
+""" + ("ordinary article listing content " * 20)
+
+    suspicious, keyword = _looks_like_captcha(body)
+
+    assert suspicious is False
+    assert keyword is None
+
+
 def test_looks_like_captcha_detects_real_sogou_challenge_copy():
     body = "# 搜狗搜索\n\n" + "x" * 250 + "此验证码用于确认这些请求不是自动程序发出的"
     suspicious, kw = _looks_like_captcha(body)

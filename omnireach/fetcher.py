@@ -22,11 +22,16 @@ CAPTCHA_KEYWORDS = (
     "完成验证后即可继续访问",
     "请输入验证码",
     "请完成安全验证",
+    "此验证码用于确认",
+    "不是自动程序",
+)
+
+CLOUDFLARE_CHALLENGE_SIGNALS = (
     "Cloudflare",
     "Just a moment",
     "Checking your browser",
-    "此验证码用于确认",
-    "不是自动程序",
+    "Ray ID",
+    "security verification",
 )
 
 HTTP_HEADERS = {
@@ -53,6 +58,21 @@ def _looks_like_captcha(markdown: str) -> tuple[bool, str | None]:
     for keyword in CAPTCHA_KEYWORDS:
         if keyword.casefold() in folded:
             return True, keyword
+    challenge_signals = [
+        signal
+        for signal in CLOUDFLARE_CHALLENGE_SIGNALS
+        if signal.casefold() in folded
+    ]
+    if len(challenge_signals) >= 2:
+        keyword = next(
+            (
+                signal
+                for signal in challenge_signals
+                if signal != "Cloudflare"
+            ),
+            challenge_signals[0],
+        )
+        return True, keyword
     return False, None
 
 
