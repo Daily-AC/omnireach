@@ -18,3 +18,10 @@ def test_package_runtime_and_plugin_versions_match():
 
     assert pyproject["project"]["version"] == __version__
     assert plugin["version"] == __version__
+
+
+def test_packaged_readme_does_not_link_to_unshipped_relative_assets():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "](./" not in readme
+    assert "](LICENSE)" not in readme

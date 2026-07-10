@@ -1,6 +1,6 @@
 # omnireach
 
-<sub>English · [中文](./README.zh.md)</sub>
+<sub>English · [中文](https://github.com/Daily-AC/omnireach/blob/main/README.zh.md)</sub>
 
 **Your agent reads Twitter. It still can't read WeChat. omnireach fixes that.**
 
@@ -12,7 +12,7 @@ omnireach search --on wechat "Claude Code 技巧"   # works 60 seconds after ins
 
 Installed as a Claude Code skill, so your agent just knows how to use it next session. No LLM inside, no per-call scraping fees — the heavy sources reuse your own browser session.
 
-![demo — zero-config WeChat search, uniform JSON across sources](./docs/assets/demo-wechat.gif)
+![demo — zero-config WeChat search, uniform JSON across sources](https://raw.githubusercontent.com/Daily-AC/omnireach/main/docs/assets/demo-wechat.gif)
 
 ### MCP before Playwright
 
@@ -27,12 +27,12 @@ screenshots, and visual assertions.
 | Warm runtime, median of 5 | **1292.39 ms** | 1591.44 ms |
 
 On the recorded machine, Playwright took **1.9x** as long on the cold path and **1.2x** as
-long with both runtimes warm. See the [method and limitations](./docs/benchmarks/read-path-v0.12.md)
-or inspect [every raw sample](./docs/benchmarks/read-path-v0.12.json).
+long with both runtimes warm. See the [method and limitations](https://github.com/Daily-AC/omnireach/blob/main/docs/benchmarks/read-path-v0.12.md)
+or inspect [every raw sample](https://github.com/Daily-AC/omnireach/blob/main/docs/benchmarks/read-path-v0.12.json).
 
-![demo — real MCP fetch and logged-in Xiaohongshu search without adding a visible Chrome window](./docs/assets/demo-fast-path.gif)
+![demo — real MCP fetch and logged-in Xiaohongshu search without adding a visible Chrome window](https://raw.githubusercontent.com/Daily-AC/omnireach/main/docs/assets/demo-fast-path.gif)
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Daily-AC/omnireach/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
 
 ---
@@ -205,7 +205,7 @@ export OMNIREACH_FORCE_JSON=1
 
 The `not isatty()` auto-JSON added in v0.9.2 covers most cases, but some agent terminals (e.g. Antigravity) allocate a real PTY to subprocesses making `isatty()=True`. Explicit `--json` or the env var always works.
 
-Full skill contract: [`skills/omnireach/SKILL.md`](./skills/omnireach/SKILL.md)
+Full skill contract: [`skills/omnireach/SKILL.md`](https://github.com/Daily-AC/omnireach/blob/main/skills/omnireach/SKILL.md)
 
 ---
 
@@ -412,6 +412,6 @@ See `docs/superpowers/specs/2026-05-25-omnireach-design.md`.
 <details>
 <summary><b>License</b></summary>
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/Daily-AC/omnireach/blob/main/LICENSE).
 
 </details>
