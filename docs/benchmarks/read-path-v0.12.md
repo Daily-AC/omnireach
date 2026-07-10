@@ -1,18 +1,18 @@
 # Read-Path Benchmark: omnireach MCP vs Playwright
 
-Generated at `2026-07-10T10:26:19.446551Z` against [https://www.rfc-editor.org/rfc/rfc9110.html](https://www.rfc-editor.org/rfc/rfc9110.html).
+Generated at `2026-07-10T10:50:36.509609Z` against [https://www.rfc-editor.org/rfc/rfc9110.html](https://www.rfc-editor.org/rfc/rfc9110.html).
 Each value is the median of 5 measured runs. [Raw samples](./read-path-v0.12.json) are committed beside this report.
 
 ## Result
 
 | Read path | Median | Minimum | Maximum |
 |---|---:|---:|---:|
-| omnireach MCP, cold process | 1425.26 ms | 1389.18 ms | 1494.21 ms |
-| Playwright, cold headless system Chrome | 2713.69 ms | 2556.70 ms | 2940.93 ms |
-| omnireach MCP, warm server | 1292.39 ms | 1248.84 ms | 1338.44 ms |
-| Playwright, warm headless system Chrome | 1591.44 ms | 1555.50 ms | 1649.05 ms |
+| omnireach MCP, cold process | 1383.86 ms | 1338.95 ms | 1431.74 ms |
+| Playwright, cold headless system Chrome | 3749.26 ms | 3296.85 ms | 4768.51 ms |
+| omnireach MCP, warm server | 1311.46 ms | 1255.25 ms | 1712.05 ms |
+| Playwright, warm headless system Chrome | 1687.94 ms | 1530.79 ms | 1726.71 ms |
 
-For this document on this machine, cold Playwright retrieval took **1.9x** the omnireach MCP time. With both runtimes already warm, Playwright took **1.2x** the omnireach MCP time.
+For this document on this machine, cold Playwright retrieval took **2.7x** the omnireach MCP time. With both runtimes already warm, Playwright took **1.3x** the omnireach MCP time.
 
 ## Method
 

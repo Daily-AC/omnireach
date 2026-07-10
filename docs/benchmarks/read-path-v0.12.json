@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-07-10T10:26:19.446551Z",
+  "generated_at": "2026-07-10T10:50:36.509609Z",
   "target_url": "https://www.rfc-editor.org/rfc/rfc9110.html",
   "repetitions": 5,
-  "command": "/Users/e0_7/.cache/uv/builds-v0/.tmp3v5op7/bin/python scripts/benchmark_read_path.py --repeat 5 --json-out docs/benchmarks/read-path-v0.12.json --markdown-out docs/benchmarks/read-path-v0.12.md",
+  "command": "python scripts/benchmark_read_path.py --repeat 5 --json-out docs/benchmarks/read-path-v0.12.json --markdown-out docs/benchmarks/read-path-v0.12.md",
   "environment": {
     "os": "macOS-26.0.1-arm64-arm-64bit",
     "architecture": "arm64",
@@ -13,51 +13,51 @@
   },
   "results": {
     "omnireach_mcp_cold": {
-      "median_ms": 1425.26,
-      "min_ms": 1389.18,
-      "max_ms": 1494.21,
+      "median_ms": 1383.86,
+      "min_ms": 1338.95,
+      "max_ms": 1431.74,
       "samples_ms": [
-        1425.26,
-        1494.21,
-        1389.18,
-        1414.18,
-        1454.9
+        1431.74,
+        1383.86,
+        1429.07,
+        1338.95,
+        1373.5
       ]
     },
     "omnireach_mcp_warm": {
-      "median_ms": 1292.39,
-      "min_ms": 1248.84,
-      "max_ms": 1338.44,
+      "median_ms": 1311.46,
+      "min_ms": 1255.25,
+      "max_ms": 1712.05,
       "samples_ms": [
-        1295.06,
-        1262.6,
-        1248.84,
-        1292.39,
-        1338.44
+        1255.25,
+        1311.46,
+        1352.6,
+        1712.05,
+        1263.1
       ]
     },
     "playwright_chrome_cold": {
-      "median_ms": 2713.69,
-      "min_ms": 2556.7,
-      "max_ms": 2940.93,
+      "median_ms": 3749.26,
+      "min_ms": 3296.85,
+      "max_ms": 4768.51,
       "samples_ms": [
-        2940.93,
-        2713.69,
-        2696.14,
-        2829.71,
-        2556.7
+        3749.26,
+        3811.85,
+        3606.72,
+        3296.85,
+        4768.51
       ]
     },
     "playwright_chrome_warm": {
-      "median_ms": 1591.44,
-      "min_ms": 1555.5,
-      "max_ms": 1649.05,
+      "median_ms": 1687.94,
+      "min_ms": 1530.79,
+      "max_ms": 1726.71,
       "samples_ms": [
-        1624.16,
-        1591.44,
-        1578.44,
-        1555.5,
-        1649.05
+        1698.92,
+        1624.73,
+        1726.71,
+        1530.79,
+        1687.94
       ]
     }
   },

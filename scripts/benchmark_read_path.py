@@ -334,6 +334,11 @@ def _package_version(package: str) -> str:
         return "not installed"
 
 
+def portable_command(arguments: list[str]) -> str:
+    """Render a reproducible command without local interpreter paths."""
+    return shlex.join(["python", *arguments])
+
+
 def _atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
@@ -388,7 +393,7 @@ def run_benchmark(
         .replace("+00:00", "Z"),
         "target_url": url,
         "repetitions": repetitions,
-        "command": shlex.join([sys.executable, *sys.argv]),
+        "command": portable_command(sys.argv),
         "environment": {
             "os": platform.platform(),
             "architecture": platform.machine(),

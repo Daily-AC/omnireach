@@ -51,6 +51,27 @@ def test_validate_text_accepts_a_real_document_body():
     module.validate_text("x" * 500)
 
 
+def test_portable_command_omits_interpreter_and_cache_paths():
+    module = _load_module()
+
+    command = module.portable_command(
+        [
+            "scripts/benchmark_read_path.py",
+            "--repeat",
+            "5",
+            "--json-out",
+            "docs/benchmarks/read-path-v0.12.json",
+        ]
+    )
+
+    assert command == (
+        "python scripts/benchmark_read_path.py --repeat 5 "
+        "--json-out docs/benchmarks/read-path-v0.12.json"
+    )
+    assert "/Users/" not in command
+    assert ".cache/uv" not in command
+
+
 def test_render_report_uses_measured_medians_and_scope():
     module = _load_module()
     payload = {

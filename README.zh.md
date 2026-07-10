@@ -22,11 +22,11 @@ Chrome；支持的登录墙来源只在需要时通过后台临时 tab 复用你
 
 | 同一次 RFC 9110 读取 | omnireach MCP | Playwright + 无头系统 Chrome |
 |---|---:|---:|
-| 冷进程，5 次中位数 | **1425.26 ms** | 2713.69 ms |
-| 热运行时，5 次中位数 | **1292.39 ms** | 1591.44 ms |
+| 冷进程，5 次中位数 | **1383.86 ms** | 3749.26 ms |
+| 热运行时，5 次中位数 | **1311.46 ms** | 1687.94 ms |
 
-在记录数据的机器上，Playwright 冷路径耗时是 omnireach 的 **1.9 倍**，双方热启动后
-是 **1.2 倍**。查看[测试方法与边界](./docs/benchmarks/read-path-v0.12.md)，或直接核对
+在记录数据的机器上，Playwright 冷路径耗时是 omnireach 的 **2.7 倍**，双方热启动后
+是 **1.3 倍**。查看[测试方法与边界](./docs/benchmarks/read-path-v0.12.md)，或直接核对
 [全部原始样本](./docs/benchmarks/read-path-v0.12.json)。
 
 ![演示 — 真实 MCP fetch 与登录态小红书搜索，全程不新增可见 Chrome 窗口](./docs/assets/demo-fast-path.gif)

@@ -23,10 +23,10 @@ screenshots, and visual assertions.
 
 | Same RFC 9110 read | omnireach MCP | Playwright + headless system Chrome |
 |---|---:|---:|
-| Cold process, median of 5 | **1425.26 ms** | 2713.69 ms |
-| Warm runtime, median of 5 | **1292.39 ms** | 1591.44 ms |
+| Cold process, median of 5 | **1383.86 ms** | 3749.26 ms |
+| Warm runtime, median of 5 | **1311.46 ms** | 1687.94 ms |
 
-On the recorded machine, Playwright took **1.9x** as long on the cold path and **1.2x** as
+On the recorded machine, Playwright took **2.7x** as long on the cold path and **1.3x** as
 long with both runtimes warm. See the [method and limitations](https://github.com/Daily-AC/omnireach/blob/main/docs/benchmarks/read-path-v0.12.md)
 or inspect [every raw sample](https://github.com/Daily-AC/omnireach/blob/main/docs/benchmarks/read-path-v0.12.json).
 
