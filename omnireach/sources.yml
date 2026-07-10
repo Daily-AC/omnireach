@@ -153,17 +153,17 @@
 - id: douyin
   tier: heavy
   adapter: omnireach.adapters.douyin.DouyinAdapter
-  description: 抖音 视频搜索 (登录态 Chrome, OpenCLI 后台临时 tab)
+  description: 抖音视频搜索 (Omnireach 原生 Chrome 桥优先, OpenCLI 兼容回退)
   query_hints: ["抖音", douyin]
   default_in_auto: false
   trust: 0.55
   timeout_seconds: 30
   deps:
-    auto:
-      - { kind: npm, name: "github:Daily-AC/OpenCLI" }
+    auto: []
     manual:
-      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
-      - { step: "在 Chrome 中登录抖音账号 (打开 www.douyin.com 扫码登录)", verify: "opencli douyin search 测试 --limit 1 --format json" }
+      - { step: "运行 omnireach bridge install，记下输出的 chrome-extension 目录", verify: "omnireach bridge path --json" }
+      - { step: "在 chrome://extensions 开启开发者模式，加载上一步目录中的未打包扩展", verify: "omnireach bridge status --json" }
+      - { step: "在当前 Chrome 中登录 www.douyin.com", verify: "omnireach search 登录测试 --on douyin --limit 1 --json" }
 
 - id: tavily
   tier: booster

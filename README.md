@@ -17,10 +17,11 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 ### MCP before Playwright
 
 For search and reading, start with two read-only MCP tools instead of browser automation.
-Ordinary page fetches never start Chrome. When OpenCLI is installed, normal searches add
-Google and Twitter through hidden ephemeral tabs that close after the call; `quick` mode
-remains browser-free. Keep Playwright for clicks, forms, file transfer, screenshots, and
-visual assertions.
+Ordinary page fetches never start Chrome. Douyin search can now use Omnireach's own small,
+read-only Chrome bridge; Google, Twitter, and the other browser-backed sources still use
+OpenCLI while they migrate. Browser-backed calls use temporary background surfaces that
+close after the call, and `quick` mode remains browser-free. Keep Playwright for clicks,
+forms, file transfer, screenshots, and visual assertions.
 
 | Same RFC 9110 read | omnireach MCP | Playwright + headless system Chrome |
 |---|---:|---:|
@@ -63,7 +64,7 @@ loaded plugin MCP configuration.
 ## What you get
 
 **1. Reach the unreachable.**
-Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok — login-walled vertical platforms that no agent web search reaches. omnireach reads them through your own logged-in browser session (via OpenCLI Chrome bridge), so the results your agent sees are the same results a human would see when signed in.
+Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok — login-walled vertical platforms that no agent web search reaches. omnireach reads them through your own logged-in browser session. Douyin now uses the Omnireach native bridge first; OpenCLI remains the compatibility path for sources not migrated yet.
 
 **2. One uniform contract.**
 `omnireach search` → normalized metadata + URL, same shape across every source. `omnireach fetch` → clean markdown for any URL, with host-aware routing: ordinary pages use a built-in HTTP extractor with Jina fallback, while `mp.weixin.qq.com` uses your logged-in Chrome session. No Playwright or Crawl4AI is required for the default path.
@@ -159,6 +160,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach init` | Write default `~/.omnireach/preferences.toml` |
 | `omnireach sources` | List all sources + tier status |
 | `omnireach setup <source>` | Guided setup for a 🟡 / 🔴 source |
+| `omnireach bridge install` | Install/update the Omnireach native Chrome extension assets |
+| `omnireach bridge path` | Print the stable unpacked-extension directory |
+| `omnireach bridge status --json` | Ping the installed extension through the authenticated localhost bridge |
 | `omnireach doctor` | Health check (sources / fetch backends / wechat backends) |
 
 ---
@@ -176,7 +180,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | twitter | 🔴 heavy | OpenCLI + Chrome extension | Automatically included when OpenCLI is installed; inherits Chrome login |
 | xiaohongshu | 🔴 heavy | OpenCLI + Chrome extension | v0.3 path |
 | tiktok | 🔴 heavy | OpenCLI + Chrome extension | TikTok international (v0.7) |
-| douyin | 🔴 heavy | OpenCLI + Chrome extension | 抖音 via the Daily-AC fork until upstream WeChat stdout support lands |
+| douyin | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Reuses the current Chrome login without invoking OpenCLI on the native path |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | paid (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | paid (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | paid (v0.4) |
@@ -184,7 +188,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | wechat | ✅ ready | none (optional `EXA_API_KEY` for enhancement) | WeChat Official Accounts — search via Sogou free path; `EXA_API_KEY` optionally enables semantic enhancement; v0.10.1+ `omnireach fetch <wechat-url>` auto-routes through OpenCLI logged-in Chrome |
 | bilibili | ✅ ready | none (optional `EXA_API_KEY` for enhancement) | B站 — v0.9+ defaults to B站 official search API; `EXA_API_KEY` optionally enables semantic enhancement |
 
-> **抖音 / douyin**: Uses `omnireach setup douyin` and the [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI). Douyin search is already upstream; the fork remains only because WeChat `--stdout` support is still pending upstream. Requires signing in to www.douyin.com in Chrome.
+> **抖音 / douyin**: Run `omnireach bridge install`, load the printed directory once from `chrome://extensions` as an unpacked extension, and sign in to www.douyin.com in that Chrome profile. `auto` prefers this dependency-free native path and falls back to OpenCLI only when the extension is absent or disconnected. Set `OMNIREACH_BROWSER_TRANSPORT=native` to verify that OpenCLI is not invoked.
 
 > **WeChat fetch**: zero-config Sogou search now resolves signed result links to direct `mp.weixin.qq.com` URLs in the same HTTP session. Fetch then uses the Daily-AC/OpenCLI fork (`weixin download --stdout`, upstream PR [jackwener/OpenCLI#1770](https://github.com/jackwener/OpenCLI/pull/1770)) in an explicit background, ephemeral tab and releases it after the command.
 

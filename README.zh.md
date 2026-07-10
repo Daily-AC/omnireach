@@ -17,9 +17,9 @@ omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
 ### 先读网页，再启动 Playwright
 
 搜索和读取任务先用两个只读 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
-完全不启动 Chrome；安装 OpenCLI 后，普通搜索会通过用完即关的后台临时 tab 自动加入
-Google 和 Twitter，`quick` 模式仍完全不碰浏览器。点击、表单、文件传输、截图和视觉
-断言继续交给 Playwright。
+完全不启动 Chrome；抖音现在可走 Omnireach 自己的轻量只读 Chrome 桥，Google、
+Twitter 和其余浏览器源在逐个迁移期间仍使用 OpenCLI。浏览器路径用完即关，`quick`
+模式仍完全不碰浏览器。点击、表单、文件传输、截图和视觉断言继续交给 Playwright。
 
 | 同一次 RFC 9110 读取 | omnireach MCP | Playwright + 无头系统 Chrome |
 |---|---:|---:|
@@ -61,7 +61,7 @@ curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh 
 ## 你能得到什么
 
 **1. 触达那些触达不了的地方。**
-Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— 这些有登录墙的纵向平台，任何 agent 网络搜索都够不着。omnireach 通过你自己的已登录浏览器会话（借助 OpenCLI Chrome 桥接）读取这些平台，agent 看到的结果和一个已登录人类看到的一样。
+Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— 这些有登录墙的纵向平台，任何 agent 网络搜索都够不着。omnireach 复用你自己的已登录浏览器会话；抖音已优先走 Omnireach 原生桥，尚未迁移的源继续保留 OpenCLI 兼容路径。
 
 **2. 统一的数据契约。**
 `omnireach search` → 归一化 metadata + URL，跨所有源格式统一。`omnireach fetch` → 任意 URL 的干净 markdown：普通网页走内置 HTTP 提取 + Jina 兜底，只有 `mp.weixin.qq.com` 走登录态 Chrome。默认路径不需要 Playwright 或 Crawl4AI。
@@ -156,6 +156,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach init` | 写默认 `~/.omnireach/preferences.toml` |
 | `omnireach sources` | 列出所有源 + 状态 |
 | `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 |
+| `omnireach bridge install` | 安装或更新 Omnireach 原生 Chrome 扩展文件 |
+| `omnireach bridge path` | 输出稳定的未打包扩展目录 |
+| `omnireach bridge status --json` | 通过鉴权 localhost 桥真实 ping 扩展 |
 | `omnireach doctor` | 健康检查 (含 sources / fetch backends / wechat backends) |
 
 ---
@@ -173,7 +176,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | twitter | 🔴 heavy | OpenCLI + Chrome 扩展 | OpenCLI 可用时自动加入；继承 Chrome 登录态 |
 | xiaohongshu | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
 | tiktok | 🔴 heavy | OpenCLI + Chrome 扩展 | TikTok 国际版 (v0.7) |
-| douyin | 🔴 heavy | OpenCLI + Chrome 扩展 | 抖音；WeChat stdout 上游合并前仍装 Daily-AC fork |
+| douyin | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | 原生路径继承当前 Chrome 登录态，不调用 OpenCLI |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | 付费 (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | 付费 (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | 付费 (v0.4) |
@@ -181,7 +184,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | wechat | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | 微信公众号 — search 走 Sogou 免费搜索; `EXA_API_KEY` 可选启用语义增强; v0.10.1 起 `omnireach fetch <wechat-url>` 自动走 OpenCLI 登录态 Chrome 拿正文 |
 | bilibili | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | B站 — v0.9 起默认走 B站官方 search API; `EXA_API_KEY` 可选启用语义增强 |
 
-> **抖音 (douyin.com)**: 走 `omnireach setup douyin`，装 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)。Douyin search 已经进上游；继续用 fork 只因为 WeChat `--stdout` 尚未进上游。需要在 Chrome 登录 www.douyin.com。
+> **抖音 (douyin.com)**: 运行 `omnireach bridge install`，在 `chrome://extensions` 中一次性加载输出目录里的未打包扩展，并在同一 Chrome profile 登录 www.douyin.com。默认 `auto` 优先走这个零新增依赖的原生路径，仅在扩展缺失或未连接时回退 OpenCLI。设置 `OMNIREACH_BROWSER_TRANSPORT=native` 可验证全程没有调用 OpenCLI。
 
 > **微信公众号 fetch**: Sogou 零配置搜索现在会在同一 HTTP session 内把签名跳转链接解成直达 `mp.weixin.qq.com` URL；fetch 再用 Daily-AC/OpenCLI fork 的 `weixin download --stdout`，显式创建后台临时 tab，命令结束立即释放。
 
