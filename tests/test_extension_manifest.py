@@ -35,6 +35,7 @@ def test_service_worker_contract_is_allowlisted_and_closes_hidden_window():
 
     assert '"system.ping"' in source
     assert '"douyin.search"' in source
+    assert 'extensionVersion: "0.1.0"' in source
     assert "focused: false" in source
     assert "chrome.scripting.executeScript" in source
     assert "finally" in source

@@ -146,7 +146,11 @@ async function executeJob(job) {
   }
   try {
     if (job.command === "system.ping") {
-      return { id: job.id, ok: true, items: [{ pong: true, version: "0.1.0" }] };
+      return {
+        id: job.id,
+        ok: true,
+        items: [{ pong: true, extensionVersion: "0.1.0" }],
+      };
     }
     const items = await executeDouyinSearch(job.payload || {});
     return { id: job.id, ok: true, items };
