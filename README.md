@@ -187,7 +187,7 @@ export OMNIREACH_FORCE_JSON=1
 
 The `not isatty()` auto-JSON added in v0.9.2 covers most cases, but some agent terminals (e.g. Antigravity) allocate a real PTY to subprocesses making `isatty()=True`. Explicit `--json` or the env var always works.
 
-Full skill contract: [`.claude-plugin/skills/omnireach/SKILL.md`](./.claude-plugin/skills/omnireach/SKILL.md)
+Full skill contract: [`skills/omnireach/SKILL.md`](./skills/omnireach/SKILL.md)
 
 ---
 

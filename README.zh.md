@@ -184,7 +184,7 @@ export OMNIREACH_FORCE_JSON=1
 
 v0.9.2 加的 `not isatty()` 自动 JSON 在大多数场景够用，但有些 agent 终端（如 Antigravity）给子进程分配真 PTY 让 `isatty()=True`，自动检测失效 —— 显式 `--json` 或 env var 是 always-works 保险。
 
-完整 Skill 契约：[`.claude-plugin/skills/omnireach/SKILL.md`](./.claude-plugin/skills/omnireach/SKILL.md)
+完整 Skill 契约：[`skills/omnireach/SKILL.md`](./skills/omnireach/SKILL.md)
 
 ---
 

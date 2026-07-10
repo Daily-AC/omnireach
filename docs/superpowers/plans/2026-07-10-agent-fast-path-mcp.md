@@ -23,8 +23,9 @@
 - Create `tests/test_mcp_process.py`: real stdio lifecycle test.
 - Modify `tests/test_cli.py` and `tests/test_cmd_fetch.py`: lock CLI parity after extraction.
 - Create `.mcp.json`: plugin MCP registration.
-- Modify `.claude-plugin/skills/omnireach/SKILL.md`: MCP-first tool policy.
-- Create `.claude-plugin/skills/omnireach/references/cli.md`: detailed CLI fallback reference.
+- Modify `.claude-plugin/plugin.json`: use the current author schema and automatic component discovery.
+- Modify `skills/omnireach/SKILL.md`: MCP-first tool policy.
+- Create `skills/omnireach/references/cli.md`: detailed CLI fallback reference.
 - Modify `tests/test_skill_manifest.py`: validate MCP registration and routing policy.
 - Modify `install.sh`: install the skill reference alongside `SKILL.md`.
 - Modify `README.md` and `README.zh.md`: document MCP setup and Playwright boundary.
@@ -57,7 +58,7 @@ Expected: every installed CLI, including `opencli reddit search`, reports `argv 
 - [ ] **Step 3: Commit only the baseline fixes**
 
 ```bash
-git add .claude-plugin/skills/omnireach/SKILL.md CLAUDE.md README.md README.zh.md \
+git add skills/omnireach/SKILL.md CLAUDE.md README.md README.zh.md \
   omnireach pyproject.toml scripts/verify-adapter-contracts.sh tests uv.lock
 git commit -m "fix: make fetch and Chrome-backed search lightweight"
 ```
@@ -692,8 +693,9 @@ git commit -m "test: verify MCP stdio lifecycle"
 
 **Files:**
 - Create: `.mcp.json`
-- Modify: `.claude-plugin/skills/omnireach/SKILL.md`
-- Create: `.claude-plugin/skills/omnireach/references/cli.md`
+- Modify: `.claude-plugin/plugin.json`
+- Modify: `skills/omnireach/SKILL.md`
+- Create: `skills/omnireach/references/cli.md`
 - Modify: `install.sh`
 - Modify: `tests/test_skill_manifest.py`
 
@@ -710,7 +712,7 @@ def test_plugin_registers_omnireach_mcp_server():
 
 def test_skill_requires_mcp_before_browser_automation():
     text = (
-        PROJECT_ROOT / ".claude-plugin" / "skills" / "omnireach" / "SKILL.md"
+        PROJECT_ROOT / "skills" / "omnireach" / "SKILL.md"
     ).read_text().lower()
     assert "omnireach_search" in text
     assert "omnireach_fetch" in text
@@ -720,7 +722,7 @@ def test_skill_requires_mcp_before_browser_automation():
 
 def test_skill_cli_reference_exists_and_is_installed():
     reference = (
-        PROJECT_ROOT / ".claude-plugin" / "skills" / "omnireach" /
+        PROJECT_ROOT / "skills" / "omnireach" /
         "references" / "cli.md"
     )
     assert reference.exists()
@@ -776,7 +778,7 @@ from an `Additional Resources` section.
 - [ ] **Step 5: Install the reference with the standalone skill**
 
 After downloading `SKILL.md`, update `install.sh` to create `${SKILL_DIR}/references` and
-download `.claude-plugin/skills/omnireach/references/cli.md`. A reference download failure
+download `skills/omnireach/references/cli.md`. A reference download failure
 must print a warning but leave the installed CLI usable.
 
 - [ ] **Step 6: Run skill and installer tests**
@@ -792,7 +794,7 @@ Expected: `PASS: verify-install static checks`.
 - [ ] **Step 7: Commit plugin integration**
 
 ```bash
-git add .mcp.json .claude-plugin/skills/omnireach install.sh \
+git add .mcp.json skills/omnireach install.sh \
   tests/test_skill_manifest.py
 git commit -m "feat: register MCP tools and prefer them in the skill"
 ```
@@ -828,7 +830,7 @@ in `CLAUDE.md`. Remove stale statements that say agents should always invoke the
 
 - [ ] **Step 3: Verify documentation consistency**
 
-Run: `rg -n "omnireach_search|omnireach_fetch|Playwright|omnireach mcp" README.md README.zh.md CLAUDE.md .claude-plugin/skills/omnireach`
+Run: `rg -n "omnireach_search|omnireach_fetch|Playwright|omnireach mcp" README.md README.zh.md CLAUDE.md skills/omnireach`
 
 Expected: both tool names and the Playwright boundary appear in both READMEs and the skill.
 
