@@ -40,7 +40,7 @@ class _BridgeState:
 
 class _BridgeServer(ThreadingHTTPServer):
     daemon_threads = True
-    allow_reuse_address = False
+    allow_reuse_address = True
 
     def __init__(self, address: tuple[str, int], state: _BridgeState) -> None:
         self.state = state

@@ -254,6 +254,38 @@ def test_native_bridge_port_contention_is_unavailable(tmp_path):
             )
 
 
+def test_native_bridge_reuses_fixed_port_after_completed_job(tmp_path):
+    paths = install_extension(home=tmp_path)
+    token = paths.token_path.read_text().strip()
+    port = _free_port()
+
+    def run_once() -> None:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(
+                run_native_job,
+                "system.ping",
+                {},
+                home=tmp_path,
+                port=port,
+                connect_timeout=2,
+                result_timeout=2,
+            )
+            job = _poll_job(port, token)
+            result = {"id": job["id"], "ok": True, "items": [{"pong": True}]}
+            with _request(
+                port,
+                token,
+                method="POST",
+                path="/v1/result",
+                body=json.dumps(result).encode(),
+            ):
+                pass
+            assert future.result() == [{"pong": True}]
+
+    run_once()
+    run_once()
+
+
 def test_native_bridge_cancellation_stops_waiting(tmp_path):
     install_extension(home=tmp_path)
     cancel = threading.Event()
