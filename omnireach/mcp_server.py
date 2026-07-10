@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+import sys
+from typing import Any, TextIO
 from urllib.parse import urlparse
 
 from omnireach import __version__
@@ -263,3 +264,33 @@ def handle_message(message: object) -> dict[str, Any] | None:
             return _error(request_id, -32601, "Tool not found")
         return _result(request_id, value)
     return _error(request_id, -32601, "Method not found")
+
+
+def serve_stdio(
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+) -> None:
+    """Serve newline-delimited MCP JSON-RPC until stdin closes."""
+    input_stream = stdin or sys.stdin
+    output_stream = stdout or sys.stdout
+    error_stream = stderr or sys.stderr
+    for line in input_stream:
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError as exc:
+            response = _error(None, -32700, f"Parse error: {exc.msg}")
+        else:
+            try:
+                response = handle_message(message)
+            except Exception as exc:  # noqa: BLE001
+                print(f"omnireach MCP internal error: {exc}", file=error_stream)
+                request_id = message.get("id") if isinstance(message, dict) else None
+                response = _error(request_id, -32603, "Internal error")
+        if response is None:
+            continue
+        output_stream.write(
+            json.dumps(response, ensure_ascii=False, separators=(",", ":"))
+        )
+        output_stream.write("\n")
+        output_stream.flush()
