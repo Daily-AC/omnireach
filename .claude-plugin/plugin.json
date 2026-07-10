@@ -2,10 +2,7 @@
   "name": "omnireach",
   "version": "0.1.0",
   "description": "Search & read the login-walled Chinese internet for your AI agent — 微信公众号/小红书/抖音/B站/TikTok + Twitter/Reddit/HN/YouTube. One CLI, one JSON schema, zero-config WeChat search.",
-  "author": "Daily-AC",
+  "author": {"name": "Daily-AC"},
   "license": "MIT",
-  "homepage": "https://github.com/Daily-AC/omnireach",
-  "components": {
-    "skills": ["./skills/omnireach"]
-  }
+  "homepage": "https://github.com/Daily-AC/omnireach"
 }

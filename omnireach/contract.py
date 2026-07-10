@@ -63,3 +63,15 @@ class SearchEnvelope(BaseModel):
     ts: str
     results: list[SearchResult] = Field(default_factory=list)
     errors: list[SourceError] = Field(default_factory=list)
+
+
+class FetchEnvelope(BaseModel):
+    """The top-level JSON returned by `omnireach fetch <url>`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    backend: Literal["http", "jina", "crwl", "opencli"] | None = None
+    fetched_at: str
+    content_markdown: str = ""
+    errors: list[str] = Field(default_factory=list)

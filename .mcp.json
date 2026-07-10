@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "omnireach": {
+      "command": "omnireach",
+      "args": ["mcp"]
+    }
+  }
+}

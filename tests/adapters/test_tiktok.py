@@ -34,7 +34,7 @@ async def test_tiktok_search_parses_opencli_json_array(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.tiktok.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.tiktok.shutil.which", lambda n: "/usr/bin/" + n)
 
     out = await TikTokAdapter().search("claude", limit=3)
@@ -70,7 +70,7 @@ async def test_tiktok_search_back_compat_dict_response(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.tiktok.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.tiktok.shutil.which", lambda n: "/usr/bin/" + n)
 
     out = await TikTokAdapter().search("hi")
@@ -93,7 +93,7 @@ async def test_tiktok_search_invokes_opencli_with_format_json(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.tiktok.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.tiktok.shutil.which", lambda n: "/usr/bin/" + n)
 
     await TikTokAdapter().search("vibe coding", limit=5)
@@ -121,7 +121,7 @@ async def test_tiktok_title_truncates_long_desc(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.tiktok.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.tiktok.shutil.which", lambda n: "/usr/bin/" + n)
 
     out = await TikTokAdapter().search("x")

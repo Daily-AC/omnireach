@@ -18,12 +18,9 @@ from omnireach.commands.init import init_cmd
 from omnireach.commands.setup import setup_cmd
 from omnireach.commands.preferences import preferences_cmd
 from omnireach.commands.sources import sources_cmd
-from omnireach.dispatcher import Dispatcher
-from omnireach.normalizer import build_envelope
 from omnireach.registry import load_registry
-from omnireach.router import RouteRequest, Router
-from omnireach.scorer import rank
 from omnireach.secrets_env import load_secrets_env
+from omnireach.service import augment_with_active_boosters, search
 
 _SECRETS_PATH = Path.home() / ".omnireach" / "secrets.env"
 load_secrets_env(_SECRETS_PATH)
@@ -31,6 +28,11 @@ load_secrets_env(_SECRETS_PATH)
 ISSUE_URL = "https://github.com/Daily-AC/omnireach/issues/new/choose"
 
 console = Console()
+
+
+def _augment_with_active_boosters(source_ids, reg, explicit_sources):
+    """Compatibility wrapper for callers that imported the former CLI helper."""
+    return augment_with_active_boosters(source_ids, reg, explicit_sources)
 
 
 def _should_emit_json(explicit_flag: bool) -> bool:
@@ -49,41 +51,18 @@ def _should_emit_json(explicit_flag: bool) -> bool:
     return not sys.stdout.isatty()
 
 
-_BOOSTER_KEY_ENV = {
-    "tavily": "TAVILY_API_KEY",
-    "brave": "BRAVE_API_KEY",
-    "perplexity": "PERPLEXITY_API_KEY",
-    "exa": "EXA_API_KEY",
-    "wechat": "EXA_API_KEY",
-    "bilibili": "EXA_API_KEY",
-}
-
-
-def _augment_with_active_boosters(source_ids, reg, explicit_sources):
-    """When a booster's API Key env is set, ensure it's in the fanout.
-
-    Only auto-augments when user didn't pass --on (explicit overrides win).
-    """
-    if explicit_sources:
-        return source_ids
-    out = list(source_ids)
-    for booster_id, env in _BOOSTER_KEY_ENV.items():
-        if not os.environ.get(env):
-            continue
-        if booster_id in out:
-            continue
-        try:
-            reg.get(booster_id)
-        except KeyError:
-            continue
-        out.append(booster_id)
-    return out
-
-
 @click.group()
 @click.version_option(__version__, "-V", "--version")
 def main() -> None:
     """omnireach — 全网通搜索 CLI."""
+
+
+@main.command("mcp")
+def mcp_cmd() -> None:
+    """Run the omnireach MCP server over stdio."""
+    from omnireach.mcp_server import serve_stdio
+
+    serve_stdio()
 
 
 @main.command("search")
@@ -96,31 +75,34 @@ def main() -> None:
 @click.option("--json", "json_out", is_flag=True, help="输出 JSON, 适合下游 pipe")
 def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: float, json_out: bool) -> None:
     """运行一次搜索."""
-    explicit = [s.strip() for s in on_.split(",")] if on_ else None
-    reg = load_registry()
-    router = Router(reg)
-    route = router.plan(RouteRequest(query=query, explicit_sources=explicit, mode=mode))
+    explicit: list[str] | None = None
+    if on_:
+        requested = [source.strip() for source in on_.split(",") if source.strip()]
+        known = {spec.id for spec in load_registry().sources}
+        for unknown in [source for source in requested if source not in known]:
+            click.echo(
+                f"warning: 未知源 '{unknown}' — 跳过 "
+                "(用 `omnireach sources` 查看可用源)",
+                err=True,
+            )
+        explicit = [source for source in requested if source in known]
+        if not explicit:
+            raise click.UsageError("没有有效的 source")
 
-    for unknown in route.unknown_sources:
-        click.echo(f"warning: 未知源 '{unknown}' — 跳过 (用 `omnireach sources` 查看可用源)", err=True)
-
-    route_sources = _augment_with_active_boosters(route.source_ids, reg, explicit)
-
-    adapters = {}
-    for sid in route_sources:
-        try:
-            spec = reg.get(sid)
-            adapters[sid] = spec.load_adapter_class()()
-        except Exception as e:  # noqa: BLE001
-            click.echo(f"skip {sid}: {e}", err=True)
-
-    timeouts_by_source = {s.id: s.timeout_seconds for s in reg.sources}
-    dispatcher = Dispatcher(timeout=timeout, per_source_limit=limit,
-                            timeouts_by_source=timeouts_by_source)
-    results, errors = asyncio.run(dispatcher.run(adapters, query))
-    trust_map = {s.id: s.trust for s in reg.sources}
-    ranked = rank(results, trust_map=trust_map)
-    envelope = build_envelope(query=query, results=ranked, errors=errors)
+    envelope = asyncio.run(
+        search(
+            query,
+            sources=explicit,
+            mode=mode,
+            limit=limit,
+            timeout=timeout,
+        )
+    )
+    ranked = envelope.results
+    errors = envelope.errors
+    for error in errors:
+        if error.error.startswith("adapter load failed:"):
+            click.echo(f"skip {error.source}: {error.error}", err=True)
 
     if _should_emit_json(json_out):
         click.echo(envelope.model_dump_json())

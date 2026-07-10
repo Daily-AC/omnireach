@@ -1,6 +1,4 @@
-import asyncio
 import json
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -8,61 +6,68 @@ from omnireach.adapters.base import AdapterUnavailable
 from omnireach.adapters.reddit import RedditAdapter
 
 
-def _mock_proc(stdout: bytes, stderr: bytes = b"", returncode: int = 0):
-    proc = AsyncMock()
-    proc.communicate = AsyncMock(return_value=(stdout, stderr))
-    proc.returncode = returncode
-    return proc
+# OpenCLI v1.8.6 `reddit search` shape observed in a real run on 2026-07-10.
+_REAL_OPENCLI_ITEM = {
+    "id": "1u6g6tn",
+    "title": "I think Claude Code saved my life.",
+    "subreddit": "r/ClaudeCode",
+    "author": "TheComplicatedMan",
+    "score": 561,
+    "comments": 169,
+    "url": (
+        "https://www.reddit.com/r/ClaudeCode/comments/1u6g6tn/"
+        "i_think_claude_code_saved_my_life/"
+    ),
+    "created_utc": 1781529030,
+    "selftext": "I was at the prompt working, but did not feel well.",
+}
 
 
-def test_is_ready_false_without_rdt(monkeypatch):
-    monkeypatch.setattr("shutil.which", lambda b: None)
-    assert asyncio.run(RedditAdapter().is_ready()) is False
+async def test_is_ready_requires_opencli(monkeypatch):
+    monkeypatch.setattr("omnireach.adapters.reddit.shutil.which", lambda b: "/bin/opencli")
+    assert await RedditAdapter().is_ready() is True
+
+    monkeypatch.setattr("omnireach.adapters.reddit.shutil.which", lambda b: None)
+    assert await RedditAdapter().is_ready() is False
 
 
-def test_is_ready_true_with_rdt(monkeypatch):
-    monkeypatch.setattr("shutil.which", lambda b: "/usr/bin/rdt-cli")
-    assert asyncio.run(RedditAdapter().is_ready()) is True
+async def test_search_parses_real_opencli_shape(monkeypatch):
+    captured: list[str] = []
 
+    async def fake_exec(*args, **kwargs):
+        captured.extend(args)
 
-def test_search_parses_results(monkeypatch):
-    monkeypatch.setattr("shutil.which", lambda b: "/usr/bin/rdt-cli")
-    payload = json.dumps({
-        "results": [
-            {
-                "title": "Post 1",
-                "permalink": "/r/python/comments/abc/post_1",
-                "selftext": "body",
-                "author": "alice",
-                "created_utc": 1716000000,
-                "score": 42,
-                "num_comments": 7,
-                "subreddit": "python",
-            },
-        ]
-    }).encode()
-    with patch("omnireach.adapters.reddit.asyncio.create_subprocess_exec",
-               AsyncMock(return_value=_mock_proc(payload))):
-        out = asyncio.run(RedditAdapter().search("python", limit=5))
+        class P:
+            returncode = 0
+
+            async def communicate(self):
+                return json.dumps([_REAL_OPENCLI_ITEM]).encode(), b""
+
+        return P()
+
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters.reddit.shutil.which", lambda b: "/bin/opencli")
+
+    out = await RedditAdapter().search("Claude Code", limit=5)
+
     assert len(out) == 1
     assert out[0].source == "reddit"
-    assert out[0].title == "Post 1"
-    assert "reddit.com/r/python/comments/abc" in out[0].url
-    assert out[0].author == "alice"
-    assert out[0].engagement.likes == 42
-    assert out[0].engagement.comments == 7
+    assert out[0].adapter == "opencli"
+    assert out[0].title == "I think Claude Code saved my life."
+    assert out[0].url == _REAL_OPENCLI_ITEM["url"]
+    assert out[0].content == "I was at the prompt working, but did not feel well."
+    assert out[0].author == "TheComplicatedMan"
+    assert out[0].engagement.likes == 561
+    assert out[0].engagement.comments == 169
+    assert out[0].ts == "2026-06-15T13:10:30+00:00"
+    assert captured[:4] == ["opencli", "reddit", "search", "Claude Code"]
+    assert captured[captured.index("--limit") + 1] == "5"
+    assert captured[captured.index("--window") + 1] == "background"
+    assert captured[captured.index("--site-session") + 1] == "ephemeral"
+    assert captured[captured.index("--keep-tab") + 1] == "false"
 
 
-def test_search_raises_when_missing(monkeypatch):
-    monkeypatch.setattr("shutil.which", lambda b: None)
-    with pytest.raises(AdapterUnavailable):
-        asyncio.run(RedditAdapter().search("q"))
-
-
-def test_search_detects_unauth_error(monkeypatch):
-    monkeypatch.setattr("shutil.which", lambda b: "/usr/bin/rdt-cli")
-    with patch("omnireach.adapters.reddit.asyncio.create_subprocess_exec",
-               AsyncMock(return_value=_mock_proc(b"", b"not logged in: run `rdt login`", 1))):
-        with pytest.raises(AdapterUnavailable) as exc:
-            asyncio.run(RedditAdapter().search("q"))
-        assert "login" in str(exc.value).lower() or "rdt" in str(exc.value).lower()
+async def test_search_raises_when_opencli_missing(monkeypatch):
+    monkeypatch.setattr("omnireach.adapters.reddit.shutil.which", lambda b: None)
+    with pytest.raises(AdapterUnavailable, match="opencli"):
+        await RedditAdapter().search("q")

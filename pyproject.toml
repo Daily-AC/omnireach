@@ -25,8 +25,6 @@ dependencies = [
   "PyYAML>=6.0",
   "rich>=13.7",
   "feedparser>=6.0,<7.0",
-  "lxml>=6.1.1",
-  "cssselect>=1.4.0",
 ]
 
 [project.optional-dependencies]
@@ -50,7 +48,7 @@ Changelog = "https://github.com/Daily-AC/omnireach/releases"
 packages = ["omnireach"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["docs/", ".claude-plugin/", ".github/", ".impeccable/", "tests/", "install.sh", "scripts/", "CLAUDE.md", "uv.lock"]
+exclude = ["docs/", "skills/", ".claude-plugin/", ".github/", ".impeccable/", "tests/", "install.sh", "scripts/", "CLAUDE.md", "uv.lock"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

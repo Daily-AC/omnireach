@@ -44,6 +44,23 @@ def test_setup_reports_failure(monkeypatch):
     assert "失败" in res.output or "failed" in res.output.lower()
 
 
+def test_setup_reddit_routes_to_opencli_wizard(monkeypatch):
+    from omnireach import wizard as wiz_mod
+    from omnireach.wizard import SetupReport
+
+    async def fake_run_setup(spec, **kwargs):
+        assert spec.id == "reddit"
+        assert [dep.name for dep in spec.deps_auto] == ["github:Daily-AC/OpenCLI"]
+        return SetupReport(source_id="reddit", already_ready=True)
+
+    monkeypatch.setattr(wiz_mod, "run_setup", fake_run_setup)
+
+    result = CliRunner().invoke(main, ["setup", "reddit", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "已就绪" in result.output
+
+
 def test_setup_tavily_writes_secrets_env(tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     from click.testing import CliRunner

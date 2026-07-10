@@ -13,11 +13,11 @@ declare -A ADAPTERS=(
     ["yt-dlp:ytsearch"]="--flat-playlist --dump-json --no-warnings"
     ["gh:search repos"]="--json"
     ["gh:search issues"]="--json"
-    ["rdt-cli:search"]="--json --limit"
-    ["opencli:twitter search"]="--format --limit"
-    ["opencli:xiaohongshu search"]="--format --limit"
-    ["opencli:tiktok search"]="--format --limit"
-    ["opencli:douyin search"]="--format --limit"
+    ["opencli:reddit search"]="--format --limit --window --site-session --keep-tab"
+    ["opencli:twitter search"]="--format --limit --window --site-session --keep-tab"
+    ["opencli:xiaohongshu search"]="--format --limit --window --site-session --keep-tab"
+    ["opencli:tiktok search"]="--format --limit --window --site-session --keep-tab"
+    ["opencli:douyin search"]="--format --limit --window --site-session --keep-tab"
 )
 
 EXIT=0

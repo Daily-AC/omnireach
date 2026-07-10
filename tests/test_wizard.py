@@ -55,8 +55,8 @@ async def test_setup_runs_auto_install_then_manual_then_verifies():
     installs: list[tuple[str, str]] = []
 
     spec = _spec(
-        auto=[Dep(kind="pipx", name="agent-reach"), Dep(kind="npm", name="rdt-cli")],
-        manual=[Dep(step="跑 `rdt login`")],
+        auto=[Dep(kind="pipx", name="agent-reach"), Dep(kind="npm", name="demo-cli")],
+        manual=[Dep(step="运行 `demo login`")],
     )
 
     adapter = _StubAdapter(ready=False)
@@ -78,8 +78,8 @@ async def test_setup_runs_auto_install_then_manual_then_verifies():
         prompt_user_step=prompt_user_step,
     )
 
-    assert installs == [("pipx", "agent-reach"), ("npm", "rdt-cli")]
-    assert prompts == ["跑 `rdt login`"]
+    assert installs == [("pipx", "agent-reach"), ("npm", "demo-cli")]
+    assert prompts == ["运行 `demo login`"]
     assert report.success is True
     assert report.already_ready is False
     assert [s.kind for s in report.steps] == [StepKind.AUTO, StepKind.AUTO, StepKind.MANUAL, StepKind.VERIFY]

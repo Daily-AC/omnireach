@@ -10,6 +10,7 @@ def test_cli_help():
     res = runner.invoke(main, ["--help"])
     assert res.exit_code == 0
     assert "search" in res.output
+    assert "mcp" in res.output
 
 
 def test_cli_search_on_hackernews_only_smoke(monkeypatch):

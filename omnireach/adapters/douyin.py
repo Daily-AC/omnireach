@@ -13,11 +13,10 @@ returns 0 for these fields — see PR description for follow-up via aweme detail
 
 from __future__ import annotations
 
-import asyncio
-import json
 import shutil
 
 from omnireach.adapters.base import AdapterBase, AdapterUnavailable
+from omnireach.adapters._opencli import run_opencli_json
 from omnireach.contract import Engagement, SearchResult
 
 
@@ -34,21 +33,9 @@ class DouyinAdapter(AdapterBase):
                 "douyin", "opencli not installed", hint="omnireach setup douyin"
             )
 
-        proc = await asyncio.create_subprocess_exec(
-            "opencli", "douyin", "search", "--format", "json", "--limit", str(limit), query,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        items = await run_opencli_json(
+            "douyin", "douyin", "search", "--limit", str(limit), query
         )
-        out, err = await proc.communicate()
-        if proc.returncode != 0:
-            raise AdapterUnavailable("douyin", err.decode().strip() or "opencli douyin search failed")
-
-        try:
-            data = json.loads(out.decode())
-        except json.JSONDecodeError as e:
-            raise AdapterUnavailable("douyin", f"opencli returned non-JSON: {e}")
-
-        items = data if isinstance(data, list) else data.get("results", [])
 
         results: list[SearchResult] = []
         for item in items[:limit]:

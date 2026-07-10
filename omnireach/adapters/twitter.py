@@ -10,12 +10,20 @@ with `opencli doctor` and `opencli twitter state` as verify commands.
 
 from __future__ import annotations
 
-import asyncio
-import json
 import shutil
 
 from omnireach.adapters.base import AdapterBase, AdapterUnavailable
+from omnireach.adapters._opencli import run_opencli_json
 from omnireach.contract import Engagement, SearchResult
+
+
+def _int_or_none(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(str(value).replace(",", ""))
+    except ValueError:
+        return None
 
 
 class TwitterAdapter(AdapterBase):
@@ -31,22 +39,9 @@ class TwitterAdapter(AdapterBase):
                 "twitter", "opencli not installed", hint="omnireach setup twitter"
             )
 
-        proc = await asyncio.create_subprocess_exec(
-            "opencli", "twitter", "search", "--format", "json", "--limit", str(limit), query,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        items = await run_opencli_json(
+            "twitter", "twitter", "search", "--limit", str(limit), query
         )
-        out, err = await proc.communicate()
-        if proc.returncode != 0:
-            raise AdapterUnavailable("twitter", err.decode().strip() or "opencli twitter search failed")
-
-        try:
-            data = json.loads(out.decode())
-        except json.JSONDecodeError as e:
-            raise AdapterUnavailable("twitter", f"opencli returned non-JSON: {e}")
-
-        # opencli v1.7.22 returns a JSON array directly. Older shapes used {"results": [...]}.
-        items = data if isinstance(data, list) else data.get("results", [])
 
         results: list[SearchResult] = []
         for item in items[:limit]:
@@ -63,9 +58,10 @@ class TwitterAdapter(AdapterBase):
                     ts=item.get("created_at"),
                     score=0.5,
                     engagement=Engagement(
-                        likes=item.get("like_count"),
-                        shares=item.get("retweet_count"),
-                        comments=item.get("reply_count"),
+                        likes=_int_or_none(item.get("likes", item.get("like_count"))),
+                        shares=_int_or_none(item.get("retweets", item.get("retweet_count"))),
+                        comments=_int_or_none(item.get("replies", item.get("reply_count"))),
+                        views=_int_or_none(item.get("views")),
                     ),
                     raw=item,
                 )
