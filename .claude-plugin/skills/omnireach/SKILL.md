@@ -1,120 +1,81 @@
 ---
 name: omnireach
-description: Search AND read the login-walled Chinese internet — 微信公众号 / 小红书 / 抖音 / B站 / TikTok — plus Twitter / Reddit / YouTube / HackerNews / GitHub / RSS, via the user's own browser session, with one uniform JSON schema across all sources (zero-config WeChat search). Two commands: `omnireach search <query>` (metadata + URL) and `omnireach fetch <url>` (full markdown). Use when the user wants to search or read any of these platforms, shares a URL to read, asks to research a topic, OR when Claude Code's built-in WebSearch is unavailable (proxy / relay-station / Bedrock / Vertex-Claude3.x environments where the web_search_20250305 server tool isn't implemented).
+description: This skill should be used to call `omnireach_search` or `omnireach_fetch` when the user asks to "search the web", "research a topic", "search Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok, YouTube, HackerNews, GitHub, or RSS", "read this URL", "fetch this article", or "avoid Playwright/browser automation" for read-only web work. It provides MCP-first search and fetch through the user's existing Chrome login state when required.
 ---
 
-# omnireach — 全网通搜索 + 全文抓取
+# omnireach
 
-omnireach 是一个 CLI 工具集, 把 web 搜索 + 多平台读取 (Twitter / Reddit / YouTube / B站 / 小红书 / HN / GitHub / 微信公众号 / RSS) 整合到一条命令里。Claude Code 的 WebSearch 是 server tool, 真实可用性经过两层 gate: (a) 客户端 `isEnabled()` 看 `CLAUDE_CODE_USE_*` env var (默认 firstParty 注册 tool, 显式 Bedrock 关); (b) 上游 API 必须**专门实现** `web_search_20250305` server tool (Anthropic / DeepSeek / Foundry / Vertex+Claude4+ 等专门做 Claude Code 兼容的都实现; 单纯做 API 转译的 OpenAI 兼容中转站和大部分自托管 gateway 不实现)。omnireach 给两层 gate 任一关掉的用户补一个客户端实现的多源 search + fetch。同时即使 WebSearch 可用, 它也搜不到 Twitter / 小红书 / 微信公众号 等纵向源, omnireach 也能补齐。
+Use omnireach as the read-only web fast path. Search across ordinary web sources and
+login-walled vertical platforms, then fetch full page Markdown through one stable schema.
+Keep browser automation for interactions that search and fetch cannot perform.
 
-v0.10 起两个核心子命令:
-- `omnireach search <query>` → 全网 SERP (metadata + URL)
-- `omnireach fetch <url>` → URL 拉成全文 markdown — 普通网页走内置无浏览器 HTTP → Jina fallback；`mp.weixin.qq.com` 走后台临时 OpenCLI tab 继承登录态
+## Tool Choice Policy
 
-## Agent 调用约定 (重要)
+1. Call `omnireach_search` first for web research or platform search.
+2. Call `omnireach_fetch` first to read an HTTP or HTTPS URL.
+3. Use the omnireach CLI fallback only when these MCP tools are unavailable.
+4. Use Playwright or browser control only for clicks, forms, uploads, downloads,
+   screenshots, visual inspection, or unsupported interactive workflows.
 
-**作为 Agent 调用 omnireach 时, 永远显式拿 JSON**。两种方式任选 (或都用, belt + suspenders):
+Do not launch Playwright merely to search or extract readable page content.
 
-1. **每条命令加 `--json`**: `omnireach search --json "..."` / `omnireach fetch --json "<url>"`
-2. **设环境变量** (一次性, 整个 Agent harness 生效): `export OMNIREACH_FORCE_JSON=1`
+## Search
 
-为什么需要: omnireach 默认在 TTY 下出 rich.Table (人类友好), 但 Agent 拿到 wrap 过的 table 文本抠 URL/字段是噩梦。v0.9.2 加了 `not isatty()` 自动 JSON, 但某些 Agent 终端 (如 Antigravity) 会给子进程分配真 PTY 让 `isatty()=True`, 自动检测就失效 —— 显式 `--json` 或 env var 是 always-works 保险。
+Call `omnireach_search` with a non-empty `query`.
 
-## 如何使用
+Optional arguments:
 
-### 第一次用 / step 0 (自愈)
+- `sources`: restrict the call to source IDs such as `reddit`, `xiaohongshu`, `wechat`,
+  `twitter`, `hackernews`, or `bilibili`.
+- `mode`: use `auto`, `quick`, or `deep`; explicit `sources` take precedence.
+- `limit`: request 1 through 50 results per source.
+- `timeout`: allow 1 through 120 seconds.
 
-如果 `omnireach` 不在 PATH (skill 在但 CLI 没装), 先跑这一条幂等命令装好 CLI + skill, 然后正常用:
+Read `results` as normalized search metadata. Treat each result's `content` as a snippet,
+not the full document. Inspect `errors` for unavailable or failed sources while retaining
+successful results from other sources.
+
+Use `omnireach_fetch` on a selected result URL when full text is required.
+
+## Fetch
+
+Call `omnireach_fetch` with an absolute HTTP or HTTPS `url`.
+
+Leave `backend` as `auto` unless diagnosing a backend. Auto routing uses built-in HTTP then
+Jina for ordinary pages and the logged-in OpenCLI Chrome bridge for supported WeChat URLs.
+Ordinary HTTP fetch does not start Chrome. Browser-backed paths use a hidden ephemeral tab
+and close it after the call.
+
+Treat `content_markdown` as successful only when it is non-empty. Inspect `errors` for
+blocked requests, CAPTCHA detection, unavailable backends, and fallback attempts. A tool
+result marked as an error still contains the full fetch envelope for recovery.
+
+## Setup and Recovery
+
+If the MCP tools are absent but `omnireach` is installed, use the CLI fallback documented
+in `references/cli.md`.
+
+If the CLI is absent, install it with the idempotent installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh | sh
 ```
 
-零配置即可用: hackernews / rss / wechat (Sogou 免费) / bilibili (B站官方 API)。Reddit / Twitter / xhs / TikTok / Douyin 统一走 OpenCLI 后台临时 tab；其他源跑 `omnireach setup <source>` 解锁 (注意: `setup` 是交互式, 给人用; agent 别直接调)。
+Do not invoke interactive `omnireach setup <source>` from an unattended agent process.
+Ask the user to run setup when a login-backed source reports that OpenCLI or its Chrome
+extension is unavailable.
 
-### Search — 拿 URL + metadata
+Run `omnireach doctor --json` to diagnose source readiness and backend support. Prefer a
+different configured source or ordinary HTTP fallback when a nonessential source is
+unavailable.
 
-```bash
-omnireach search --json "Claude 4.7 prompt caching 实测"
-```
+## Boundary
 
-返回标准化 envelope:
-```json
-{
-  "query": "...",
-  "ts": "ISO 8601 Z",
-  "results": [{"source", "adapter", "title", "url", "content", "ts", "score", "engagement", "raw", "cost"}],
-  "errors": [{"source", "error", "category": "unavailable" | "failed"}]
-}
-```
+Use omnireach for finding and reading information. Do not claim it replaces full browser
+automation. Switch to browser control only when the requested outcome requires page state
+changes, visual evidence, or an interaction sequence.
 
-注意: `content` 字段是 SERP snippet (≤ 500 字 + "…", v0.8 起 contract 层强制截断)。要全文用 `omnireach fetch <url>`。
+## Additional Resources
 
-### Fetch — URL → 全文 markdown (v0.10, v0.10.1 加 OpenCLI 路径)
-
-```bash
-omnireach fetch --json "https://mp.weixin.qq.com/s/abc"        # auto → opencli (登录态)
-omnireach fetch --json "https://example.com/article"           # auto → http → jina
-```
-
-返回:
-```json
-{
-  "url": "...",
-  "backend": "http" | "opencli" | "jina" | "crwl" | null,
-  "fetched_at": "ISO 8601 Z",
-  "content_markdown": "# title\n\nbody...",
-  "errors": ["<backend>: <error detail>"]
-}
-```
-
-Backend 选择:
-- `--backend auto` (default): **host-aware** — `mp.weixin.qq.com` URL 强走 opencli；其它 host 走内置 HTTP 提取优先 + Jina Reader fallback。默认路径不需要 Playwright/Crawl4AI
-- `--backend http`: 强制走 omnireach 内置 HTTP + HTML-to-Markdown，不启动浏览器
-- `--backend opencli`: 强制走 OpenCLI weixin 登录态路径 (只对 `mp.weixin.qq.com` 有意义, 其它 host 报 `backend_unavailable`)
-- `--backend jina`: 强制走 Jina Reader, 零依赖
-- `--backend crwl`: 显式 opt-in Crawl4AI 本地浏览器抓取, 没装就报错
-
-**CAPTCHA 启发式兜底**: 所有 backend 拿到响应后扫验证页关键词。命中后不会把验证页当正文成功返回；auto 会记录 `captcha_suspected` 并尝试下一 backend。全部失败时仍输出 JSON envelope，但退出码非零。
-
-### Search + Fetch 组合 pipeline
-
-```bash
-# 拿 wechat 公众号搜索结果的全文
-omnireach search --on wechat --json "claude 4.7" \
-  | jq -r '.results[].url' \
-  | xargs -I{} omnireach fetch --json {}
-```
-
-### 限定源
-
-```bash
-omnireach search --on twitter,reddit --json "anyrouter 跑路"
-omnireach search --on hackernews --json "show hn omnireach"
-```
-
-### 模式
-
-```bash
-omnireach search --mode quick "...."  # 只查 hackernews
-omnireach search --mode deep  "...."  # 全部就绪源
-```
-
-### Doctor — 检查源 + fetch backend 状态
-
-```bash
-omnireach doctor --json
-# 返 {
-#   sources: [...],
-#   fetch_backends: [{tool: "http", ok: true, ...}, {tool: "crwl", ok: true|false, ...}],
-#   wechat_backends: [{tool: "opencli weixin", ok: true|false, ...}]   # v0.10.1+
-# }
-```
-
-`wechat_backends` 段检测 OpenCLI 是否在 PATH、`weixin download --stdout` 是否存在，以及是否支持 `--window background / --site-session ephemeral / --keep-tab false` 静默契约。没装/老版本会给出升级提示。
-
-## 何时用 omnireach 而不是其他工具
-
-- **用 `omnireach search`**: 用户在中转站环境, 或想搜 Twitter/Reddit/小红书/B站 等原生 WebSearch 不擅长的源
-- **用 `omnireach fetch`**: 拿到 URL 后想取全文 markdown。普通网页不启动浏览器；需要登录态的微信自动走静默 OpenCLI 通道
-- **不用**: 简单的网页打开 (用 WebFetch), 或代码搜索 (用 grep/Grep)
+- Read `references/cli.md` for CLI fallback commands, JSON envelopes, backend flags, and
+  MCP client registration.

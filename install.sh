@@ -41,6 +41,10 @@ mkdir -p "${SKILL_DIR}"
 if ! curl -fsSL "${RAW}/.claude-plugin/skills/omnireach/SKILL.md" -o "${SKILL_DIR}/SKILL.md"; then
   say "  (warning: could not fetch SKILL.md from ${REF}; CLI still installed)"
 fi
+mkdir -p "${SKILL_DIR}/references"
+if ! curl -fsSL "${RAW}/.claude-plugin/skills/omnireach/references/cli.md" -o "${SKILL_DIR}/references/cli.md"; then
+  say "  (warning: could not fetch references/cli.md from ${REF}; CLI still installed)"
+fi
 
 say ""
 say "✅ omnireach ready."
