@@ -194,6 +194,37 @@ def test_tty_skips_unavailable_errors_and_prints_footer(monkeypatch):
     assert "doctor" in out or "未配置" in out
 
 
+def test_tty_prints_opencli_runtime_failure_instead_of_unconfigured(monkeypatch):
+    from omnireach.contract import SearchEnvelope, SourceError
+
+    async def fake_search(*args, **kwargs):
+        return SearchEnvelope(
+            query="gpt5.6",
+            ts="2026-07-10T00:00:00Z",
+            errors=[
+                SourceError(
+                    source="douyin",
+                    error=(
+                        "opencli douyin command failed: "
+                        "Chrome bridge disconnected"
+                    ),
+                    category="failed",
+                )
+            ],
+        )
+
+    monkeypatch.setattr("omnireach.cli.search", fake_search)
+    monkeypatch.setattr("omnireach.cli._should_emit_json", lambda _: False)
+
+    result = CliRunner().invoke(
+        main, ["search", "gpt5.6", "--on", "douyin"]
+    )
+
+    assert "✗ douyin" in result.output
+    assert "Chrome bridge disconnected" in result.output
+    assert "源未配置" not in result.output
+
+
 def test_json_output_keeps_unavailable_errors(monkeypatch):
     """JSON output retains all errors with category field, unlike TTY."""
     import json as _json
