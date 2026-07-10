@@ -1,6 +1,6 @@
 ---
 name: omnireach
-description: This skill should be used to call `omnireach_search` or `omnireach_fetch` when the user asks to "search the web", "research a topic", "search Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok, YouTube, HackerNews, GitHub, or RSS", "read this URL", "fetch this article", or "avoid Playwright/browser automation" for read-only web work. It provides MCP-first search and fetch through the user's existing Chrome login state when required.
+description: This skill should be used to call `omnireach_search` or `omnireach_fetch` when the user asks to "search the web", "research a topic", "search Google, Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok, YouTube, HackerNews, GitHub, or RSS", "read this URL", "fetch this article", or "avoid Playwright/browser automation" for read-only web work. It provides MCP-first search and fetch through the user's existing Chrome login state when required.
 ---
 
 # omnireach
@@ -25,8 +25,8 @@ Call `omnireach_search` with a non-empty `query`.
 
 Optional arguments:
 
-- `sources`: restrict the call to source IDs such as `reddit`, `xiaohongshu`, `wechat`,
-  `twitter`, `hackernews`, or `bilibili`.
+- `sources`: restrict the call to source IDs such as `google`, `twitter`, `reddit`,
+  `xiaohongshu`, `wechat`, `hackernews`, or `bilibili`.
 - `mode`: use `auto`, `quick`, or `deep`; explicit `sources` take precedence.
 - `limit`: request 1 through 50 results per source.
 - `timeout`: allow 1 through 120 seconds.
@@ -34,6 +34,10 @@ Optional arguments:
 Read `results` as normalized search metadata. Treat each result's `content` as a snippet,
 not the full document. Inspect `errors` for unavailable or failed sources while retaining
 successful results from other sources.
+
+When OpenCLI is installed, `auto` and `deep` searches include Google and Twitter through
+hidden ephemeral Chrome tabs that close after the call. Use `quick` when the search must
+remain browser-free. An explicit `sources` list is exact and disables automatic additions.
 
 Use `omnireach_fetch` on a selected result URL when full text is required.
 

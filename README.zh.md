@@ -4,7 +4,7 @@
 
 **你的 agent 读得了 Twitter，却读不了微信公众号。omnireach 解决这件事。**
 
-omnireach 让你的 agent 搜索并读取登录墙后的中文互联网 —— 微信公众号 · 小红书 · 抖音 · B站 · TikTok —— 外加 Twitter、Reddit、HN、YouTube 等，统一接口：`omnireach search` 跨全部源返回同一套归一化 JSON schema，`omnireach fetch` 对任意 URL 返回干净 markdown。微信搜索**零配置**开箱即用 —— 无 key、无登录：
+omnireach 让你的 agent 搜索 Google 和登录墙后的中文互联网 —— 微信公众号 · 小红书 · 抖音 · B站 · TikTok —— 外加 Twitter、Reddit、HN、YouTube 等，统一接口：`omnireach search` 跨全部源返回同一套归一化 JSON schema，`omnireach fetch` 对任意 URL 返回干净 markdown。微信搜索**零配置**开箱即用 —— 无 key、无登录：
 
 ```bash
 omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
@@ -16,9 +16,10 @@ omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
 
 ### 先读网页，再启动 Playwright
 
-搜索和读取任务先用两个只读 MCP 工具，不要先启动浏览器。普通网页完全不启动
-Chrome；支持的登录墙来源只在需要时通过后台临时 tab 复用你现有的 Chrome 登录态。
-点击、表单、文件传输、截图和视觉断言继续交给 Playwright。
+搜索和读取任务先用两个只读 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
+完全不启动 Chrome；安装 OpenCLI 后，普通搜索会通过用完即关的后台临时 tab 自动加入
+Google 和 Twitter，`quick` 模式仍完全不碰浏览器。点击、表单、文件传输、截图和视觉
+断言继续交给 Playwright。
 
 | 同一次 RFC 9110 读取 | omnireach MCP | Playwright + 无头系统 Chrome |
 |---|---:|---:|
@@ -141,9 +142,9 @@ omnireach search --on wechat --json "claude 4.7" \
 
 | 命令 | 干嘛 |
 |---|---|
-| `omnireach search "<query>"` | 搜索 (SERP: metadata + URL) |
+| `omnireach search "<query>"` | 搜索；已连接 OpenCLI 时自动加入 Google + Twitter |
 | `omnireach search --on twitter,reddit "..."` | 指定源 |
-| `omnireach search --mode quick "..."` | 只查 HN |
+| `omnireach search --mode quick "..."` | 只查 HN，不调用浏览器源 |
 | `omnireach search --mode deep "..."` | 查所有就绪源 |
 | `omnireach search --json "..."` | 显式 JSON 输出 |
 | **`omnireach fetch <url>`** | **URL → 全文 markdown** — `mp.weixin.qq.com` 走 OpenCLI 登录态 Chrome，其它 host 走内置 HTTP → Jina fallback |
@@ -167,8 +168,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | youtube | ✅ ready | `yt-dlp` (pip install) | `omnireach setup youtube` |
 | github | ✅ ready | `gh` CLI + `gh auth login` | `omnireach setup github` |
 | rss | ✅ ready | 内置 feedparser | query 必须是 URL |
+| google | 🔴 heavy | OpenCLI + Chrome 扩展 | OpenCLI 可用时自动加入；后台临时 tab |
 | reddit | 🔴 heavy | OpenCLI + Chrome 扩展 | 未登录可搜公开内容；Chrome 已登录时自动继承登录态 |
-| twitter | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
+| twitter | 🔴 heavy | OpenCLI + Chrome 扩展 | OpenCLI 可用时自动加入；继承 Chrome 登录态 |
 | xiaohongshu | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
 | tiktok | 🔴 heavy | OpenCLI + Chrome 扩展 | TikTok 国际版 (v0.7) |
 | douyin | 🔴 heavy | OpenCLI + Chrome 扩展 | 抖音；WeChat stdout 上游合并前仍装 Daily-AC fork |

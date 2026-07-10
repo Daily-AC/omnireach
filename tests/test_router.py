@@ -24,6 +24,14 @@ def test_auto_falls_back_to_defaults_when_no_hint():
     assert "hackernews" in route.source_ids
 
 
+def test_auto_base_route_excludes_boosters_until_service_activates_them():
+    reg = load_registry()
+    route = Router(reg).plan(RouteRequest(query="gpt5.6"))
+    boosters = {source.id for source in reg.sources if source.tier == "booster"}
+
+    assert boosters.isdisjoint(route.source_ids)
+
+
 def test_quick_mode_narrows_to_web_and_hn():
     reg = load_registry()
     r = Router(reg)

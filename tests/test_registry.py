@@ -12,10 +12,11 @@ def test_load_registry_returns_all_sources():
     assert "bilibili" in ids
     assert "reddit" in ids
     assert "twitter" in ids
+    assert "google" in ids
     assert "xiaohongshu" in ids
     assert "tiktok" in ids
     assert "douyin" in ids
-    assert len(reg.sources) == 15
+    assert len(reg.sources) == 16
 
 
 def test_get_by_id():
@@ -88,6 +89,17 @@ def test_registry_has_exa_booster():
     by_id = {s.id: s for s in reg.sources}
     assert by_id["exa"].tier == "booster"
     assert by_id["exa"].trust == 0.85
+
+
+def test_registry_has_google_heavy_source():
+    google = load_registry().get("google")
+    assert google.tier == "heavy"
+    assert google.adapter.endswith("GoogleAdapter")
+    assert google.default_in_auto is False
+    assert google.trust == 0.85
+    assert google.timeout_seconds == 15.0
+    assert "google" in google.query_hints
+    assert "谷歌" in google.query_hints
 
 
 def test_registry_web_removed():

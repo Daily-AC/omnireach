@@ -4,7 +4,7 @@
 
 **Your agent reads Twitter. It still can't read WeChat. omnireach fixes that.**
 
-omnireach searches and reads the login-walled Chinese internet — 微信公众号 · 小红书 · 抖音 · B站 · TikTok — plus Twitter, Reddit, HN, YouTube and more, through one uniform interface: `omnireach search` returns one normalized JSON schema across every source, `omnireach fetch` returns clean markdown for any URL. WeChat search works with **zero config** — no key, no login:
+omnireach searches Google and the login-walled Chinese internet — 微信公众号 · 小红书 · 抖音 · B站 · TikTok — plus Twitter, Reddit, HN, YouTube and more, through one uniform interface: `omnireach search` returns one normalized JSON schema across every source, `omnireach fetch` returns clean markdown for any URL. WeChat search works with **zero config** — no key, no login:
 
 ```bash
 omnireach search --on wechat "Claude Code 技巧"   # works 60 seconds after install
@@ -16,10 +16,11 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 
 ### MCP before Playwright
 
-For search and reading, start with two read-only MCP tools instead of a browser. Ordinary
-pages never start Chrome. Supported login-walled sources reuse your existing Chrome session
-through a hidden ephemeral tab. Keep Playwright for clicks, forms, file transfer,
-screenshots, and visual assertions.
+For search and reading, start with two read-only MCP tools instead of browser automation.
+Ordinary page fetches never start Chrome. When OpenCLI is installed, normal searches add
+Google and Twitter through hidden ephemeral tabs that close after the call; `quick` mode
+remains browser-free. Keep Playwright for clicks, forms, file transfer, screenshots, and
+visual assertions.
 
 | Same RFC 9110 read | omnireach MCP | Playwright + headless system Chrome |
 |---|---:|---:|
@@ -144,9 +145,9 @@ omnireach search --on wechat --json "claude 4.7" \
 
 | Command | What it does |
 |---|---|
-| `omnireach search "<query>"` | Search (SERP: metadata + URL) |
+| `omnireach search "<query>"` | Search; connected OpenCLI automatically adds Google + Twitter |
 | `omnireach search --on twitter,reddit "..."` | Target specific sources |
-| `omnireach search --mode quick "..."` | Quick mode — HN only |
+| `omnireach search --mode quick "..."` | Quick mode — HN only, no browser-backed sources |
 | `omnireach search --mode deep "..."` | Deep mode — all ready sources |
 | `omnireach search --json "..."` | Explicit JSON output |
 | **`omnireach fetch <url>`** | **URL → full markdown** — `mp.weixin.qq.com` uses OpenCLI logged-in Chrome; other hosts use built-in HTTP → Jina fallback |
@@ -170,8 +171,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | youtube | ✅ ready | `yt-dlp` (pip install) | `omnireach setup youtube` |
 | github | ✅ ready | `gh` CLI + `gh auth login` | `omnireach setup github` |
 | rss | ✅ ready | built-in feedparser | query must be a URL |
+| google | 🔴 heavy | OpenCLI + Chrome extension | Automatically included when OpenCLI is installed; silent background tab |
 | reddit | 🔴 heavy | OpenCLI + Chrome extension | Public search works logged out; Chrome login is inherited when present |
-| twitter | 🔴 heavy | OpenCLI + Chrome extension | v0.3 path |
+| twitter | 🔴 heavy | OpenCLI + Chrome extension | Automatically included when OpenCLI is installed; inherits Chrome login |
 | xiaohongshu | 🔴 heavy | OpenCLI + Chrome extension | v0.3 path |
 | tiktok | 🔴 heavy | OpenCLI + Chrome extension | TikTok international (v0.7) |
 | douyin | 🔴 heavy | OpenCLI + Chrome extension | 抖音 via the Daily-AC fork until upstream WeChat stdout support lands |

@@ -75,6 +75,20 @@
   enhanced_with: EXA_API_KEY
   deps: { auto: [], manual: [] }
 
+- id: google
+  tier: heavy
+  adapter: omnireach.adapters.google.GoogleAdapter
+  description: Google 网页搜索 (OpenCLI 后台临时 tab)
+  query_hints: [google, "谷歌", "网页搜索"]
+  default_in_auto: false
+  trust: 0.85
+  timeout_seconds: 15
+  deps:
+    auto:
+      - { kind: npm, name: "github:Daily-AC/OpenCLI" }
+    manual:
+      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
+
 - id: reddit
   tier: heavy
   adapter: omnireach.adapters.reddit.RedditAdapter
@@ -156,7 +170,8 @@
   adapter: omnireach.adapters.tavily.TavilyAdapter
   description: Tavily Search API (付费, web 类增强)
   query_hints: []
-  default_in_auto: true
+  # Configured boosters are appended by the service layer.
+  default_in_auto: false
   trust: 0.85
   timeout_seconds: 10
   deps:
@@ -170,7 +185,7 @@
   adapter: omnireach.adapters.brave.BraveAdapter
   description: Brave Search API (付费, 隐私友好 web 搜索)
   query_hints: []
-  default_in_auto: true
+  default_in_auto: false
   trust: 0.80
   timeout_seconds: 10
   deps:
@@ -184,7 +199,7 @@
   adapter: omnireach.adapters.perplexity.PerplexityAdapter
   description: Perplexity Sonar (付费, AI 检索摘要)
   query_hints: []
-  default_in_auto: true
+  default_in_auto: false
   trust: 0.90
   timeout_seconds: 30
   deps:
@@ -198,7 +213,7 @@
   adapter: omnireach.adapters.exa.ExaAdapter
   description: Exa Search API (付费, web search)
   query_hints: []
-  default_in_auto: true
+  default_in_auto: false
   trust: 0.85
   timeout_seconds: 15
   deps:
