@@ -1,7 +1,6 @@
 import asyncio
 
-import pytest
-
+from omnireach.adapters._opencli import OpenCLICommandError
 from omnireach.adapters.base import AdapterBase, AdapterUnavailable
 from omnireach.contract import SearchResult
 from omnireach.dispatcher import Dispatcher
@@ -45,8 +44,10 @@ class BoomAdapter(OkAdapter):
 
 async def test_dispatch_aggregates_results():
     d = Dispatcher(timeout=1.0)
-    a1 = OkAdapter(); a1.name = "a1"
-    a2 = OkAdapter(); a2.name = "a2"
+    a1 = OkAdapter()
+    a1.name = "a1"
+    a2 = OkAdapter()
+    a2.name = "a2"
     out, errs = await d.run({"a1": a1, "a2": a2}, "q")
     sources = sorted(r.source for r in out)
     assert sources == ["a1", "a2"]
@@ -55,7 +56,8 @@ async def test_dispatch_aggregates_results():
 
 async def test_dispatch_isolates_failures():
     d = Dispatcher(timeout=1.0)
-    a = OkAdapter(); a.name = "ok"
+    a = OkAdapter()
+    a.name = "ok"
     out, errs = await d.run({"ok": a, "boom": BoomAdapter()}, "q")
     assert any(r.source == "ok" for r in out)
     assert any(e.source == "boom" for e in errs)
@@ -63,7 +65,8 @@ async def test_dispatch_isolates_failures():
 
 async def test_dispatch_times_out_one_source_without_blocking_others():
     d = Dispatcher(timeout=0.1)
-    a = OkAdapter(); a.name = "ok"
+    a = OkAdapter()
+    a.name = "ok"
     out, errs = await d.run({"ok": a, "slow": SlowAdapter()}, "q")
     assert any(r.source == "ok" for r in out)
     assert any(e.source == "slow" and "timeout" in e.error.lower() for e in errs)
@@ -102,6 +105,16 @@ class _CatFailedAdapter(AdapterBase):
         raise ValueError("kaboom")
 
 
+class _OpenCLIFailedAdapter(AdapterBase):
+    name = "douyin"
+
+    async def is_ready(self) -> bool:
+        return True
+
+    async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
+        raise OpenCLICommandError("douyin", "Chrome bridge disconnected")
+
+
 def test_dispatcher_classifies_unavailable():
     d = Dispatcher(timeout=5.0, per_source_limit=5)
     results, errors = asyncio.run(d.run({"u": _CatUnavailableAdapter()}, "q"))
@@ -115,6 +128,17 @@ def test_dispatcher_classifies_failed():
     results, errors = asyncio.run(d.run({"f": _CatFailedAdapter()}, "q"))
     assert len(errors) == 1
     assert errors[0].category == "failed"
+
+
+def test_dispatcher_classifies_opencli_command_error_as_failed():
+    results, errors = asyncio.run(
+        Dispatcher(timeout=5.0).run(
+            {"douyin": _OpenCLIFailedAdapter()}, "q"
+        )
+    )
+    assert results == []
+    assert errors[0].category == "failed"
+    assert "Chrome bridge disconnected" in errors[0].error
 
 
 def test_dispatcher_classifies_timeout_as_failed():

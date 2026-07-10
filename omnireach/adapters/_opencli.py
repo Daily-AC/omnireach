@@ -17,6 +17,15 @@ SILENT_BROWSER_ARGS = (
 )
 
 
+class OpenCLICommandError(RuntimeError):
+    """OpenCLI is installed, but a command failed or broke its JSON contract."""
+
+    def __init__(self, source: str, reason: str) -> None:
+        super().__init__(f"opencli {source} command failed: {reason}")
+        self.source = source
+        self.reason = reason
+
+
 async def _stop_process(proc: asyncio.subprocess.Process) -> None:
     if proc.returncode is not None:
         return
@@ -46,19 +55,19 @@ async def run_opencli_json(source: str, *args: str) -> list[dict[str, Any]]:
         raise
     if proc.returncode != 0:
         detail = err.decode().strip() or out.decode().strip()
-        raise AdapterUnavailable(
-            source, detail or f"opencli {source} command failed"
+        raise OpenCLICommandError(
+            source, detail or "command exited with no error detail"
         )
     try:
         data = json.loads(out.decode())
     except json.JSONDecodeError as e:
-        raise AdapterUnavailable(source, f"opencli returned non-JSON: {e}") from e
+        raise OpenCLICommandError(source, f"returned non-JSON: {e}") from e
     if isinstance(data, list):
         items = data
     elif isinstance(data, dict):
         items = data.get("results", [])
     else:
-        raise AdapterUnavailable(source, "opencli returned an invalid result shape")
+        raise OpenCLICommandError(source, "returned an invalid result shape")
     if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
-        raise AdapterUnavailable(source, "opencli returned an invalid result shape")
+        raise OpenCLICommandError(source, "returned an invalid result shape")
     return items
