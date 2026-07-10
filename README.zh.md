@@ -14,6 +14,21 @@ omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
 
 ![demo — 零配置微信搜索, 跨源统一 JSON](./docs/assets/demo-wechat.gif)
 
+### 先读网页，再启动 Playwright
+
+搜索和读取任务先用两个只读 MCP 工具，不要先启动浏览器。普通网页完全不启动
+Chrome；支持的登录墙来源只在需要时通过后台临时 tab 复用你现有的 Chrome 登录态。
+点击、表单、文件传输、截图和视觉断言继续交给 Playwright。
+
+| 同一次 RFC 9110 读取 | omnireach MCP | Playwright + 无头系统 Chrome |
+|---|---:|---:|
+| 冷进程，5 次中位数 | **1425.26 ms** | 2713.69 ms |
+| 热运行时，5 次中位数 | **1292.39 ms** | 1591.44 ms |
+
+在记录数据的机器上，Playwright 冷路径耗时是 omnireach 的 **1.9 倍**，双方热启动后
+是 **1.2 倍**。查看[测试方法与边界](./docs/benchmarks/read-path-v0.12.md)，或直接核对
+[全部原始样本](./docs/benchmarks/read-path-v0.12.json)。
+
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
 

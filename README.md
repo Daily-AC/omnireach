@@ -14,6 +14,22 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 
 ![demo — zero-config WeChat search, uniform JSON across sources](./docs/assets/demo-wechat.gif)
 
+### MCP before Playwright
+
+For search and reading, start with two read-only MCP tools instead of a browser. Ordinary
+pages never start Chrome. Supported login-walled sources reuse your existing Chrome session
+through a hidden ephemeral tab. Keep Playwright for clicks, forms, file transfer,
+screenshots, and visual assertions.
+
+| Same RFC 9110 read | omnireach MCP | Playwright + headless system Chrome |
+|---|---:|---:|
+| Cold process, median of 5 | **1425.26 ms** | 2713.69 ms |
+| Warm runtime, median of 5 | **1292.39 ms** | 1591.44 ms |
+
+On the recorded machine, Playwright took **1.9x** as long on the cold path and **1.2x** as
+long with both runtimes warm. See the [method and limitations](./docs/benchmarks/read-path-v0.12.md)
+or inspect [every raw sample](./docs/benchmarks/read-path-v0.12.json).
+
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
 
