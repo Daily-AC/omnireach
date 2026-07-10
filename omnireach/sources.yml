@@ -75,6 +75,20 @@
   enhanced_with: EXA_API_KEY
   deps: { auto: [], manual: [] }
 
+- id: google
+  tier: heavy
+  adapter: omnireach.adapters.google.GoogleAdapter
+  description: Google 网页搜索 (OpenCLI 后台临时 tab)
+  query_hints: [google, "谷歌", "网页搜索"]
+  default_in_auto: false
+  trust: 0.85
+  timeout_seconds: 15
+  deps:
+    auto:
+      - { kind: npm, name: "github:Daily-AC/OpenCLI" }
+    manual:
+      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
+
 - id: reddit
   tier: heavy
   adapter: omnireach.adapters.reddit.RedditAdapter
