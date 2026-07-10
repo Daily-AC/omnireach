@@ -85,14 +85,9 @@ async function executeDouyinSearch(payload) {
           for (const anchor of anchors) {
             const href = anchor.getAttribute("href") || anchor.href || "";
             if (!/\/video\/\d+/.test(href) || unique.has(href)) continue;
-            const card =
-              anchor.closest("li, article, [data-e2e], [class*='card']") ||
-              anchor.parentElement;
-            const leafTexts = Array.from(
-              (card || anchor).querySelectorAll("span, p, h1, h2, h3, a"),
-            )
-              .filter((node) => node.children.length === 0)
-              .map((node) => (node.textContent || "").trim())
+            const leafTexts = (anchor.innerText || anchor.textContent || "")
+              .split(/\n+/)
+              .map((text) => text.trim())
               .filter(Boolean);
             unique.set(href, { href, leafTexts });
           }
@@ -149,7 +144,7 @@ async function executeJob(job) {
       return {
         id: job.id,
         ok: true,
-        items: [{ pong: true, extensionVersion: "0.1.0" }],
+        items: [{ pong: true, extensionVersion: "0.1.1" }],
       };
     }
     const items = await executeDouyinSearch(job.payload || {});

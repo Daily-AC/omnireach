@@ -55,6 +55,31 @@ test("projects a serialized result card", () => {
   });
 });
 
+test("projects the real rendered Douyin anchor text shape", () => {
+  const row = douyin.projectCard(
+    {
+      href: "//www.douyin.com/video/7660676358325980435",
+      leafTexts: [
+        "合集",
+        "05:55",
+        "1326",
+        "GPT-5.6 SOL 真顶｜我拿真实开源项目测完了",
+        "@程序员阿江-Relakkes",
+        "17小时前",
+      ],
+    },
+    0,
+  );
+
+  assert.equal(row.desc, "GPT-5.6 SOL 真顶｜我拿真实开源项目测完了");
+  assert.equal(row.author, "程序员阿江-Relakkes");
+  assert.equal(row.likes, 1326);
+  assert.equal(
+    row.url,
+    "https://www.douyin.com/video/7660676358325980435",
+  );
+});
+
 test("reports malformed cards instead of silently dropping them", () => {
   const projected = douyin.projectCards(
     [

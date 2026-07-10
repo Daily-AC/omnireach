@@ -10,6 +10,7 @@ def test_native_extension_manifest_has_narrow_permissions():
     )
 
     assert manifest["manifest_version"] == 3
+    assert manifest["version"] == "0.1.1"
     assert set(manifest["permissions"]) == {
         "offscreen",
         "scripting",
@@ -35,9 +36,10 @@ def test_service_worker_contract_is_allowlisted_and_closes_hidden_window():
 
     assert '"system.ping"' in source
     assert '"douyin.search"' in source
-    assert 'extensionVersion: "0.1.0"' in source
+    assert 'extensionVersion: "0.1.1"' in source
     assert "focused: false" in source
     assert "chrome.scripting.executeScript" in source
+    assert "anchor.innerText" in source
     assert "finally" in source
     assert "chrome.windows.remove" in source
 

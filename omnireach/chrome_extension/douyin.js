@@ -56,6 +56,11 @@
 
     for (let i = 0; i < texts.length; i += 1) {
       const text = texts[i];
+      const renderedAuthor = text.match(/^@(.{1,80})$/);
+      if (renderedAuthor && !author) {
+        author = renderedAuthor[1].trim();
+        continue;
+      }
       if (text === "@" && !author) {
         author = texts[i + 1] || "";
         continue;
