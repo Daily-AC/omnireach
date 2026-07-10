@@ -34,7 +34,7 @@ async def test_xhs_search_parses_real_opencli_shape(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.xiaohongshu.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.xiaohongshu.shutil.which", lambda n: "/usr/bin/" + n)
 
     out = await XiaohongshuAdapter().search("claude", limit=3)
@@ -65,7 +65,7 @@ async def test_xhs_search_back_compat_dict_response(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.xiaohongshu.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.xiaohongshu.shutil.which", lambda n: "/usr/bin/" + n)
 
     out = await XiaohongshuAdapter().search("hi")
@@ -88,7 +88,7 @@ async def test_xhs_search_invokes_opencli_with_format_json(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.xiaohongshu.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.xiaohongshu.shutil.which", lambda n: "/usr/bin/" + n)
 
     await XiaohongshuAdapter().search("vibe coding", limit=5)
@@ -119,10 +119,13 @@ async def test_xhs_is_ready_requires_opencli(monkeypatch):
 
 
 def test_parse_likes_handles_string_int_none_and_garbage():
-    """v0.8.1: OpenCLI returns likes as a string; helper coerces or returns None."""
+    """OpenCLI localizes compact counts; helper normalizes them to integers."""
     assert _parse_likes("102") == 102
     assert _parse_likes("0") == 0
     assert _parse_likes(4200) == 4200
+    assert _parse_likes("1.2万") == 12000
+    assert _parse_likes("2.6万") == 26000
+    assert _parse_likes("1.2k") == 1200
     assert _parse_likes(None) is None
-    assert _parse_likes("1.2k") is None  # non-numeric string → None, not raise
+    assert _parse_likes("lots") is None
     assert _parse_likes("") is None

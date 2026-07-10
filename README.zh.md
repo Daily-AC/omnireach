@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh 
 Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— 这些有登录墙的纵向平台，任何 agent 网络搜索都够不着。omnireach 通过你自己的已登录浏览器会话（借助 OpenCLI Chrome 桥接）读取这些平台，agent 看到的结果和一个已登录人类看到的一样。
 
 **2. 统一的数据契约。**
-`omnireach search` → 归一化 metadata + URL，跨所有源格式统一。`omnireach fetch` → 任意 URL 的干净 markdown，host 感知路由（`mp.weixin.qq.com` 走登录态 Chrome 绕过验证码；其他 host 走 Crawl4AI → Jina Reader 兜底）。Agent 只需学一套接口，不用对接 15 个 API。
+`omnireach search` → 归一化 metadata + URL，跨所有源格式统一。`omnireach fetch` → 任意 URL 的干净 markdown：普通网页走内置 HTTP 提取 + Jina 兜底，只有 `mp.weixin.qq.com` 走登录态 Chrome。默认路径不需要 Playwright 或 Crawl4AI。
 
 **3. WebSearch 不可用时照样能搜。**
 在 proxy / 中转站 / Bedrock / Vertex-Claude-3.x 等内置 WebSearch server tool 不可用的环境下，omnireach 在客户端直接实现搜索，绕过两层 gate，把搜索能力还给 agent。
@@ -94,8 +94,10 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach search --mode quick "..."` | 只查 HN |
 | `omnireach search --mode deep "..."` | 查所有就绪源 |
 | `omnireach search --json "..."` | 显式 JSON 输出 |
-| **`omnireach fetch <url>`** (v0.10, v0.10.1) | **URL → 全文 markdown** — `mp.weixin.qq.com` 走 OpenCLI 登录态 Chrome (v0.10.1+), 其它 host 走 crwl → jina fallback |
+| **`omnireach fetch <url>`** | **URL → 全文 markdown** — `mp.weixin.qq.com` 走 OpenCLI 登录态 Chrome，其它 host 走内置 HTTP → Jina fallback |
+| `omnireach fetch <url> --backend http` | 强制走内置、无浏览器的 HTTP 提取器 |
 | `omnireach fetch <url> --backend jina` | 强制走 Jina Reader SaaS (零本地依赖) |
+| `omnireach fetch <url> --backend crwl` | 显式选择本地 Crawl4AI |
 | `omnireach fetch <url> --backend opencli` | 强制走 OpenCLI weixin 登录态路径 (v0.10.1+) |
 | `omnireach init` | 写默认 `~/.omnireach/preferences.toml` |
 | `omnireach sources` | 列出所有源 + 状态 |
@@ -112,11 +114,11 @@ omnireach search --on wechat --json "claude 4.7" \
 | youtube | ✅ ready | `yt-dlp` (pip install) | `omnireach setup youtube` |
 | github | ✅ ready | `gh` CLI + `gh auth login` | `omnireach setup github` |
 | rss | ✅ ready | 内置 feedparser | query 必须是 URL |
-| reddit | 🟡 one_step | `rdt-cli` + `rdt login` | `omnireach setup reddit` |
+| reddit | 🔴 heavy | OpenCLI + Chrome 扩展 | 未登录可搜公开内容；Chrome 已登录时自动继承登录态 |
 | twitter | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
 | xiaohongshu | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
 | tiktok | 🔴 heavy | OpenCLI + Chrome 扩展 | TikTok 国际版 (v0.7) |
-| douyin | 🔴 heavy | OpenCLI fork + Chrome 扩展 | 抖音 (v0.7.2, 走 Daily-AC/OpenCLI fork) |
+| douyin | 🔴 heavy | OpenCLI + Chrome 扩展 | 抖音；WeChat stdout 上游合并前仍装 Daily-AC fork |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | 付费 (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | 付费 (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | 付费 (v0.4) |
@@ -124,9 +126,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | wechat | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | 微信公众号 — search 走 Sogou 免费搜索; `EXA_API_KEY` 可选启用语义增强; v0.10.1 起 `omnireach fetch <wechat-url>` 自动走 OpenCLI 登录态 Chrome 拿正文 |
 | bilibili | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | B站 — v0.9 起默认走 B站官方 search API; `EXA_API_KEY` 可选启用语义增强 |
 
-> **抖音 (douyin.com)** (v0.7.2): 走 `omnireach setup douyin`，装 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)（上游 PR [jackwener/OpenCLI#1759](https://github.com/jackwener/OpenCLI/pull/1759) 还在 review，merge 后切回）。需要在 Chrome 登录 www.douyin.com。`engagement.likes` 有真实数据（DOM 抽取）；`plays/comments/shares` 在搜索卡片上不暴露，已 normalize 成 `null`。
+> **抖音 (douyin.com)**: 走 `omnireach setup douyin`，装 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)。Douyin search 已经进上游；继续用 fork 只因为 WeChat `--stdout` 尚未进上游。需要在 Chrome 登录 www.douyin.com。
 
-> **微信公众号 fetch** (v0.10.1): `omnireach fetch <mp.weixin.qq.com URL>` 走同一个 Daily-AC/OpenCLI fork（`weixin download --stdout`，上游 PR [jackwener/OpenCLI#1770](https://github.com/jackwener/OpenCLI/pull/1770) 同状态等 review）。需要在 Chrome 打开过任一 mp.weixin.qq.com 文章（无显式登录步骤，浏览器 cookies 已存）。详见下方「如何取全文」段。
+> **微信公众号 fetch**: Sogou 零配置搜索现在会在同一 HTTP session 内把签名跳转链接解成直达 `mp.weixin.qq.com` URL；fetch 再用 Daily-AC/OpenCLI fork 的 `weixin download --stdout`，显式创建后台临时 tab，命令结束立即释放。
 
 ---
 
@@ -189,7 +191,7 @@ Gate 2 看的是**「上游有没有专门做 Claude Code server tool 兼容」*
 | 层 | 实现 | 职责 | 状态 |
 |---|---|---|---|
 | **search** | `omnireach search` subcommand | 全网定位 — 返 metadata + URL，不取内容 | ✅ v0.7+ 在用 |
-| **fetch** | `omnireach fetch` subcommand | 给定 URL 取全文 markdown — host-aware: `mp.weixin.qq.com` 走 OpenCLI 登录态，其它走 [Crawl4AI](https://github.com/unclecode/crawl4ai) → [Jina Reader](https://r.jina.ai/) | ✅ v0.10+（wechat 路径 v0.10.1+） |
+| **fetch** | `omnireach fetch` subcommand | 给定 URL 取全文 markdown — 普通网页走内置无浏览器 HTTP → [Jina Reader](https://r.jina.ai/)，登录墙微信走后台 OpenCLI | ✅ |
 | **parse** | （暂未实现，未来加在本 repo） | 视频/音频内容解析（字幕/STT/逐帧） | 🔜 未启动 |
 
 v0.10 起 `omnireach` 同时负责 search + fetch 两层（subcommand 形式）。视频解析暂仍走 yt-dlp / whisper 等外部工具组合；parse binary 等真有用户需求才在本 repo 加（YAGNI，不开 sister repo）。
@@ -219,7 +221,7 @@ uv tool install --force git+https://github.com/Daily-AC/omnireach.git           
 
 | 平台 | 状态 | 说明 |
 |---|---|---|
-| macOS | ✅ 主要开发平台 | 全部源测试过（HN/RSS/youtube/github/reddit/twitter/xhs/tiktok/douyin + 4 booster + wechat/bilibili）；`omnireach fetch` 三 backend（crwl/jina/opencli）都跑过 |
+| macOS | ✅ 主要开发平台 | 内置 HTTP、Jina、OpenCLI 微信、Twitter、TikTok、抖音、Sogou 微信与 B站均跑过真实 E2E；Crawl4AI 保留为可选项 |
 | Linux | 🟡 best-effort | 应能 work；setup 流程对 `apt`/`pacman` 不自动 |
 | WSL2 | 🟡 best-effort | 跟 Linux 一样 |
 | Windows（原生 PowerShell） | 🟡 实验性 (v0.6.3+) | 代码已 macOS 假设解耦：secrets.env 不再调 POSIX chmod；preferences edit fallback notepad；setup github 提示加 `winget install GitHub.cli`；OpenCLI 类源（twitter/xhs）跨平台理论可用但未实测。**遇到问题请提 issue。** |
@@ -310,7 +312,7 @@ omnireach search --json --on tavily "claude 4.7" | \
 v0.10 起 `omnireach fetch <url>` 是 search → 全文 pipeline 的官方收敛形态，**host-aware** 自动选 backend：
 
 ```bash
-# 任意网页 → crwl（本地 Crawl4AI）优先，jina（r.jina.ai SaaS）fallback
+# 任意网页 → 内置 HTTP 提取，遇到拦截再回退 Jina
 omnireach fetch https://example.com/article --json
 
 # 微信公众号 → 自动走 OpenCLI 登录态 Chrome（v0.10.1+），绕过验证码
@@ -326,18 +328,19 @@ Backend 矩阵：
 
 | URL host | `--backend auto` 走 | 备注 |
 |---|---|---|
-| `mp.weixin.qq.com` | **opencli**（登录态 cookie-strategy） | 装 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI) 拿 `weixin download --stdout` flag（v0.10.1 commit fe28823+）；直接 `crwl` / `jina` 会被微信「环境异常」验证码拦 |
-| 其它 host | **crwl → jina** | Crawl4AI 优先，失败/没装走 Jina Reader SaaS fallback |
+| `mp.weixin.qq.com` | **opencli**（登录态 cookie-strategy） | 固定传 `--window background --site-session ephemeral --keep-tab false`，不需要可见浏览器窗口 |
+| 其它 host | **http → jina** | 先走内置无浏览器提取；被拦或提取失败时回退 Jina Reader |
 
 显式 `--backend` 覆盖 auto：
 
 | Flag | 行为 |
 |---|---|
-| `--backend crwl` | 强制走 Crawl4AI 本地（66K ⭐ Apache-2.0，内置 Cloudflare/Akamai/DataDome 反爬绕过） |
+| `--backend http` | 强制走内置 HTTP + HTML-to-Markdown，不依赖浏览器 |
 | `--backend jina` | 强制走 [Jina Reader](https://r.jina.ai/) SaaS —— 零本地依赖，免费额度大 |
+| `--backend crwl` | 显式使用本地 Crawl4AI 抓需要浏览器渲染的页面 |
 | `--backend opencli` | 强制走 OpenCLI weixin 登录态路径（仅 mp.weixin.qq.com 有意义） |
 
-v0.10.1 给所有 backend 加 **CAPTCHA 启发式兜底**：命中 `环境异常 / 完成验证后即可继续访问 / Cloudflare / Just a moment` 等关键词时，envelope `errors[]` 加一条 `captcha_suspected: ...`，markdown 字段保留（graceful degrade —— agent 自己读 errors 决定信不信）。`omnireach doctor` 的 `wechat_backends` 段会 surface OpenCLI + `--stdout` 是否就绪。
+验证码页不再被当成成功正文返回。auto 模式会在 `errors[]` 记录 `captcha_suspected` 并尝试下一个 backend；全部失败时仍输出 JSON，但进程返回非零。`omnireach doctor` 同时报告内置 HTTP 和 OpenCLI 后台 tab 契约是否可用。
 
 </details>
 

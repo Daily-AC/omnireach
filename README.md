@@ -43,7 +43,7 @@ This installs the CLI **and** registers the Claude Code skill (auto-discovered n
 Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok — login-walled vertical platforms that no agent web search reaches. omnireach reads them through your own logged-in browser session (via OpenCLI Chrome bridge), so the results your agent sees are the same results a human would see when signed in.
 
 **2. One uniform contract.**
-`omnireach search` → normalized metadata + URL, same shape across every source. `omnireach fetch` → clean markdown for any URL, with host-aware routing (`mp.weixin.qq.com` goes through your logged-in Chrome session to bypass CAPTCHA walls; all other hosts go through Crawl4AI → Jina Reader fallback). Your agent learns one interface, not 15 APIs.
+`omnireach search` → normalized metadata + URL, same shape across every source. `omnireach fetch` → clean markdown for any URL, with host-aware routing: ordinary pages use a built-in HTTP extractor with Jina fallback, while `mp.weixin.qq.com` uses your logged-in Chrome session. No Playwright or Crawl4AI is required for the default path.
 
 **3. Works even when WebSearch doesn't.**
 On proxy / relay-station / Bedrock / Vertex-Claude-3.x setups where the built-in WebSearch server tool isn't available, omnireach gives search back — it runs entirely on the client side, bypassing both gate layers.
@@ -94,8 +94,10 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach search --mode quick "..."` | Quick mode — HN only |
 | `omnireach search --mode deep "..."` | Deep mode — all ready sources |
 | `omnireach search --json "..."` | Explicit JSON output |
-| **`omnireach fetch <url>`** (v0.10, v0.10.1) | **URL → full markdown** — `mp.weixin.qq.com` uses OpenCLI logged-in Chrome (v0.10.1+), other hosts use crwl → jina fallback |
+| **`omnireach fetch <url>`** | **URL → full markdown** — `mp.weixin.qq.com` uses OpenCLI logged-in Chrome; other hosts use built-in HTTP → Jina fallback |
+| `omnireach fetch <url> --backend http` | Force the built-in browserless HTTP extractor |
 | `omnireach fetch <url> --backend jina` | Force Jina Reader SaaS (zero local deps) |
+| `omnireach fetch <url> --backend crwl` | Explicitly opt into local Crawl4AI |
 | `omnireach fetch <url> --backend opencli` | Force OpenCLI wechat logged-in path (v0.10.1+) |
 | `omnireach init` | Write default `~/.omnireach/preferences.toml` |
 | `omnireach sources` | List all sources + tier status |
@@ -112,11 +114,11 @@ omnireach search --on wechat --json "claude 4.7" \
 | youtube | ✅ ready | `yt-dlp` (pip install) | `omnireach setup youtube` |
 | github | ✅ ready | `gh` CLI + `gh auth login` | `omnireach setup github` |
 | rss | ✅ ready | built-in feedparser | query must be a URL |
-| reddit | 🟡 one_step | `rdt-cli` + `rdt login` | `omnireach setup reddit` |
+| reddit | 🔴 heavy | OpenCLI + Chrome extension | Public search works logged out; Chrome login is inherited when present |
 | twitter | 🔴 heavy | OpenCLI + Chrome extension | v0.3 path |
 | xiaohongshu | 🔴 heavy | OpenCLI + Chrome extension | v0.3 path |
 | tiktok | 🔴 heavy | OpenCLI + Chrome extension | TikTok international (v0.7) |
-| douyin | 🔴 heavy | OpenCLI fork + Chrome extension | 抖音 (v0.7.2, Daily-AC/OpenCLI fork) |
+| douyin | 🔴 heavy | OpenCLI + Chrome extension | 抖音 via the Daily-AC fork until upstream WeChat stdout support lands |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | paid (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | paid (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | paid (v0.4) |
@@ -124,9 +126,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | wechat | ✅ ready | none (optional `EXA_API_KEY` for enhancement) | WeChat Official Accounts — search via Sogou free path; `EXA_API_KEY` optionally enables semantic enhancement; v0.10.1+ `omnireach fetch <wechat-url>` auto-routes through OpenCLI logged-in Chrome |
 | bilibili | ✅ ready | none (optional `EXA_API_KEY` for enhancement) | B站 — v0.9+ defaults to B站 official search API; `EXA_API_KEY` optionally enables semantic enhancement |
 
-> **抖音 / douyin** (v0.7.2): Uses `omnireach setup douyin`, installs [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI) (upstream PR [jackwener/OpenCLI#1759](https://github.com/jackwener/OpenCLI/pull/1759) pending review; will switch back once merged). Requires signing in to www.douyin.com in Chrome. `engagement.likes` has real data (DOM extraction); `plays/comments/shares` are not exposed in search cards, normalized to `null`.
+> **抖音 / douyin**: Uses `omnireach setup douyin` and the [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI). Douyin search is already upstream; the fork remains only because WeChat `--stdout` support is still pending upstream. Requires signing in to www.douyin.com in Chrome.
 
-> **WeChat fetch** (v0.10.1): `omnireach fetch <mp.weixin.qq.com URL>` uses the same Daily-AC/OpenCLI fork (`weixin download --stdout`, upstream PR [jackwener/OpenCLI#1770](https://github.com/jackwener/OpenCLI/pull/1770) pending). Requires having opened any mp.weixin.qq.com article in Chrome (no explicit login step; browser cookies suffice). See [How to get full text](#how-to-get-full-text-v08) below.
+> **WeChat fetch**: zero-config Sogou search now resolves signed result links to direct `mp.weixin.qq.com` URLs in the same HTTP session. Fetch then uses the Daily-AC/OpenCLI fork (`weixin download --stdout`, upstream PR [jackwener/OpenCLI#1770](https://github.com/jackwener/OpenCLI/pull/1770)) in an explicit background, ephemeral tab and releases it after the command.
 
 ---
 
@@ -189,7 +191,7 @@ Gate 2 looks at **"did the upstream specifically implement Claude Code server to
 | Layer | Implementation | Responsibility | Status |
 |---|---|---|---|
 | **search** | `omnireach search` subcommand | Locate across the web — returns metadata + URL, does not fetch content | ✅ v0.7+ in use |
-| **fetch** | `omnireach fetch` subcommand | Given a URL, fetch full-text markdown — host-aware: `mp.weixin.qq.com` via OpenCLI logged-in Chrome, others via [Crawl4AI](https://github.com/unclecode/crawl4ai) → [Jina Reader](https://r.jina.ai/) | ✅ v0.10+ (wechat path v0.10.1+) |
+| **fetch** | `omnireach fetch` subcommand | Given a URL, fetch full-text markdown — built-in browserless HTTP → [Jina Reader](https://r.jina.ai/) for ordinary pages; background OpenCLI for login-walled WeChat | ✅ |
 | **parse** | (not yet implemented, future addition to this repo) | Video/audio content parsing (subtitles/STT/frame-by-frame) | 🔜 not started |
 
 v0.10+ has omnireach covering search + fetch (subcommand form). Video parsing still uses external tools (yt-dlp / whisper); parse binary will be added to this repo when there are real user requests (YAGNI — no sister repo).
@@ -219,7 +221,7 @@ uv tool install --force git+https://github.com/Daily-AC/omnireach.git           
 
 | Platform | Status | Notes |
 |---|---|---|
-| macOS | ✅ Primary dev platform | All sources tested (HN/RSS/youtube/github/reddit/twitter/xhs/tiktok/douyin + 4 boosters + wechat/bilibili); `omnireach fetch` all three backends (crwl/jina/opencli) verified |
+| macOS | ✅ Primary dev platform | Real E2E verified for built-in HTTP, Jina, OpenCLI WeChat, Twitter, TikTok, Douyin, Sogou WeChat and Bilibili; Crawl4AI remains optional |
 | Linux | 🟡 best-effort | Should work; setup flow doesn't auto-detect `apt`/`pacman` |
 | WSL2 | 🟡 best-effort | Same as Linux |
 | Windows (native PowerShell) | 🟡 experimental (v0.6.3+) | macOS assumptions removed: secrets.env no longer calls POSIX chmod; preferences edit falls back to notepad; setup github prompts `winget install GitHub.cli`; OpenCLI sources (twitter/xhs) theoretically cross-platform but untested. **File an issue if you hit problems.** |
@@ -310,7 +312,7 @@ Other sources (HN / GitHub / RSS / YouTube / etc.) generally have content under 
 `omnireach fetch <url>` is the official search → full-text pipeline, with **host-aware** backend routing:
 
 ```bash
-# Any webpage → crwl (local Crawl4AI) preferred, jina (r.jina.ai SaaS) fallback
+# Any webpage → built-in HTTP extractor, then Jina fallback if blocked
 omnireach fetch https://example.com/article --json
 
 # WeChat Official Account article → automatically uses OpenCLI logged-in Chrome (v0.10.1+), bypasses CAPTCHA
@@ -326,18 +328,19 @@ Backend matrix:
 
 | URL host | `--backend auto` routes to | Notes |
 |---|---|---|
-| `mp.weixin.qq.com` | **opencli** (logged-in cookie strategy) | Install [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI) with `weixin download --stdout` flag (v0.10.1 commit fe28823+); direct `crwl` / `jina` are blocked by WeChat's "environment anomaly" CAPTCHA |
-| Other hosts | **crwl → jina** | Crawl4AI preferred; falls back to Jina Reader SaaS if not installed or fails |
+| `mp.weixin.qq.com` | **opencli** (logged-in cookie strategy) | Runs with `--window background --site-session ephemeral --keep-tab false`; no visible browser window is required |
+| Other hosts | **http → jina** | Built-in browserless extraction first; Jina Reader fallback when blocked or extraction fails |
 
 Explicit `--backend` overrides auto:
 
 | Flag | Behavior |
 |---|---|
-| `--backend crwl` | Force Crawl4AI local (66K ⭐ Apache-2.0, built-in Cloudflare/Akamai/DataDome bypass) |
+| `--backend http` | Force the built-in HTTP + HTML-to-Markdown extractor; no browser dependency |
 | `--backend jina` | Force [Jina Reader](https://r.jina.ai/) SaaS — zero local deps, large free tier |
+| `--backend crwl` | Explicitly opt into local Crawl4AI for a browser-rendered page |
 | `--backend opencli` | Force OpenCLI wechat logged-in path (only meaningful for mp.weixin.qq.com) |
 
-v0.10.1 adds **CAPTCHA heuristic fallback** for all backends: when keywords like `环境异常 / 完成验证后即可继续访问 / Cloudflare / Just a moment` are detected, the envelope `errors[]` gains a `captcha_suspected: ...` entry; the markdown field is preserved (graceful degrade — agent reads `errors` to decide whether to trust the content). `omnireach doctor`'s `wechat_backends` section surfaces whether OpenCLI + `--stdout` are ready.
+CAPTCHA-shaped responses are rejected rather than returned as successful article content. Auto mode records `captcha_suspected` in `errors[]` and tries the next backend; if all backends fail, JSON is still emitted but the process exits non-zero. `omnireach doctor` reports both the built-in HTTP backend and whether OpenCLI supports the background-tab contract.
 
 </details>
 

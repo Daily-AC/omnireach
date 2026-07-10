@@ -75,12 +75,6 @@ BINARY_GUIDES = {
             "Linux: 看 https://github.com/cli/cli/blob/trunk/docs/install_linux.md"
         ),
     },
-    "reddit": {
-        "binary": "rdt-cli",
-        "install": ["uv", "tool", "install", "rdt-cli"],
-        "label": "rdt-cli",
-        "post_install": "运行 `rdt login` 完成 Reddit OAuth (浏览器扫码)",
-    },
     "rss": {
         "binary": None,
         "install": None,
@@ -208,7 +202,7 @@ def setup_cmd(source_id: str, yes: bool) -> None:
         _setup_binary(source_id)
         return
 
-    if source_id in ("twitter", "xiaohongshu", "tiktok", "douyin"):
+    if source_id in ("reddit", "twitter", "xiaohongshu", "tiktok", "douyin"):
         adapter = spec.load_adapter_class()()
         report = asyncio.run(
             wizard.run_setup(

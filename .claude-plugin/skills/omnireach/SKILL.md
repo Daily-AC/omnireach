@@ -9,7 +9,7 @@ omnireach 是一个 CLI 工具集, 把 web 搜索 + 多平台读取 (Twitter / R
 
 v0.10 起两个核心子命令:
 - `omnireach search <query>` → 全网 SERP (metadata + URL)
-- `omnireach fetch <url>` → URL 拉成全文 markdown — host-aware: `mp.weixin.qq.com` 走 OpenCLI 登录态 Chrome (v0.10.1+, 绕过验证码), 其它 host 走 crwl 优先 + Jina Reader fallback
+- `omnireach fetch <url>` → URL 拉成全文 markdown — 普通网页走内置无浏览器 HTTP → Jina fallback；`mp.weixin.qq.com` 走后台临时 OpenCLI tab 继承登录态
 
 ## Agent 调用约定 (重要)
 
@@ -30,7 +30,7 @@ v0.10 起两个核心子命令:
 curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh | sh
 ```
 
-零配置即可用: hackernews / rss / wechat (Sogou 免费) / bilibili (B站官方 API)。其他源 (twitter / reddit / xhs / tiktok / douyin / boosters) 跑 `omnireach setup <source>` 解锁 (注意: `setup` 是交互式, 给人用; agent 别直接调)。
+零配置即可用: hackernews / rss / wechat (Sogou 免费) / bilibili (B站官方 API)。Reddit / Twitter / xhs / TikTok / Douyin 统一走 OpenCLI 后台临时 tab；其他源跑 `omnireach setup <source>` 解锁 (注意: `setup` 是交互式, 给人用; agent 别直接调)。
 
 ### Search — 拿 URL + metadata
 
@@ -54,28 +54,28 @@ omnireach search --json "Claude 4.7 prompt caching 实测"
 
 ```bash
 omnireach fetch --json "https://mp.weixin.qq.com/s/abc"        # auto → opencli (登录态)
-omnireach fetch --json "https://example.com/article"           # auto → crwl → jina
+omnireach fetch --json "https://example.com/article"           # auto → http → jina
 ```
 
 返回:
 ```json
 {
   "url": "...",
-  "backend": "opencli" | "crwl" | "jina" | null,
+  "backend": "http" | "opencli" | "jina" | "crwl" | null,
   "fetched_at": "ISO 8601 Z",
   "content_markdown": "# title\n\nbody...",
-  "errors": [{"code": "captcha_suspected" | "opencli_failed" | "backend_unavailable" | ...,
-              "detail": "..."}]
+  "errors": ["<backend>: <error detail>"]
 }
 ```
 
 Backend 选择:
-- `--backend auto` (default): **host-aware** — `mp.weixin.qq.com` URL 强走 opencli (登录态 cookie-strategy, 绕过验证码); 其它 host 走 crwl (本地 Crawl4AI, 反爬强) 优先 + jina (Jina Reader SaaS, `r.jina.ai/<url>`, 免费额度大, 零配置) fallback
+- `--backend auto` (default): **host-aware** — `mp.weixin.qq.com` URL 强走 opencli；其它 host 走内置 HTTP 提取优先 + Jina Reader fallback。默认路径不需要 Playwright/Crawl4AI
+- `--backend http`: 强制走 omnireach 内置 HTTP + HTML-to-Markdown，不启动浏览器
 - `--backend opencli`: 强制走 OpenCLI weixin 登录态路径 (只对 `mp.weixin.qq.com` 有意义, 其它 host 报 `backend_unavailable`)
-- `--backend crwl`: 强制走 Crawl4AI 本地, 没装就报错 (装: `pip install -U crawl4ai && crawl4ai-setup`)
 - `--backend jina`: 强制走 Jina Reader, 零依赖
+- `--backend crwl`: 显式 opt-in Crawl4AI 本地浏览器抓取, 没装就报错
 
-**CAPTCHA 启发式兜底** (v0.10.1+): 所有 backend 拿到响应后扫验证页关键词 (环境异常 / 完成验证后即可继续访问 / Cloudflare / Just a moment 等), 命中 → `errors[]` 加 `captcha_suspected` entry, **`content_markdown` 字段保留**, Agent 自己读 errors 决定信不信。
+**CAPTCHA 启发式兜底**: 所有 backend 拿到响应后扫验证页关键词。命中后不会把验证页当正文成功返回；auto 会记录 `captcha_suspected` 并尝试下一 backend。全部失败时仍输出 JSON envelope，但退出码非零。
 
 ### Search + Fetch 组合 pipeline
 
@@ -106,15 +106,15 @@ omnireach search --mode deep  "...."  # 全部就绪源
 omnireach doctor --json
 # 返 {
 #   sources: [...],
-#   fetch_backends: [{tool: "crwl", ok: true|false, ...}],
+#   fetch_backends: [{tool: "http", ok: true, ...}, {tool: "crwl", ok: true|false, ...}],
 #   wechat_backends: [{tool: "opencli weixin", ok: true|false, ...}]   # v0.10.1+
 # }
 ```
 
-`wechat_backends` 段检测 OpenCLI 是否在 PATH + `weixin download` 是否支持 `--stdout` flag (依赖 Daily-AC/OpenCLI fork commit fe28823+, 上游 PR jackwener/OpenCLI#1770 等 review)。没装/老版本 → 给出 `npm i -g github:Daily-AC/OpenCLI` 升级提示。
+`wechat_backends` 段检测 OpenCLI 是否在 PATH、`weixin download --stdout` 是否存在，以及是否支持 `--window background / --site-session ephemeral / --keep-tab false` 静默契约。没装/老版本会给出升级提示。
 
 ## 何时用 omnireach 而不是其他工具
 
 - **用 `omnireach search`**: 用户在中转站环境, 或想搜 Twitter/Reddit/小红书/B站 等原生 WebSearch 不擅长的源
-- **用 `omnireach fetch`**: 拿到 URL 后想取全文 markdown。`mp.weixin.qq.com` 这类反爬强 + 需要登录态的站点会自动走 OpenCLI 通道, 普通网页走 crwl/jina
+- **用 `omnireach fetch`**: 拿到 URL 后想取全文 markdown。普通网页不启动浏览器；需要登录态的微信自动走静默 OpenCLI 通道
 - **不用**: 简单的网页打开 (用 WebFetch), 或代码搜索 (用 grep/Grep)

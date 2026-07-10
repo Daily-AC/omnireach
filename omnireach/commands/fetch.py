@@ -1,13 +1,15 @@
 """omnireach fetch <url> — get full markdown content from a URL (v0.10).
 
-Backends (dual-backend pattern, same as wechat/bilibili adapters):
-- `crwl` (Crawl4AI, local install): preferred, 内置反爬
-- `jina` (r.jina.ai SaaS): zero-config fallback, 免费额度大
+Backends:
+- `http` (built in): lightweight HTTP + local HTML-to-Markdown extraction
+- `jina` (r.jina.ai SaaS): zero-config fallback for blocked/complex pages
+- `crwl` (Crawl4AI, local install): explicit opt-in for browser crawling
 - `opencli` (v0.10.1+): mp.weixin.qq.com URLs only — OpenCLI weixin download
   cookie-strategy path, bypasses verification-page traps that crwl/jina hit
 
 CLI:
-    omnireach fetch <url>                     # auto: host-aware (mp.weixin.qq.com → opencli; else crwl → jina)
+    omnireach fetch <url>                     # auto: host-aware (mp.weixin.qq.com → opencli; else http → jina)
+    omnireach fetch <url> --backend http      # built-in, no browser
     omnireach fetch <url> --backend crwl      # crwl only, fail if not installed
     omnireach fetch <url> --backend jina      # jina only
     omnireach fetch <url> --backend opencli   # opencli only (only meaningful for mp.weixin.qq.com)
@@ -30,6 +32,9 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
+from omnireach.adapters._opencli import SILENT_BROWSER_ARGS
+from omnireach.html_markdown import html_to_markdown
+
 console = Console()
 
 JINA_BASE = "https://r.jina.ai/"
@@ -40,10 +45,8 @@ JINA_BASE = "https://r.jina.ai/"
 # bypasses this.
 WECHAT_HOSTS = frozenset({"mp.weixin.qq.com"})
 
-# v0.10.1: CAPTCHA / verification-gate keyword heuristic. Used to flag
-# crwl/jina responses that look like verification pages instead of real
-# article content. OpenCLI path doesn't need these — it surfaces a
-# structured `status: 'failed — verification required'` row directly.
+# CAPTCHA / verification-gate keywords reject challenge pages before they can
+# be mistaken for article content. OpenCLI also surfaces structured failures.
 CAPTCHA_KEYWORDS = (
     "环境异常",
     "完成验证后即可继续访问",
@@ -52,7 +55,18 @@ CAPTCHA_KEYWORDS = (
     "Cloudflare",
     "Just a moment",
     "Checking your browser",
+    "此验证码用于确认",
+    "不是自动程序",
 )
+
+HTTP_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.8,zh-CN;q=0.7,zh;q=0.6",
+}
 
 
 def _host_of(url: str) -> str:
@@ -72,8 +86,9 @@ def _looks_like_captcha(markdown: str) -> tuple[bool, str | None]:
     """
     if len(markdown) < 200:
         return False, None
+    folded = markdown.casefold()
     for kw in CAPTCHA_KEYWORDS:
-        if kw in markdown:
+        if kw.casefold() in folded:
             return True, kw
     return False, None
 
@@ -108,6 +123,31 @@ def _fetch_via_crwl(url: str, timeout: float) -> str:
     return body
 
 
+def _fetch_via_http(url: str, timeout: float) -> str:
+    """Fetch and extract a normal web page without launching a browser."""
+    try:
+        with httpx.Client(
+            headers=HTTP_HEADERS,
+            timeout=timeout,
+            follow_redirects=True,
+        ) as client:
+            resp = client.get(url, headers=HTTP_HEADERS)
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"http fetch error: {e}") from e
+    if resp.status_code >= 400:
+        raise RuntimeError(f"http fetch 返回 {resp.status_code}")
+    content_type = resp.headers.get("content-type", "").lower()
+    if "html" in content_type or "<html" in resp.text[:500].lower():
+        response_url = getattr(resp, "url", None)
+        base_url = str(response_url) if isinstance(response_url, (str, httpx.URL)) else url
+        body = html_to_markdown(resp.text, base_url=base_url)
+    else:
+        body = resp.text
+    if not body.strip():
+        raise RuntimeError("http fetch 返回空内容")
+    return body
+
+
 def _fetch_via_jina(url: str, timeout: float) -> str:
     """GET https://r.jina.ai/<url> — Jina Reader SaaS, 返 markdown 文本。"""
     target = JINA_BASE + url
@@ -138,7 +178,10 @@ def _fetch_via_opencli_weixin(url: str, timeout: float) -> str:
         raise RuntimeError("opencli 不在 PATH (跑 `npm i -g github:Daily-AC/OpenCLI`)")
     try:
         proc = subprocess.run(
-            ["opencli", "weixin", "download", "--url", url, "--stdout", "--format", "json"],
+            [
+                "opencli", "weixin", "download", "--url", url, "--stdout",
+                "--format", "json", *SILENT_BROWSER_ARGS,
+            ],
             capture_output=True, text=True, timeout=timeout,
         )
     except subprocess.TimeoutExpired as e:
@@ -178,19 +221,23 @@ def _resolve_backends(url: str, backend: str) -> list[str]:
     - `--backend auto` + host in WECHAT_HOSTS → opencli only (single attempt;
       no jina/crwl fallback because they'd just hit the verification page
       we're trying to avoid).
-    - `--backend auto` + other hosts → crwl → jina (preserved v0.10 behavior).
+    - `--backend auto` + other hosts → built-in http → jina.
     """
     if backend != "auto":
         return [backend]
     if _host_of(url) in WECHAT_HOSTS:
         return ["opencli"]
-    return ["crwl", "jina"]
+    return ["http", "jina"]
 
 
 @click.command("fetch")
 @click.argument("url")
-@click.option("--backend", type=click.Choice(["auto", "crwl", "jina", "opencli"]), default="auto",
-              help="auto = host-aware (mp.weixin.qq.com → opencli; else crwl → jina); 或显式指定")
+@click.option(
+    "--backend",
+    type=click.Choice(["auto", "http", "jina", "crwl", "opencli"]),
+    default="auto",
+    help="auto = host-aware (mp.weixin.qq.com → opencli; else http → jina); 或显式指定",
+)
 @click.option("--json", "json_out", is_flag=True, help="输出 JSON envelope, 适合下游 pipe")
 @click.option("--timeout", type=float, default=30.0, help="单 backend 超时秒数")
 def fetch_cmd(url: str, backend: str, json_out: bool, timeout: float) -> None:
@@ -198,12 +245,12 @@ def fetch_cmd(url: str, backend: str, json_out: bool, timeout: float) -> None:
 
     omnireach search 返 metadata + URL; omnireach fetch 把 URL 变成全文 markdown.
     Default `auto`: mp.weixin.qq.com URLs 走 OpenCLI 登录态 Chrome
-    (`opencli weixin download --stdout`); 其它 URLs 走 crwl (Crawl4AI, 本地) 优先,
-    失败或没装走 jina (r.jina.ai SaaS) fallback.
+    (`opencli weixin download --stdout`); 其它 URLs 走内置 HTTP 提取优先,
+    被拦截或提取失败时走 jina (r.jina.ai SaaS) fallback. Crawl4AI 仅显式 opt-in.
 
     示例:
         omnireach fetch https://mp.weixin.qq.com/s/abc      # 自动走 opencli
-        omnireach fetch https://example.com/article         # 自动走 crwl → jina
+        omnireach fetch https://example.com/article         # 自动走 http → jina
         omnireach search --on wechat "claude" --json | \\
             jq -r '.results[].url' | xargs -I{} omnireach fetch {} --json
     """
@@ -211,34 +258,30 @@ def fetch_cmd(url: str, backend: str, json_out: bool, timeout: float) -> None:
     content = ""
     used_backend = ""
     errors: list[str] = []
-    captcha_warning: str | None = None
-
     for b in backends_to_try:
         try:
-            if b == "crwl":
-                content = _fetch_via_crwl(url, timeout)
+            if b == "http":
+                candidate = _fetch_via_http(url, timeout)
             elif b == "jina":
-                content = _fetch_via_jina(url, timeout)
+                candidate = _fetch_via_jina(url, timeout)
+            elif b == "crwl":
+                candidate = _fetch_via_crwl(url, timeout)
             elif b == "opencli":
-                content = _fetch_via_opencli_weixin(url, timeout)
+                candidate = _fetch_via_opencli_weixin(url, timeout)
+            else:
+                raise RuntimeError(f"unknown backend: {b}")
+            suspicious, keyword = _looks_like_captcha(candidate)
+            if suspicious:
+                errors.append(
+                    f"{b}: captcha_suspected: response contains "
+                    f"verification-page keyword '{keyword}'"
+                )
+                continue
+            content = candidate
             used_backend = b
             break
         except Exception as e:  # noqa: BLE001 — backend-specific exceptions vary
             errors.append(f"{b}: {e}")
-
-    # v0.10.1: CAPTCHA heuristic for crwl/jina paths. The opencli backend
-    # surfaces a structured row directly via captcha_suspected: prefix in
-    # the RuntimeError message (already captured in errors above), so we
-    # only need post-hoc keyword scan for non-opencli successful returns.
-    if content and used_backend in ("crwl", "jina"):
-        suspicious, kw = _looks_like_captcha(content)
-        if suspicious:
-            captcha_warning = (
-                f"captcha_suspected: {used_backend} returned content containing "
-                f"verification-page keyword '{kw}'; consider --backend opencli for "
-                f"mp.weixin.qq.com or check the URL in a browser"
-            )
-            errors.append(captcha_warning)
 
     envelope = {
         "url": url,
@@ -250,6 +293,8 @@ def fetch_cmd(url: str, backend: str, json_out: bool, timeout: float) -> None:
 
     if _should_emit_json(json_out):
         click.echo(_json.dumps(envelope, ensure_ascii=False))
+        if not content:
+            raise SystemExit(1)
         return
 
     if not content:

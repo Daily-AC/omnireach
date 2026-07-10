@@ -9,6 +9,7 @@ from click.testing import CliRunner
 from omnireach.cli import main
 from omnireach.commands.fetch import (
     _fetch_via_crwl,
+    _fetch_via_http,
     _fetch_via_jina,
     _fetch_via_opencli_weixin,
     _host_of,
@@ -90,13 +91,13 @@ def test_fetch_via_jina_4xx_raises(monkeypatch):
     assert "404" in str(exc.value)
 
 
-def test_fetch_auto_falls_back_to_jina_when_crwl_missing(monkeypatch):
-    """auto backend: crwl raises (not installed) → jina succeeds → use jina."""
-    def fake_crwl(*a, **kw):
-        raise RuntimeError("crwl 不在 PATH")
+def test_fetch_auto_falls_back_to_jina_when_http_is_blocked(monkeypatch):
+    """auto backend: built-in HTTP sees a challenge, then Jina succeeds."""
+    def fake_http(*a, **kw):
+        return "# Verify\n\n" + "此验证码用于确认请求不是自动程序 " * 30
     def fake_jina(url, timeout):
         return "# from jina\nfallback worked"
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_crwl", fake_crwl)
+    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_http", fake_http)
     monkeypatch.setattr("omnireach.commands.fetch._fetch_via_jina", fake_jina)
     runner = CliRunner()
     res = runner.invoke(main, ["fetch", "https://example.com", "--json"])
@@ -106,6 +107,7 @@ def test_fetch_auto_falls_back_to_jina_when_crwl_missing(monkeypatch):
     data = _json.loads(json_line)
     assert data["backend"] == "jina"
     assert "fallback worked" in data["content_markdown"]
+    assert any("captcha_suspected" in e for e in data["errors"])
 
 
 def test_fetch_explicit_crwl_backend_no_fallback(monkeypatch):
@@ -124,14 +126,14 @@ def test_fetch_explicit_crwl_backend_no_fallback(monkeypatch):
 
 
 def test_fetch_returns_envelope_with_url_and_backend(monkeypatch):
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_crwl",
+    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_http",
                         lambda url, timeout: "# hello")
     runner = CliRunner()
     res = runner.invoke(main, ["fetch", "https://example.com", "--json"])
     json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
     data = _json.loads(json_line)
     assert data["url"] == "https://example.com"
-    assert data["backend"] == "crwl"
+    assert data["backend"] == "http"
     assert data["content_markdown"] == "# hello"
     assert data["fetched_at"].endswith("Z")
     assert data["errors"] == []
@@ -179,8 +181,8 @@ def test_v0101_resolve_backends_auto_wechat_url_goes_opencli():
 
 
 def test_v0101_resolve_backends_auto_other_host_preserves_v010():
-    """auto + non-wechat host → crwl → jina (v0.10 behavior preserved)."""
-    assert _resolve_backends("https://example.com/foo", "auto") == ["crwl", "jina"]
+    """auto + non-wechat host → built-in HTTP → Jina, without Playwright."""
+    assert _resolve_backends("https://example.com/foo", "auto") == ["http", "jina"]
 
 
 def test_v0101_resolve_backends_explicit_crwl_wins_on_wechat_url():
@@ -281,6 +283,39 @@ def test_v0101_looks_like_captcha_detects_cloudflare():
     assert kw in ("Just a moment", "Checking your browser")
 
 
+def test_looks_like_captcha_detects_real_sogou_challenge_copy():
+    body = "# 搜狗搜索\n\n" + "x" * 250 + "此验证码用于确认这些请求不是自动程序发出的"
+    suspicious, kw = _looks_like_captcha(body)
+    assert suspicious is True
+    assert kw == "此验证码用于确认"
+
+
+def test_fetch_via_http_extracts_readable_markdown(monkeypatch):
+    fake_resp = MagicMock()
+    fake_resp.status_code = 200
+    fake_resp.headers = {"content-type": "text/html; charset=utf-8"}
+    fake_resp.text = """
+      <html><head><title>Example story</title><script>bad()</script></head>
+      <body><nav><img src="logo.png">Skip me</nav><article><h1>Example story</h1>
+      <p>A useful paragraph with <a href="/more">a link</a>.</p>
+      <pre><code>print("hello")</code></pre></article></body></html>
+    """
+
+    class FakeClient:
+        def __init__(self, *a, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def get(self, url, headers=None): return fake_resp
+
+    monkeypatch.setattr("omnireach.commands.fetch.httpx.Client", FakeClient)
+    out = _fetch_via_http("https://example.com/story", timeout=10.0)
+    assert "# Example story" in out
+    assert "A useful paragraph with [a link](https://example.com/more)." in out
+    assert 'print("hello")' in out
+    assert "Skip me" not in out
+    assert "bad()" not in out
+
+
 def test_v0101_looks_like_captcha_short_payload_returns_false():
     """Short responses don't trigger heuristic (too noisy)."""
     suspicious, _ = _looks_like_captcha("环境异常")
@@ -349,14 +384,13 @@ def test_v0101_fetch_wechat_url_explicit_backend_crwl_respects_user(monkeypatch)
     res = runner.invoke(main, [
         "fetch", "https://mp.weixin.qq.com/s/abc", "--backend", "crwl", "--json",
     ])
-    assert res.exit_code == 0
+    assert res.exit_code == 1
     json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
     data = _json.loads(json_line)
     assert called["crwl"] is True, "explicit --backend crwl must run crwl"
     assert called["opencli"] is False, "explicit --backend crwl must NOT run opencli"
-    assert data["backend"] == "crwl"
-    # Graceful degrade: markdown still returned (Agent can decide), errors flags CAPTCHA
-    assert "环境异常" in data["content_markdown"]
+    assert data["backend"] is None
+    assert data["content_markdown"] == ""
     assert any("captcha_suspected" in e for e in data["errors"])
 
 
@@ -372,7 +406,8 @@ def test_v0101_fetch_crwl_captcha_heuristic_flags_cloudflare(monkeypatch):
     ])
     json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
     data = _json.loads(json_line)
-    assert data["backend"] == "crwl"
+    assert res.exit_code == 1
+    assert data["backend"] is None
     assert any("captcha_suspected" in e for e in data["errors"])
 
 
@@ -395,8 +430,26 @@ def test_v0101_fetch_jina_captcha_heuristic_flags(monkeypatch):
     ])
     json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
     data = _json.loads(json_line)
-    assert data["backend"] == "jina"
+    assert res.exit_code == 1
+    assert data["backend"] is None
     assert any("captcha_suspected" in e for e in data["errors"])
+
+
+def test_fetch_json_failure_returns_nonzero_exit(monkeypatch):
+    monkeypatch.setattr(
+        "omnireach.commands.fetch._fetch_via_http",
+        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("network down")),
+    )
+    monkeypatch.setattr(
+        "omnireach.commands.fetch._fetch_via_jina",
+        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("reader down")),
+    )
+    runner = CliRunner()
+    res = runner.invoke(main, ["fetch", "https://example.com", "--json"])
+    data = _json.loads(next(l for l in res.output.splitlines() if l.startswith("{")))
+    assert res.exit_code == 1
+    assert data["backend"] is None
+    assert data["content_markdown"] == ""
 
 
 def test_v0101_fetch_help_lists_opencli_backend_choice():

@@ -25,8 +25,6 @@ dependencies = [
   "PyYAML>=6.0",
   "rich>=13.7",
   "feedparser>=6.0,<7.0",
-  "lxml>=6.1.1",
-  "cssselect>=1.4.0",
 ]
 
 [project.optional-dependencies]
