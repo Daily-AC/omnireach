@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 
 from omnireach.contract import SearchEnvelope, SourceError
 from omnireach.dispatcher import Dispatcher
@@ -19,6 +20,28 @@ BOOSTER_KEY_ENV = {
     "wechat": "EXA_API_KEY",
     "bilibili": "EXA_API_KEY",
 }
+
+AUTO_BROWSER_SOURCES = ("google", "twitter")
+
+
+def augment_with_active_browser_sources(
+    source_ids: list[str],
+    registry: Registry,
+    explicit_sources: list[str] | None,
+    mode: str,
+) -> list[str]:
+    """Add silent Chrome-backed sources only to non-explicit, non-quick routes."""
+    if explicit_sources or mode == "quick" or not shutil.which("opencli"):
+        return list(source_ids)
+    output = list(source_ids)
+    for source_id in AUTO_BROWSER_SOURCES:
+        try:
+            registry.get(source_id)
+        except KeyError:
+            continue
+        if source_id not in output:
+            output.append(source_id)
+    return output
 
 
 def augment_with_active_boosters(
@@ -60,8 +83,11 @@ async def search(
     route = Router(registry).plan(
         RouteRequest(query=query, explicit_sources=sources, mode=mode)
     )
+    source_ids = augment_with_active_browser_sources(
+        route.source_ids, registry, sources, mode
+    )
     source_ids = augment_with_active_boosters(
-        route.source_ids, registry, sources
+        source_ids, registry, sources
     )
 
     adapters = {}
