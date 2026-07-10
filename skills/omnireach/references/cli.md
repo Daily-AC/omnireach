@@ -26,6 +26,10 @@ Run a routed search:
 omnireach search --json "Claude Code prompt caching"
 ```
 
+With OpenCLI installed, normal and deep searches automatically include Google and Twitter
+through hidden ephemeral Chrome tabs. `--mode quick` stays browser-free. `--on` is exact and
+does not add either source unless requested.
+
 Restrict sources:
 
 ```bash
@@ -134,6 +138,7 @@ Run interactive setup only in a user-controlled terminal:
 omnireach setup reddit
 omnireach setup xiaohongshu
 omnireach setup twitter
+omnireach setup google
 ```
 
 Login-backed adapters require OpenCLI and its Chrome extension. They pass
