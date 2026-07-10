@@ -7,7 +7,7 @@ This file is loaded automatically when Claude Code starts in this repo. It carri
 **omnireach 是项目名, 同 repo 内多个职责子命令 (subcommand 形态, 落地后再判断要不要拆 binary)**, 不是单一工具。完整"触达全网"语义由三层职责实现, 都在同 repo（**不开 sister repo**, 拍板于 2026-05-27 session）:
 
 - **`omnireach search`** (v0.1+ 起在用): search 层 — 全网定位 metadata + URL, **不取内容**
-- **`omnireach fetch`** (v0.10 起 ship 为 subcommand): fetch 层 — 给定 URL 取全文 markdown; v0.10.1 起 host-aware (`mp.weixin.qq.com` → OpenCLI 登录态, 其它 host → crwl/jina)
+- **`omnireach fetch`** (v0.10 起 ship 为 subcommand): fetch 层 — 给定 URL 取全文 markdown; 当前 host-aware 路径为普通网页内置 HTTP → Jina fallback，`mp.weixin.qq.com` → OpenCLI 后台临时 tab；Crawl4AI 只保留显式 opt-in
 - **parse** (暂未实现): parse 层 — 视频/音频内容解析 (字幕/STT/逐帧), 真有 issue 才加
 
 类比 `cargo` (一个 repo 下 `cargo` / `rustc` / `rustfmt` 多个 sibling binary, 共享一个项目愿景) 而不是 `git` + `git-lfs` (后者是 standalone separate repo)。**Why monorepo 而非 multirepo**: 2026-05-27 session 调研 Crawl4AI 时验证 —— 收纳 `crwl` 作为 fetch 工具不影响 search 行为, 只补齐 search 结果, 完全没有 sister repo 的耦合协调成本。一个 release 频道 + 一个 issue tracker + 一份 README 就够。
@@ -42,7 +42,7 @@ omnireach 是给**任何 Claude Code WebSearch 拿不到结果**的用户的工�
 - OpenAI 兼容中转站用户: **上游没实现 server tool 处理** → 失败
 - 显式 Bedrock 用户 / Vertex Claude 3.x: 客户端 isEnabled 直接关
 
-**Why omnireach 不止补缺**: 即使 WebSearch 可用 (firstParty 直连), 它也搜不全 — Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok 这些纵向源服务端 WebSearch 几乎都够不着。omnireach 三重价值: (1) 给客户端 gate 关掉的用户**补缺**; (2) 给上游不实现 server tool 的用户**补缺**; (3) 给 WebSearch 可用但搜不到纵向源的用户**补纵向**。CLI + Claude Code Skill 双形态。
+**Why omnireach 不止补缺**: 即使 WebSearch 可用 (firstParty 直连), 它也搜不全 — Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok 这些纵向源服务端 WebSearch 几乎都够不着。omnireach 三重价值: (1) 给客户端 gate 关掉的用户**补缺**; (2) 给上游不实现 server tool 的用户**补缺**; (3) 给 WebSearch 可用但搜不到纵向源的用户**补纵向**。CLI + MCP + Claude Code Skill 三形态。
 
 **历史措辞修订 (2026-06-03 三轮)**:
 - 第一轮 (上午): README/SKILL/本文件痛点写"中转站丢 WebSearch" — narrow
@@ -55,8 +55,10 @@ omnireach 是给**任何 Claude Code WebSearch 拿不到结果**的用户的工�
 
 ## 架构核心 — Umbrella + 适配器壳（v0.5 修订）
 
-- 上游 binary 直调: `yt-dlp` (youtube) / `gh` (github) / `rdt-cli` (reddit) / Python `feedparser` (rss)
-- OpenCLI bridge (Node + 登录态 Chrome) → twitter / xiaohongshu / tiktok / douyin
+- 上游 binary 直调: `yt-dlp` (youtube) / `gh` (github) / Python `feedparser` (rss)
+- OpenCLI bridge (Node + 登录态 Chrome) → reddit / twitter / xiaohongshu / tiktok / douyin
+- Application services: `omnireach.service.search` + `omnireach.fetcher.fetch`，CLI 与 MCP 共用同一 envelope 和 backend 逻辑
+- MCP stdio: `omnireach mcp` 零新增依赖实现 MCP 2025-06-18，暴露 `omnireach_search` / `omnireach_fetch`
 - HN 直接调 Algolia Search API（无上游）
 - Boosters (Tavily / Brave / Perplexity / Exa) → httpx 调付费 API，env var 检测式接入
 - Agent-Reach **完全可选**（v0.5 起）: 仅作 `setup --batch` 一键引导 installer，runtime 不依赖
@@ -66,8 +68,8 @@ omnireach 自己只做: 路由 (Router) + 并发分发 (Dispatcher) + 归一 (No
 ## Tier 系统 (5 tier, sources.yml 中声明)
 
 - ✅ `ready`: 零配置或一条 `pip install` 可用 (HN/youtube/github/rss)
-- 🟡 `one_step`: 一次 OAuth/Key 配置 (reddit 需 `rdt login`)
-- 🔴 `heavy`: 装 Chrome 扩展 + 浏览器登录态 (twitter / xiaohongshu / tiktok / douyin)
+- 🟡 `one_step`: 一次 OAuth/Key 配置
+- 🔴 `heavy`: 装 Chrome 扩展 + 浏览器登录态 (reddit / twitter / xiaohongshu / tiktok / douyin)
 - 💎 `booster`: 付费 API Key (Tavily/Brave/Perplexity/Exa)，env var 检测，结果元数据 `cost="paid"`
 - 🚧 `wip`: 待重写源，sources 列表显示但不参与 auto fanout (v0.7 起暂无 wip 源)
 
@@ -140,9 +142,10 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 ## v1.x wishlist
 
 - `omnireach diagnose --autopr` (用户 agent 自动 fix upstream bug 后自动 PR 回 repo)
-- e2e CI matrix 装真实 yt-dlp/gh/rdt-cli/opencli docker images
+- e2e CI matrix 装真实 yt-dlp/gh/opencli docker images
 - 公开发布到 Claude Marketplace
-- ~~**本 repo 加 fetch binary 时, default backend 候选**~~ — ✅ 已落地 v0.10 / v0.10.1: `omnireach fetch` 走 crwl ([unclecode/crawl4ai](https://github.com/unclecode/crawl4ai)) 优先 + jina ([jina-ai/reader](https://github.com/jina-ai/reader)) fallback, mp.weixin.qq.com 加 OpenCLI 登录态 backend。**注意 Crawl4AI 代码结构有 monolith 倾向** (extraction_strategy.py 120KB / async_crawler_strategy.py 118KB), 但 omnireach 用的是 `crwl` CLI 不直接调 Python API, monolith 不影响我们。doctor 检测 crwl 在 PATH (v0.9.3+) + opencli `weixin download --stdout` 在 PATH (v0.10.1+)。
+- **fetch 当前架构 (2026-07-10)**: 默认普通网页走 repo 自带的轻量 HTTP + HTML-to-Markdown，遇到验证页或提取失败回退 Jina；`mp.weixin.qq.com` 走 OpenCLI 登录态后台临时 tab；`crwl` 只保留显式 `--backend crwl` opt-in。OpenCLI adapter 全部显式传 `--window background --site-session ephemeral --keep-tab false`，并在 dispatcher 取消时回收子进程。基础依赖已移除 `lxml/cssselect`。
+- **Agent fast path (2026-07-10)**: 只读联网任务先用 MCP `omnireach_search` / `omnireach_fetch`，MCP 不可用才回退 CLI；Playwright 只保留给点击、表单、上传下载、截图、视觉验证和未支持的交互流程。`.mcp.json` 在 plugin root 自动注册 `omnireach mcp`。
 - (Apache-2.0 License 切换问题不再适用 — monorepo 模型下整个仓库统一 MIT)
 
 ## 外部 issue 历史

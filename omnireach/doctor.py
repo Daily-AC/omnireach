@@ -21,13 +21,7 @@ class SourceStatus:
 
 @dataclass
 class FetchBackendStatus:
-    """v0.9.3: external fetch tool that complements omnireach's search layer.
-
-    omnireach returns metadata + URL only. To get full article content from
-    those URLs, users pipe into a fetch tool (currently Crawl4AI's `crwl`).
-    Doctor reports presence/absence so Agents know whether the full-content
-    pipeline is wired.
-    """
+    """A built-in or optional backend used by `omnireach fetch`."""
 
     tool: str
     ok: bool
@@ -39,7 +33,7 @@ class FetchBackendStatus:
 class WechatBackendStatus:
     """v0.10.1: host-specific cookie-strategy backend for mp.weixin.qq.com.
 
-    Generic web fetchers (crwl, jina) get verification-page-trapped on
+    Generic web fetchers (http, crwl, jina) get verification-page-trapped on
     WeChat article URLs. OpenCLI's `weixin download --stdout` uses the
     user's logged-in Chrome profile to bypass this. Doctor reports whether
     OpenCLI is on PATH AND whether the `--stdout` flag is available
@@ -52,12 +46,17 @@ class WechatBackendStatus:
     fix_hint: str = ""
 
 
-# v0.9.3: known fetch backends — currently just crwl, but designed for growth
-# (jina via curl, firecrawl, etc. could be added later).
 FETCH_BACKENDS = [
     {
+        "tool": "http",
+        "purpose": "内置轻量 HTTP + HTML → Markdown (不启动浏览器)",
+        "builtin": True,
+        "fix_hint": "",
+    },
+    {
         "tool": "crwl",
-        "purpose": "Crawl4AI — URL → 干净 Markdown (反爬绕 Cloudflare/Akamai 等)",
+        "purpose": "Crawl4AI — 显式 opt-in 的浏览器抓取 backend",
+        "builtin": False,
         "fix_hint": "pip install -U crawl4ai && crawl4ai-setup",
     },
 ]
@@ -67,6 +66,11 @@ def run_fetch_backend_doctor() -> list[FetchBackendStatus]:
     """Probe each known fetch backend (binary on PATH)."""
     out: list[FetchBackendStatus] = []
     for b in FETCH_BACKENDS:
+        if b.get("builtin"):
+            out.append(FetchBackendStatus(
+                tool=b["tool"], ok=True, detail=f"{b['purpose']} — 内置可用",
+            ))
+            continue
         if shutil.which(b["tool"]):
             out.append(FetchBackendStatus(
                 tool=b["tool"], ok=True,
@@ -127,9 +131,22 @@ def run_wechat_backend_doctor() -> list[WechatBackendStatus]:
             fix_hint=install_hint,
         ))
         return out
+    silent_flags = ("--window", "--site-session", "--keep-tab")
+    if any(flag not in help_text for flag in silent_flags):
+        out.append(WechatBackendStatus(
+            tool="opencli weixin", ok=False,
+            detail=(
+                f"{purpose} — 当前 OpenCLI 不支持 background ephemeral tab；"
+                "升级后才可保证不弹可见标签页"
+            ),
+            fix_hint=install_hint,
+        ))
+        return out
     out.append(WechatBackendStatus(
         tool="opencli weixin", ok=True,
-        detail=f"{purpose} — opencli + `weixin download --stdout` 在 PATH",
+        detail=(
+            f"{purpose} — --stdout + --window background + ephemeral tab 已支持"
+        ),
     ))
     return out
 
@@ -137,7 +154,6 @@ def run_wechat_backend_doctor() -> list[WechatBackendStatus]:
 BINARY_FOR_SOURCE = {
     "youtube": "yt-dlp",
     "github": "gh",
-    "reddit": "rdt-cli",
 }
 
 ENV_FOR_BOOSTER = {
@@ -204,13 +220,11 @@ async def run_doctor() -> list[SourceStatus]:
                     detail=f"{env} 未配",
                     fix_hint=f"omnireach setup {sid}"))
             continue
-        if sid in ("twitter", "xiaohongshu", "tiktok", "douyin"):
-            # v0.3 OpenCLI path — check for OpenCLI binary
-            for candidate in ("openrouter", "opencli", "opencli-search"):
-                if shutil.which(candidate):
-                    statuses.append(SourceStatus(sid, spec.tier, ok=True,
-                        detail=f"{candidate} 在 PATH"))
-                    break
+        if sid in ("reddit", "twitter", "xiaohongshu", "tiktok", "douyin"):
+            if shutil.which("opencli"):
+                statuses.append(SourceStatus(
+                    sid, spec.tier, ok=True, detail="opencli 在 PATH"
+                ))
             else:
                 statuses.append(SourceStatus(sid, spec.tier, ok=False,
                     detail="OpenCLI 不在 PATH",

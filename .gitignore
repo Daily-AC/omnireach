@@ -11,6 +11,7 @@ build/
 *.swp
 .claude/
 .env
+.worktrees/
 
 # hyperframes skills + scratch (installed via `npx skills add` to author the demo GIF — not part of the project)
 .agents/

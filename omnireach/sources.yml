@@ -76,28 +76,25 @@
   deps: { auto: [], manual: [] }
 
 - id: reddit
-  tier: one_step
+  tier: heavy
   adapter: omnireach.adapters.reddit.RedditAdapter
-  description: Reddit 帖子 + 评论搜索 (需要 rdt-cli 登录)
+  description: Reddit 帖子搜索 (OpenCLI 后台临时 tab；Chrome 登录态可选)
   query_hints: [reddit, "r/", subreddit]
-  # default_in_auto: false because reddit is one_step — until the user has
-  # run `omnireach setup reddit` and completed OAuth, including it in auto
-  # fanout would just produce "AdapterUnavailable: rdt-cli not installed"
-  # errors on every search. Discoverable via query hints (reddit/r//subreddit)
-  # or explicit --on reddit.
+  # Browser-backed sources stay opt-in so auto fanout never opens Chrome tabs.
   default_in_auto: false
   trust: 0.70
   timeout_seconds: 20
   deps:
     auto:
-      - { kind: npm, name: rdt-cli }
+      - { kind: npm, name: "github:Daily-AC/OpenCLI" }
     manual:
-      - { step: "在浏览器完成 Reddit OAuth — 运行 `rdt login` 并按提示授权" }
+      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk (装完后启用 chrome://extensions 里的开发者模式)", verify: "opencli doctor" }
+      - { step: "可选：在 Chrome 中登录 reddit.com，以继承账号可见内容和偏好" }
 
 - id: twitter
   tier: heavy
   adapter: omnireach.adapters.twitter.TwitterAdapter
-  description: Twitter / X 搜索 (登录态 Chrome, 通过 OpenCLI)
+  description: Twitter / X 搜索 (登录态 Chrome, OpenCLI 后台临时 tab)
   query_hints: [twitter, "x.com", "推特"]
   default_in_auto: false
   trust: 0.60
@@ -112,7 +109,7 @@
 - id: xiaohongshu
   tier: heavy
   adapter: omnireach.adapters.xiaohongshu.XiaohongshuAdapter
-  description: 小红书 搜索 + 笔记内容 (登录态 Chrome, 通过 OpenCLI)
+  description: 小红书 搜索 + 笔记内容 (登录态 Chrome, OpenCLI 后台临时 tab)
   query_hints: ["小红书", xiaohongshu, "种草", "笔记"]
   default_in_auto: false
   trust: 0.50
@@ -127,7 +124,7 @@
 - id: tiktok
   tier: heavy
   adapter: omnireach.adapters.tiktok.TikTokAdapter
-  description: TikTok 视频搜索 (国际版, 登录态 Chrome, 通过 OpenCLI)
+  description: TikTok 视频搜索 (国际版, 登录态 Chrome, OpenCLI 后台临时 tab)
   query_hints: [tiktok, "海外短视频"]
   default_in_auto: false
   trust: 0.55
@@ -142,7 +139,7 @@
 - id: douyin
   tier: heavy
   adapter: omnireach.adapters.douyin.DouyinAdapter
-  description: 抖音 视频搜索 (登录态 Chrome, 通过 OpenCLI fork 暂用)
+  description: 抖音 视频搜索 (登录态 Chrome, OpenCLI 后台临时 tab)
   query_hints: ["抖音", douyin]
   default_in_auto: false
   trust: 0.55

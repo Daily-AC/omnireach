@@ -7,21 +7,35 @@ through the Chrome extension install + xiaohongshu login.
 
 from __future__ import annotations
 
-import asyncio
-import json
+import re
 import shutil
+from decimal import Decimal, InvalidOperation
 
 from omnireach.adapters.base import AdapterBase, AdapterUnavailable
+from omnireach.adapters._opencli import run_opencli_json
 from omnireach.contract import Engagement, SearchResult
 
 
 def _parse_likes(v: object) -> int | None:
-    """OpenCLI returns likes as a string ('102', '1593'). Parse to int or None."""
-    if v is None:
+    """Normalize OpenCLI counts such as ``102``, ``1.2万`` or ``1.2k``."""
+    if v is None or isinstance(v, bool):
         return None
+    match = re.fullmatch(
+        r"([0-9]+(?:\.[0-9]+)?)\s*([万亿km]?)\+?",
+        str(v).strip().replace(",", "").lower(),
+    )
+    if match is None:
+        return None
+    multiplier = {
+        "": 1,
+        "k": 1_000,
+        "m": 1_000_000,
+        "万": 10_000,
+        "亿": 100_000_000,
+    }[match.group(2)]
     try:
-        return int(str(v))
-    except (TypeError, ValueError):
+        return int(Decimal(match.group(1)) * multiplier)
+    except InvalidOperation:
         return None
 
 
@@ -38,22 +52,9 @@ class XiaohongshuAdapter(AdapterBase):
                 "xiaohongshu", "opencli not installed", hint="omnireach setup xiaohongshu"
             )
 
-        proc = await asyncio.create_subprocess_exec(
-            "opencli", "xiaohongshu", "search", "--format", "json", "--limit", str(limit), query,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        items = await run_opencli_json(
+            "xiaohongshu", "xiaohongshu", "search", "--limit", str(limit), query
         )
-        out, err = await proc.communicate()
-        if proc.returncode != 0:
-            raise AdapterUnavailable("xiaohongshu", err.decode().strip() or "opencli xiaohongshu search failed")
-
-        try:
-            data = json.loads(out.decode())
-        except json.JSONDecodeError as e:
-            raise AdapterUnavailable("xiaohongshu", f"opencli returned non-JSON: {e}")
-
-        # opencli v1.7.22 returns a JSON array directly. Older shapes used {"results": [...]}.
-        items = data if isinstance(data, list) else data.get("results", [])
 
         # OpenCLI xhs search keys observed (v0.8.1 hotfix, real E2E 2026-05-27):
         # rank, author, author_url, likes(string), title, url, published_at.
