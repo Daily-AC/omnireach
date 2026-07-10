@@ -102,6 +102,16 @@ def test_registry_has_google_heavy_source():
     assert "谷歌" in google.query_hints
 
 
+def test_registry_douyin_prefers_native_bridge_without_opencli_install():
+    douyin = load_registry().get("douyin")
+
+    assert douyin.deps_auto == []
+    steps = "\n".join(dep.step for dep in douyin.deps_manual)
+    assert "omnireach bridge install" in steps
+    assert "chrome-extension" in steps
+    assert "OpenCLI" not in steps
+
+
 def test_registry_web_removed():
     from omnireach.registry import load_registry
     reg = load_registry()

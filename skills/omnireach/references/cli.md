@@ -37,6 +37,19 @@ omnireach search --on reddit,xiaohongshu --limit 5 --json "Claude Code"
 omnireach search --on wechat --json "AI 编程"
 ```
 
+Set up the native Douyin bridge once:
+
+```bash
+omnireach bridge install
+omnireach bridge path
+omnireach bridge status --json
+OMNIREACH_BROWSER_TRANSPORT=native omnireach search --on douyin --json "AI 编程"
+```
+
+Load the directory printed by `bridge install` once as an unpacked Chrome extension.
+Transport modes are `auto` (native first, OpenCLI fallback), `native` (never call OpenCLI),
+and `opencli` (force the compatibility path).
+
 The search envelope contains:
 
 ```json
@@ -141,6 +154,7 @@ omnireach setup twitter
 omnireach setup google
 ```
 
-Login-backed adapters require OpenCLI and its Chrome extension. They pass
-`--window background --site-session ephemeral --keep-tab false`; direct calls to old
-OpenCLI versions may still create visible tabs.
+Douyin prefers the Omnireach native Chrome bridge. Other login-backed adapters still
+require OpenCLI and its Chrome extension while they migrate. OpenCLI calls pass `--window
+background --site-session ephemeral --keep-tab false`; direct calls to old OpenCLI versions
+may still create visible tabs.
