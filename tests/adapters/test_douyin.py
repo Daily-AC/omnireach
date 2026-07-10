@@ -32,7 +32,7 @@ async def test_douyin_search_parses_opencli_json_array(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.douyin.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.douyin.shutil.which", lambda n: "/usr/bin/" + n)
 
     out = await DouyinAdapter().search("claude code", limit=3)
@@ -61,7 +61,7 @@ async def test_douyin_search_invokes_opencli_with_format_json(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.douyin.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.douyin.shutil.which", lambda n: "/usr/bin/" + n)
 
     await DouyinAdapter().search("claude", limit=5)
@@ -90,7 +90,7 @@ async def test_douyin_search_zero_likes_also_normalized_to_none(monkeypatch):
 
         return P()
 
-    monkeypatch.setattr("omnireach.adapters.douyin.asyncio.create_subprocess_exec", fake_exec)
+    monkeypatch.setattr("omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec)
     monkeypatch.setattr("omnireach.adapters.douyin.shutil.which", lambda n: "/usr/bin/" + n)
 
     out = await DouyinAdapter().search("x")
