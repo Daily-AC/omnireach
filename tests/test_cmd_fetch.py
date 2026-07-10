@@ -1,7 +1,7 @@
 """Tests for `omnireach fetch <url>` subcommand (v0.10, v0.10.1 additions)."""
 
 import json as _json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from click.testing import CliRunner
@@ -69,7 +69,7 @@ def test_fetch_via_jina_returns_response_text(monkeypatch):
         def __exit__(self, *a): pass
         def get(self, url, headers=None): return fake_resp
 
-    monkeypatch.setattr("omnireach.commands.fetch.httpx.Client", FakeClient)
+    monkeypatch.setattr("omnireach.fetcher.httpx.Client", FakeClient)
     out = _fetch_via_jina("https://example.com", timeout=10.0)
     assert "jina markdown" in out
 
@@ -85,7 +85,7 @@ def test_fetch_via_jina_4xx_raises(monkeypatch):
         def __exit__(self, *a): pass
         def get(self, url, headers=None): return fake_resp
 
-    monkeypatch.setattr("omnireach.commands.fetch.httpx.Client", FakeClient)
+    monkeypatch.setattr("omnireach.fetcher.httpx.Client", FakeClient)
     with pytest.raises(RuntimeError) as exc:
         _fetch_via_jina("https://example.com", timeout=10.0)
     assert "404" in str(exc.value)
@@ -97,12 +97,12 @@ def test_fetch_auto_falls_back_to_jina_when_http_is_blocked(monkeypatch):
         return "# Verify\n\n" + "此验证码用于确认请求不是自动程序 " * 30
     def fake_jina(url, timeout):
         return "# from jina\nfallback worked"
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_http", fake_http)
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_jina", fake_jina)
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_http", fake_http)
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_jina", fake_jina)
     runner = CliRunner()
     res = runner.invoke(main, ["fetch", "https://example.com", "--json"])
     assert res.exit_code == 0
-    json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
+    json_line = next((line for line in res.output.splitlines() if line.strip().startswith("{")), None)
     assert json_line is not None
     data = _json.loads(json_line)
     assert data["backend"] == "jina"
@@ -114,10 +114,10 @@ def test_fetch_explicit_crwl_backend_no_fallback(monkeypatch):
     """--backend crwl only tries crwl; if it fails, no jina fallback."""
     def fake_crwl(*a, **kw):
         raise RuntimeError("crwl 不在 PATH")
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_crwl", fake_crwl)
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_crwl", fake_crwl)
     runner = CliRunner()
     res = runner.invoke(main, ["fetch", "https://example.com", "--backend", "crwl", "--json"])
-    json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
+    json_line = next((line for line in res.output.splitlines() if line.strip().startswith("{")), None)
     assert json_line is not None
     data = _json.loads(json_line)
     assert data["backend"] is None
@@ -126,11 +126,11 @@ def test_fetch_explicit_crwl_backend_no_fallback(monkeypatch):
 
 
 def test_fetch_returns_envelope_with_url_and_backend(monkeypatch):
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_http",
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_http",
                         lambda url, timeout: "# hello")
     runner = CliRunner()
     res = runner.invoke(main, ["fetch", "https://example.com", "--json"])
-    json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
+    json_line = next((line for line in res.output.splitlines() if line.strip().startswith("{")), None)
     data = _json.loads(json_line)
     assert data["url"] == "https://example.com"
     assert data["backend"] == "http"
@@ -307,7 +307,7 @@ def test_fetch_via_http_extracts_readable_markdown(monkeypatch):
         def __exit__(self, *a): pass
         def get(self, url, headers=None): return fake_resp
 
-    monkeypatch.setattr("omnireach.commands.fetch.httpx.Client", FakeClient)
+    monkeypatch.setattr("omnireach.fetcher.httpx.Client", FakeClient)
     out = _fetch_via_http("https://example.com/story", timeout=10.0)
     assert "# Example story" in out
     assert "A useful paragraph with [a link](https://example.com/more)." in out
@@ -345,13 +345,13 @@ def test_v0101_fetch_wechat_url_auto_routes_to_opencli(monkeypatch):
         called["opencli"] = True
         return "# 文章 via opencli"
 
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_crwl", fake_crwl)
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_jina", fake_jina)
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_opencli_weixin", fake_opencli)
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_crwl", fake_crwl)
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_jina", fake_jina)
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_opencli_weixin", fake_opencli)
     runner = CliRunner()
     res = runner.invoke(main, ["fetch", "https://mp.weixin.qq.com/s/abc", "--json"])
     assert res.exit_code == 0
-    json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
+    json_line = next((line for line in res.output.splitlines() if line.strip().startswith("{")), None)
     data = _json.loads(json_line)
     assert data["backend"] == "opencli"
     assert "via opencli" in data["content_markdown"]
@@ -378,14 +378,14 @@ def test_v0101_fetch_wechat_url_explicit_backend_crwl_respects_user(monkeypatch)
         called["opencli"] = True
         return "should not be called"
 
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_crwl", fake_crwl)
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_opencli_weixin", fake_opencli)
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_crwl", fake_crwl)
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_opencli_weixin", fake_opencli)
     runner = CliRunner()
     res = runner.invoke(main, [
         "fetch", "https://mp.weixin.qq.com/s/abc", "--backend", "crwl", "--json",
     ])
     assert res.exit_code == 1
-    json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
+    json_line = next((line for line in res.output.splitlines() if line.strip().startswith("{")), None)
     data = _json.loads(json_line)
     assert called["crwl"] is True, "explicit --backend crwl must run crwl"
     assert called["opencli"] is False, "explicit --backend crwl must NOT run opencli"
@@ -399,12 +399,12 @@ def test_v0101_fetch_crwl_captcha_heuristic_flags_cloudflare(monkeypatch):
     def fake_crwl(url, timeout):
         return ("# Page\n\nJust a moment, Checking your browser " + "x" * 250)
 
-    monkeypatch.setattr("omnireach.commands.fetch._fetch_via_crwl", fake_crwl)
+    monkeypatch.setattr("omnireach.fetcher._fetch_via_crwl", fake_crwl)
     runner = CliRunner()
     res = runner.invoke(main, [
         "fetch", "https://example.com/article", "--backend", "crwl", "--json",
     ])
-    json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
+    json_line = next((line for line in res.output.splitlines() if line.strip().startswith("{")), None)
     data = _json.loads(json_line)
     assert res.exit_code == 1
     assert data["backend"] is None
@@ -423,12 +423,12 @@ def test_v0101_fetch_jina_captcha_heuristic_flags(monkeypatch):
         def __exit__(self, *a): pass
         def get(self, url, headers=None): return fake_resp
 
-    monkeypatch.setattr("omnireach.commands.fetch.httpx.Client", FakeClient)
+    monkeypatch.setattr("omnireach.fetcher.httpx.Client", FakeClient)
     runner = CliRunner()
     res = runner.invoke(main, [
         "fetch", "https://example.com/page", "--backend", "jina", "--json",
     ])
-    json_line = next((l for l in res.output.splitlines() if l.strip().startswith("{")), None)
+    json_line = next((line for line in res.output.splitlines() if line.strip().startswith("{")), None)
     data = _json.loads(json_line)
     assert res.exit_code == 1
     assert data["backend"] is None
@@ -437,16 +437,16 @@ def test_v0101_fetch_jina_captcha_heuristic_flags(monkeypatch):
 
 def test_fetch_json_failure_returns_nonzero_exit(monkeypatch):
     monkeypatch.setattr(
-        "omnireach.commands.fetch._fetch_via_http",
+        "omnireach.fetcher._fetch_via_http",
         lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("network down")),
     )
     monkeypatch.setattr(
-        "omnireach.commands.fetch._fetch_via_jina",
+        "omnireach.fetcher._fetch_via_jina",
         lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("reader down")),
     )
     runner = CliRunner()
     res = runner.invoke(main, ["fetch", "https://example.com", "--json"])
-    data = _json.loads(next(l for l in res.output.splitlines() if l.startswith("{")))
+    data = _json.loads(next(line for line in res.output.splitlines() if line.startswith("{")))
     assert res.exit_code == 1
     assert data["backend"] is None
     assert data["content_markdown"] == ""
