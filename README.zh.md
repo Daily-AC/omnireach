@@ -29,6 +29,8 @@ Chrome；支持的登录墙来源只在需要时通过后台临时 tab 复用你
 是 **1.2 倍**。查看[测试方法与边界](./docs/benchmarks/read-path-v0.12.md)，或直接核对
 [全部原始样本](./docs/benchmarks/read-path-v0.12.json)。
 
+![演示 — 真实 MCP fetch 与登录态小红书搜索，全程不新增可见 Chrome 窗口](./docs/assets/demo-fast-path.gif)
+
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
 

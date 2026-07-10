@@ -30,6 +30,8 @@ On the recorded machine, Playwright took **1.9x** as long on the cold path and *
 long with both runtimes warm. See the [method and limitations](./docs/benchmarks/read-path-v0.12.md)
 or inspect [every raw sample](./docs/benchmarks/read-path-v0.12.json).
 
+![demo — real MCP fetch and logged-in Xiaohongshu search without adding a visible Chrome window](./docs/assets/demo-fast-path.gif)
+
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
 
