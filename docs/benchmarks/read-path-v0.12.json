@@ -1,0 +1,94 @@
+{
+  "generated_at": "2026-07-10T10:50:36.509609Z",
+  "target_url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+  "repetitions": 5,
+  "command": "python scripts/benchmark_read_path.py --repeat 5 --json-out docs/benchmarks/read-path-v0.12.json --markdown-out docs/benchmarks/read-path-v0.12.md",
+  "environment": {
+    "os": "macOS-26.0.1-arm64-arm-64bit",
+    "architecture": "arm64",
+    "python": "3.12.13",
+    "omnireach": "0.12.0-alpha",
+    "playwright": "1.61.0",
+    "chrome": "149.0.7827.201"
+  },
+  "results": {
+    "omnireach_mcp_cold": {
+      "median_ms": 1383.86,
+      "min_ms": 1338.95,
+      "max_ms": 1431.74,
+      "samples_ms": [
+        1431.74,
+        1383.86,
+        1429.07,
+        1338.95,
+        1373.5
+      ]
+    },
+    "omnireach_mcp_warm": {
+      "median_ms": 1311.46,
+      "min_ms": 1255.25,
+      "max_ms": 1712.05,
+      "samples_ms": [
+        1255.25,
+        1311.46,
+        1352.6,
+        1712.05,
+        1263.1
+      ]
+    },
+    "playwright_chrome_cold": {
+      "median_ms": 3749.26,
+      "min_ms": 3296.85,
+      "max_ms": 4768.51,
+      "samples_ms": [
+        3749.26,
+        3811.85,
+        3606.72,
+        3296.85,
+        4768.51
+      ]
+    },
+    "playwright_chrome_warm": {
+      "median_ms": 1687.94,
+      "min_ms": 1530.79,
+      "max_ms": 1726.71,
+      "samples_ms": [
+        1698.92,
+        1624.73,
+        1726.71,
+        1530.79,
+        1687.94
+      ]
+    }
+  },
+  "content_characters": {
+    "omnireach_mcp_cold": [
+      734983,
+      734983,
+      734983,
+      734983,
+      734983
+    ],
+    "omnireach_mcp_warm": [
+      734983,
+      734983,
+      734983,
+      734983,
+      734983
+    ],
+    "playwright_chrome_cold": [
+      448944,
+      448944,
+      448944,
+      448944,
+      448944
+    ],
+    "playwright_chrome_warm": [
+      448944,
+      448944,
+      448944,
+      448944,
+      448944
+    ]
+  }
+}

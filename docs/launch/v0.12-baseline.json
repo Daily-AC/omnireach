@@ -1,0 +1,85 @@
+{
+  "captured_at": "2026-07-10T10:33:13Z",
+  "repository": {
+    "full_name": "Daily-AC/omnireach",
+    "url": "https://github.com/Daily-AC/omnireach",
+    "stars": 6,
+    "forks": 1,
+    "subscribers": 0,
+    "open_issues": 0,
+    "created_at": "2026-05-25T06:44:52Z",
+    "updated_at": "2026-07-10T09:11:56Z",
+    "pushed_at": "2026-07-10T09:10:33Z",
+    "default_branch": "main"
+  },
+  "traffic_14_day": {
+    "views": {
+      "count": 37,
+      "uniques": 27,
+      "daily": [
+        {"date": "2026-06-26", "count": 0, "uniques": 0},
+        {"date": "2026-06-27", "count": 0, "uniques": 0},
+        {"date": "2026-06-28", "count": 0, "uniques": 0},
+        {"date": "2026-06-29", "count": 1, "uniques": 1},
+        {"date": "2026-06-30", "count": 0, "uniques": 0},
+        {"date": "2026-07-01", "count": 0, "uniques": 0},
+        {"date": "2026-07-02", "count": 1, "uniques": 1},
+        {"date": "2026-07-03", "count": 0, "uniques": 0},
+        {"date": "2026-07-04", "count": 0, "uniques": 0},
+        {"date": "2026-07-05", "count": 0, "uniques": 0},
+        {"date": "2026-07-06", "count": 21, "uniques": 19},
+        {"date": "2026-07-07", "count": 7, "uniques": 4},
+        {"date": "2026-07-08", "count": 2, "uniques": 1},
+        {"date": "2026-07-09", "count": 5, "uniques": 3}
+      ]
+    },
+    "clones": {
+      "count": 174,
+      "uniques": 51,
+      "daily": [
+        {"date": "2026-06-26", "count": 1, "uniques": 1},
+        {"date": "2026-06-27", "count": 0, "uniques": 0},
+        {"date": "2026-06-28", "count": 3, "uniques": 2},
+        {"date": "2026-06-29", "count": 1, "uniques": 1},
+        {"date": "2026-06-30", "count": 7, "uniques": 6},
+        {"date": "2026-07-01", "count": 2, "uniques": 2},
+        {"date": "2026-07-02", "count": 1, "uniques": 1},
+        {"date": "2026-07-03", "count": 4, "uniques": 3},
+        {"date": "2026-07-04", "count": 3, "uniques": 3},
+        {"date": "2026-07-05", "count": 0, "uniques": 0},
+        {"date": "2026-07-06", "count": 78, "uniques": 20},
+        {"date": "2026-07-07", "count": 63, "uniques": 4},
+        {"date": "2026-07-08", "count": 4, "uniques": 4},
+        {"date": "2026-07-09", "count": 7, "uniques": 7}
+      ]
+    },
+    "referrers": [
+      {"name": "github.com", "count": 9, "uniques": 6}
+    ],
+    "popular_paths": [
+      {"path": "/Daily-AC/omnireach", "count": 22, "uniques": 19},
+      {"path": "/Daily-AC/omnireach/releases", "count": 5, "uniques": 5},
+      {"path": "/Daily-AC/omnireach/issues", "count": 4, "uniques": 4},
+      {"path": "/Daily-AC/omnireach/blob/main/README.zh.md", "count": 3, "uniques": 3},
+      {"path": "/Daily-AC/omnireach/branches", "count": 1, "uniques": 1},
+      {"path": "/Daily-AC/omnireach/pull/26", "count": 1, "uniques": 1},
+      {"path": "/Daily-AC/omnireach/pulls", "count": 1, "uniques": 1}
+    ]
+  },
+  "stars": [
+    {"starred_at": "2026-05-26T11:45:15Z", "user": "menoking"},
+    {"starred_at": "2026-05-26T13:12:57Z", "user": "Daily-AC"},
+    {"starred_at": "2026-06-10T05:12:44Z", "user": "kakawaa"},
+    {"starred_at": "2026-06-14T06:02:39Z", "user": "walaqi"},
+    {"starred_at": "2026-07-06T13:55:02Z", "user": "ANNNIEEEE10"},
+    {"starred_at": "2026-07-08T02:49:59Z", "user": "cherotichsxy-hub"}
+  ],
+  "latest_release": {
+    "tag": "v0.11.0-alpha",
+    "name": "v0.11.0-alpha - Senses/Eyes repositioning + AI-native install",
+    "published_at": "2026-06-22T08:09:15Z",
+    "url": "https://github.com/Daily-AC/omnireach/releases/tag/v0.11.0-alpha",
+    "assets": [],
+    "asset_downloads": 0
+  }
+}

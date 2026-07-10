@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "omnireach"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 description = "Search & read the login-walled Chinese internet for your AI agent — 微信公众号/小红书/抖音/B站 + Twitter/Reddit/HN/YouTube, one CLI, one JSON schema. Zero-config WeChat search."
 readme = "README.md"
 requires-python = ">=3.10"
