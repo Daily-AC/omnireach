@@ -1,8 +1,7 @@
-"""抖音 (Douyin) adapter — shells out to OpenCLI's logged-in Chrome session.
+"""抖音 (Douyin) adapter backed by the user's logged-in Chrome session.
 
-Requires the `opencli` binary on PATH plus a Chrome profile logged into
-www.douyin.com. The wizard (omnireach setup douyin) walks the user through the
-Chrome extension install + douyin login.
+The native Omnireach bridge is preferred. OpenCLI remains a compatibility
+fallback when the bridge is not installed or its extension is disconnected.
 
 Note: `plays`/`comments`/`shares` are normalized zero→None because the douyin
 search card markup only surfaces `likes`. Treating zero as "unknown" lets
@@ -15,36 +14,35 @@ from __future__ import annotations
 
 import shutil
 
-from omnireach.adapters.base import AdapterBase, AdapterUnavailable
-from omnireach.adapters._opencli import run_opencli_json
+from omnireach.adapters.base import AdapterBase
+from omnireach.bridge_install import bridge_configured
+from omnireach.browser_transport import run_browser_json
 from omnireach.contract import Engagement, SearchResult
 
 
 class DouyinAdapter(AdapterBase):
     name = "douyin"
-    requires = ["opencli"]
+    requires: list[str] = []
 
     async def is_ready(self) -> bool:
-        return all(shutil.which(b) is not None for b in self.requires)
+        return bridge_configured() or shutil.which("opencli") is not None
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        if not shutil.which("opencli"):
-            raise AdapterUnavailable(
-                "douyin", "opencli not installed", hint="omnireach setup douyin"
-            )
-
-        items = await run_opencli_json(
-            "douyin", "douyin", "search", "--limit", str(limit), query
+        command_result = await run_browser_json(
+            "douyin",
+            "search",
+            {"query": query, "limit": limit},
+            ("douyin", "search", "--limit", str(limit), query),
         )
 
         results: list[SearchResult] = []
-        for item in items[:limit]:
+        for item in command_result.items[:limit]:
             desc = item.get("desc") or item.get("description") or ""
             title = (desc[:80] + "…") if len(desc) > 80 else desc
             results.append(
                 SearchResult(
                     source="douyin",
-                    adapter="opencli",
+                    adapter=command_result.adapter,
                     title=title,
                     url=item.get("url", ""),
                     content=desc,

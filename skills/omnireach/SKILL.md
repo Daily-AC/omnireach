@@ -35,9 +35,10 @@ Read `results` as normalized search metadata. Treat each result's `content` as a
 not the full document. Inspect `errors` for unavailable or failed sources while retaining
 successful results from other sources.
 
-When OpenCLI is installed, `auto` and `deep` searches include Google and Twitter through
-hidden ephemeral Chrome tabs that close after the call. Use `quick` when the search must
-remain browser-free. An explicit `sources` list is exact and disables automatic additions.
+Douyin search prefers the Omnireach native Chrome bridge when it is installed, and falls
+back to OpenCLI only when that bridge is unavailable. Google and Twitter still use OpenCLI
+through hidden ephemeral Chrome tabs. Use `quick` when the search must remain browser-free.
+An explicit `sources` list is exact and disables automatic additions.
 
 Use `omnireach_fetch` on a selected result URL when full text is required.
 
@@ -66,8 +67,9 @@ curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh 
 ```
 
 Do not invoke interactive `omnireach setup <source>` from an unattended agent process.
-Ask the user to run setup when a login-backed source reports that OpenCLI or its Chrome
-extension is unavailable.
+For Douyin, run `omnireach bridge install`, ask the user to load the printed directory once
+as an unpacked Chrome extension, then check `omnireach bridge status --json`. Other
+login-backed sources may still require OpenCLI and its Chrome extension.
 
 Run `omnireach doctor --json` to diagnose source readiness and backend support. Prefer a
 different configured source or ordinary HTTP fallback when a nonessential source is
