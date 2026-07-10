@@ -11,6 +11,11 @@ from omnireach.bridge_install import (
     bridge_paths,
     install_extension,
 )
+from omnireach.native_bridge import (
+    NativeBridgeCommandError,
+    NativeBridgeUnavailable,
+    probe_native_bridge,
+)
 
 
 def _emit(payload: dict[str, object], json_out: bool) -> None:
@@ -58,11 +63,22 @@ def bridge_path_cmd(json_out: bool) -> None:
 def bridge_status_cmd(json_out: bool) -> None:
     paths = bridge_paths()
     configured = bridge_configured()
+    connected = False
+    error = ""
+    details: dict[str, object] = {}
+    if configured:
+        try:
+            details = probe_native_bridge()
+            connected = True
+        except (NativeBridgeUnavailable, NativeBridgeCommandError) as exc:
+            error = str(exc)
     _emit(
         {
             "installed": configured,
-            "connected": False,
+            "connected": connected,
             "extension_dir": str(paths.extension_dir),
+            "extension_version": details.get("extensionVersion"),
+            "error": error,
         },
         json_out,
     )
