@@ -35,6 +35,9 @@ curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh 
 
 这条命令会安装 CLI **并且**注册 Claude Code Skill（下次会话自动发现）。零配置源 —— HackerNews、RSS、微信（Sogou 路径）、B站 —— 立即可用。其他源各需一次性配置步骤。
 
+以 Claude Code plugin 方式安装 repo 时，还会自动注册内置 MCP server。单独运行一键
+安装脚本时，即使客户端没有加载 plugin MCP 配置，skill 仍可回退到 CLI。
+
 ---
 
 ## 你能得到什么
@@ -47,6 +50,38 @@ Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— �
 
 **3. WebSearch 不可用时照样能搜。**
 在 proxy / 中转站 / Bedrock / Vertex-Claude-3.x 等内置 WebSearch server tool 不可用的环境下，omnireach 在客户端直接实现搜索，绕过两层 gate，把搜索能力还给 agent。
+
+---
+
+## Agent 快路径 —— MCP 优先于 Playwright
+
+plugin 暴露两个由模型直接调用的工具：
+
+- `omnireach_search`：联网研究与平台搜索
+- `omnireach_fetch`：把 HTTP/HTTPS URL 读取为 Markdown
+
+二者由零新增依赖的 stdio 命令提供：
+
+```bash
+omnireach mcp
+```
+
+不通过 plugin 加载的 MCP 客户端可使用标准配置：
+
+```json
+{
+  "mcpServers": {
+    "omnireach": {
+      "command": "omnireach",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+只读任务优先使用这两个工具，不要启动 Playwright。普通网页 fetch 完全不启动
+Chrome；登录墙 adapter 可能通过后台临时 tab 继承现有 Chrome 登录态，调用结束立即
+释放。只有点击、表单、上传下载、截图、视觉断言或未支持的交互流程才使用 Playwright。
 
 ---
 
@@ -99,6 +134,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach fetch <url> --backend jina` | 强制走 Jina Reader SaaS (零本地依赖) |
 | `omnireach fetch <url> --backend crwl` | 显式选择本地 Crawl4AI |
 | `omnireach fetch <url> --backend opencli` | 强制走 OpenCLI weixin 登录态路径 (v0.10.1+) |
+| `omnireach mcp` | 通过 MCP stdio 提供 `omnireach_search` 与 `omnireach_fetch` |
 | `omnireach init` | 写默认 `~/.omnireach/preferences.toml` |
 | `omnireach sources` | 列出所有源 + 状态 |
 | `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 |
@@ -134,7 +170,8 @@ omnireach search --on wechat --json "claude 4.7" \
 
 ## Agent 调用约定
 
-作为 agent 调用 omnireach 时，**永远显式拿 JSON**，防止 rich 表格 wrap 让你抠不到字段：
+Agent 应优先调用 `omnireach_search` 做搜索，再调用 `omnireach_fetch` 读取选中的
+URL。只有 MCP 不可用时才回退 CLI；走 CLI 时，**永远显式拿 JSON**：
 
 ```bash
 # 方式 1：每条命令加 --json

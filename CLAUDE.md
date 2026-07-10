@@ -42,7 +42,7 @@ omnireach 是给**任何 Claude Code WebSearch 拿不到结果**的用户的工�
 - OpenAI 兼容中转站用户: **上游没实现 server tool 处理** → 失败
 - 显式 Bedrock 用户 / Vertex Claude 3.x: 客户端 isEnabled 直接关
 
-**Why omnireach 不止补缺**: 即使 WebSearch 可用 (firstParty 直连), 它也搜不全 — Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok 这些纵向源服务端 WebSearch 几乎都够不着。omnireach 三重价值: (1) 给客户端 gate 关掉的用户**补缺**; (2) 给上游不实现 server tool 的用户**补缺**; (3) 给 WebSearch 可用但搜不到纵向源的用户**补纵向**。CLI + Claude Code Skill 双形态。
+**Why omnireach 不止补缺**: 即使 WebSearch 可用 (firstParty 直连), 它也搜不全 — Twitter / Reddit / 小红书 / 微信公众号 / 抖音 / B站 / TikTok 这些纵向源服务端 WebSearch 几乎都够不着。omnireach 三重价值: (1) 给客户端 gate 关掉的用户**补缺**; (2) 给上游不实现 server tool 的用户**补缺**; (3) 给 WebSearch 可用但搜不到纵向源的用户**补纵向**。CLI + MCP + Claude Code Skill 三形态。
 
 **历史措辞修订 (2026-06-03 三轮)**:
 - 第一轮 (上午): README/SKILL/本文件痛点写"中转站丢 WebSearch" — narrow
@@ -57,6 +57,8 @@ omnireach 是给**任何 Claude Code WebSearch 拿不到结果**的用户的工�
 
 - 上游 binary 直调: `yt-dlp` (youtube) / `gh` (github) / Python `feedparser` (rss)
 - OpenCLI bridge (Node + 登录态 Chrome) → reddit / twitter / xiaohongshu / tiktok / douyin
+- Application services: `omnireach.service.search` + `omnireach.fetcher.fetch`，CLI 与 MCP 共用同一 envelope 和 backend 逻辑
+- MCP stdio: `omnireach mcp` 零新增依赖实现 MCP 2025-06-18，暴露 `omnireach_search` / `omnireach_fetch`
 - HN 直接调 Algolia Search API（无上游）
 - Boosters (Tavily / Brave / Perplexity / Exa) → httpx 调付费 API，env var 检测式接入
 - Agent-Reach **完全可选**（v0.5 起）: 仅作 `setup --batch` 一键引导 installer，runtime 不依赖
@@ -143,6 +145,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - e2e CI matrix 装真实 yt-dlp/gh/opencli docker images
 - 公开发布到 Claude Marketplace
 - **fetch 当前架构 (2026-07-10)**: 默认普通网页走 repo 自带的轻量 HTTP + HTML-to-Markdown，遇到验证页或提取失败回退 Jina；`mp.weixin.qq.com` 走 OpenCLI 登录态后台临时 tab；`crwl` 只保留显式 `--backend crwl` opt-in。OpenCLI adapter 全部显式传 `--window background --site-session ephemeral --keep-tab false`，并在 dispatcher 取消时回收子进程。基础依赖已移除 `lxml/cssselect`。
+- **Agent fast path (2026-07-10)**: 只读联网任务先用 MCP `omnireach_search` / `omnireach_fetch`，MCP 不可用才回退 CLI；Playwright 只保留给点击、表单、上传下载、截图、视觉验证和未支持的交互流程。`.mcp.json` 在 plugin root 自动注册 `omnireach mcp`。
 - (Apache-2.0 License 切换问题不再适用 — monorepo 模型下整个仓库统一 MIT)
 
 ## 外部 issue 历史

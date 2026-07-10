@@ -35,6 +35,10 @@ curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh 
 
 This installs the CLI **and** registers the Claude Code skill (auto-discovered next session). Zero-config sources — HackerNews, RSS, 微信 (Sogou path), B站 — work immediately. Other sources open up after a one-time setup step each.
 
+Installing the repository as a Claude Code plugin also registers the bundled MCP server.
+The standalone installer keeps the CLI fallback available even when the client has not
+loaded plugin MCP configuration.
+
 ---
 
 ## What you get
@@ -47,6 +51,39 @@ Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok — login-wall
 
 **3. Works even when WebSearch doesn't.**
 On proxy / relay-station / Bedrock / Vertex-Claude-3.x setups where the built-in WebSearch server tool isn't available, omnireach gives search back — it runs entirely on the client side, bypassing both gate layers.
+
+---
+
+## Agent fast path — MCP before Playwright
+
+The plugin exposes two model-controlled tools:
+
+- `omnireach_search` for web research and platform search
+- `omnireach_fetch` for reading an HTTP or HTTPS URL as Markdown
+
+Both tools are served by the dependency-free stdio command:
+
+```bash
+omnireach mcp
+```
+
+For MCP clients that do not load the plugin, register it with:
+
+```json
+{
+  "mcpServers": {
+    "omnireach": {
+      "command": "omnireach",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Use these tools before Playwright for read-only work. Ordinary page fetches do not start
+Chrome. Login-backed adapters may use the user's existing Chrome session through a hidden,
+ephemeral tab that is released after the call. Keep Playwright for clicks, forms, uploads,
+downloads, screenshots, visual assertions, and unsupported interactive workflows.
 
 ---
 
@@ -99,6 +136,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach fetch <url> --backend jina` | Force Jina Reader SaaS (zero local deps) |
 | `omnireach fetch <url> --backend crwl` | Explicitly opt into local Crawl4AI |
 | `omnireach fetch <url> --backend opencli` | Force OpenCLI wechat logged-in path (v0.10.1+) |
+| `omnireach mcp` | Serve `omnireach_search` and `omnireach_fetch` over MCP stdio |
 | `omnireach init` | Write default `~/.omnireach/preferences.toml` |
 | `omnireach sources` | List all sources + tier status |
 | `omnireach setup <source>` | Guided setup for a 🟡 / 🔴 source |
@@ -134,7 +172,9 @@ omnireach search --on wechat --json "claude 4.7" \
 
 ## Agent calling convention
 
-When calling omnireach from an agent, **always request JSON explicitly** to prevent rich-table output from wrapping fields you need:
+Prefer the MCP tools: call `omnireach_search` for research, then
+`omnireach_fetch` for selected URLs. Fall back to the CLI only when MCP is unavailable.
+When using that fallback, **always request JSON explicitly**:
 
 ```bash
 # Option 1: explicit flag per command
