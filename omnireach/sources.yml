@@ -82,7 +82,7 @@
   query_hints: [google, "谷歌", "网页搜索"]
   default_in_auto: false
   trust: 0.85
-  timeout_seconds: 15
+  timeout_seconds: 60
   deps:
     auto:
       - { kind: npm, name: "github:Daily-AC/OpenCLI" }
@@ -97,7 +97,7 @@
   # Browser-backed sources stay opt-in so auto fanout never opens Chrome tabs.
   default_in_auto: false
   trust: 0.70
-  timeout_seconds: 20
+  timeout_seconds: 60
   deps:
     auto:
       - { kind: npm, name: "github:Daily-AC/OpenCLI" }
@@ -112,7 +112,7 @@
   query_hints: [twitter, "x.com", "推特"]
   default_in_auto: false
   trust: 0.60
-  timeout_seconds: 30
+  timeout_seconds: 60
   deps:
     auto:
       - { kind: npm, name: "github:Daily-AC/OpenCLI" }
@@ -127,7 +127,7 @@
   query_hints: ["小红书", xiaohongshu, "种草", "笔记"]
   default_in_auto: false
   trust: 0.50
-  timeout_seconds: 30
+  timeout_seconds: 60
   deps:
     auto:
       - { kind: npm, name: "github:Daily-AC/OpenCLI" }
@@ -142,7 +142,7 @@
   query_hints: [tiktok, "海外短视频"]
   default_in_auto: false
   trust: 0.55
-  timeout_seconds: 30
+  timeout_seconds: 60
   deps:
     auto:
       - { kind: npm, name: "github:Daily-AC/OpenCLI" }
@@ -157,7 +157,7 @@
   query_hints: ["抖音", douyin]
   default_in_auto: false
   trust: 0.55
-  timeout_seconds: 30
+  timeout_seconds: 60
   deps:
     auto: []
     manual:

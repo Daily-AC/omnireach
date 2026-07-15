@@ -3,7 +3,11 @@ import json
 
 import pytest
 
-from omnireach.adapters._opencli import OpenCLICommandError, run_opencli_json
+from omnireach.adapters._opencli import (
+    OpenCLICommandError,
+    opencli_profile,
+    run_opencli_json,
+)
 from omnireach.adapters.base import AdapterUnavailable
 
 
@@ -140,3 +144,30 @@ async def test_opencli_bridge_missing_binary_stays_unavailable(monkeypatch):
 
     with pytest.raises(AdapterUnavailable, match="opencli not installed"):
         await run_opencli_json("douyin", "douyin", "search", "gpt5.6")
+
+
+async def test_opencli_profile_is_passed_only_to_child_environment(monkeypatch):
+    captured = {}
+
+    async def fake_exec(*args, **kwargs):
+        captured.update(kwargs)
+
+        class P:
+            returncode = 0
+
+            async def communicate(self):
+                return b"[]", b""
+
+        return P()
+
+    monkeypatch.setattr("omnireach.adapters._opencli.shutil.which", lambda _: "/bin/opencli")
+    monkeypatch.setattr(
+        "omnireach.adapters._opencli.asyncio.create_subprocess_exec", fake_exec
+    )
+    monkeypatch.delenv("OPENCLI_PROFILE", raising=False)
+
+    with opencli_profile("934ve3jn"):
+        await run_opencli_json("reddit", "reddit", "search", "python")
+
+    assert captured["env"]["OPENCLI_PROFILE"] == "934ve3jn"
+    assert "OPENCLI_PROFILE" not in __import__("os").environ
