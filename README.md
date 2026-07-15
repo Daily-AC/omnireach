@@ -148,6 +148,9 @@ omnireach search --on wechat --json "claude 4.7" \
 |---|---|
 | `omnireach search "<query>"` | Search; connected OpenCLI automatically adds Google + Twitter |
 | `omnireach search --on twitter,reddit "..."` | Target specific sources |
+| `omnireach search --sources twitter,reddit "..."` | Alias for `--on`, matching the MCP argument name |
+| `omnireach search --profile <name> "..."` | Select an OpenCLI Browser Bridge profile for this search |
+| `omnireach search --timeout 90 "..."` | Override every source timeout; browser-backed heavy sources default to 60 seconds |
 | `omnireach search --mode quick "..."` | Quick mode — HN only, no browser-backed sources |
 | `omnireach search --mode deep "..."` | Deep mode — all ready sources |
 | `omnireach search --json "..."` | Explicit JSON output |
@@ -209,7 +212,7 @@ omnireach fetch  --json "<url>"
 export OMNIREACH_FORCE_JSON=1
 ```
 
-The `not isatty()` auto-JSON added in v0.9.2 covers most cases, but some agent terminals (e.g. Antigravity) allocate a real PTY to subprocesses making `isatty()=True`. Explicit `--json` or the env var always works.
+The `not isatty()` auto-JSON added in v0.9.2 covers most cases, but some agent terminals (e.g. Antigravity) allocate a real PTY to subprocesses making `isatty()=True`. Explicit `--json` or the env var always works. When `--json` is present, CLI usage errors are also emitted as a JSON error envelope on stdout. Fetch rejects short verification and login-wall placeholders instead of treating any non-empty body as success; Reddit failures include a logged-in OpenCLI fallback hint.
 
 Full skill contract: [`skills/omnireach/SKILL.md`](https://github.com/Daily-AC/omnireach/blob/main/skills/omnireach/SKILL.md)
 

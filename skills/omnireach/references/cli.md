@@ -28,13 +28,15 @@ omnireach search --json "Claude Code prompt caching"
 
 With OpenCLI installed, normal and deep searches automatically include Google and Twitter
 through hidden ephemeral Chrome tabs. `--mode quick` stays browser-free. `--on` is exact and
-does not add either source unless requested.
+does not add either source unless requested. `--sources` is an alias for `--on`, matching the
+MCP argument name.
 
 Restrict sources:
 
 ```bash
 omnireach search --on reddit,xiaohongshu --limit 5 --json "Claude Code"
 omnireach search --on wechat --json "AI 编程"
+omnireach search --sources reddit --profile work --timeout 90 --json "Claude Code"
 ```
 
 Set up the native Douyin bridge once:
@@ -80,6 +82,10 @@ The search envelope contains:
 Fetch a result URL to obtain full content; search `content` is intentionally capped as a
 snippet.
 
+Browser-backed heavy sources default to 60 seconds for cold starts. An explicit `--timeout`
+overrides every selected source. Use `--profile <name>` when `omnireach doctor --json` reports
+multiple connected OpenCLI Browser Bridge profiles.
+
 ## Fetch
 
 Use host-aware automatic routing:
@@ -111,6 +117,9 @@ Backend behavior:
 
 Use `--backend <name>` only for diagnosis or an explicit user request. Fetch exits nonzero
 when every backend fails, even though it still prints the JSON envelope.
+Known verification and login-wall placeholders are recorded in `errors` and never returned as
+successful content. Reddit verification errors suggest `opencli reddit read <url> --format md`
+as a logged-in fallback.
 
 ## MCP Server Command
 

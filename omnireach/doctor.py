@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
 
+from omnireach.bridge_install import bridge_configured
+from omnireach.native_bridge import (
+    NativeBridgeCommandError,
+    NativeBridgeUnavailable,
+    probe_native_bridge,
+)
 from omnireach.registry import load_registry
 
 
@@ -41,6 +48,13 @@ class WechatBackendStatus:
     """
 
     tool: str
+    ok: bool
+    detail: str
+    fix_hint: str = ""
+
+
+@dataclass(frozen=True)
+class OpenCLIProbe:
     ok: bool
     detail: str
     fix_hint: str = ""
@@ -171,10 +185,128 @@ FREE_BACKEND_DETAIL = {
     "bilibili": "B站官方 search API",
 }
 
+OPENCLI_SOURCE_IDS = {
+    "google", "reddit", "twitter", "xiaohongshu", "tiktok", "douyin"
+}
+
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+
+def run_opencli_doctor() -> OpenCLIProbe:
+    """Probe the Browser Bridge connection, not merely the OpenCLI binary."""
+    if not shutil.which("opencli"):
+        return OpenCLIProbe(
+            ok=False,
+            detail="OpenCLI 不在 PATH",
+            fix_hint="npm i -g github:Daily-AC/OpenCLI",
+        )
+    try:
+        proc = subprocess.run(
+            ["opencli", "doctor"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except subprocess.TimeoutExpired:
+        return OpenCLIProbe(
+            ok=False,
+            detail="`opencli doctor` timeout (>15s)",
+            fix_hint="运行 `opencli doctor` 检查 Browser Bridge",
+        )
+    except OSError as exc:
+        return OpenCLIProbe(
+            ok=False,
+            detail=f"`opencli doctor` 启动失败: {exc}",
+            fix_hint="重新安装 OpenCLI",
+        )
+
+    output = _ANSI_ESCAPE.sub("", (proc.stdout or "") + (proc.stderr or ""))
+    folded = output.casefold()
+    if (
+        "multiple browser bridge profiles" in folded
+        or "no default profile was selected" in folded
+    ):
+        return OpenCLIProbe(
+            ok=False,
+            detail="OpenCLI Browser Bridge 多 profile 冲突",
+            fix_hint=(
+                "运行 `opencli profile list` 后 `opencli profile use <name>`，"
+                "或搜索时传 `--profile <name>`"
+            ),
+        )
+    if "[missing] extension" in folded or "[fail] connectivity" in folded:
+        return OpenCLIProbe(
+            ok=False,
+            detail="OpenCLI Browser Bridge 未连接或连通性检查失败",
+            fix_hint="打开 Chrome 扩展后运行 `opencli doctor`",
+        )
+    if proc.returncode != 0:
+        last_line = next(
+            (line.strip() for line in reversed(output.splitlines()) if line.strip()),
+            f"exit {proc.returncode}",
+        )
+        return OpenCLIProbe(
+            ok=False,
+            detail=f"`opencli doctor` 失败: {last_line[:200]}",
+            fix_hint="运行 `opencli doctor` 查看完整诊断",
+        )
+    return OpenCLIProbe(ok=True, detail="opencli doctor 通过，Browser Bridge 可用")
+
+
+def run_douyin_doctor(opencli_probe: OpenCLIProbe) -> SourceStatus:
+    """Probe the native bridge first, then report the OpenCLI fallback."""
+    if bridge_configured():
+        try:
+            details = probe_native_bridge()
+        except (NativeBridgeUnavailable, NativeBridgeCommandError) as exc:
+            if opencli_probe.ok:
+                return SourceStatus(
+                    "douyin",
+                    "heavy",
+                    ok=True,
+                    detail=(
+                        f"原生 Chrome bridge 不可用 ({exc}); "
+                        "OpenCLI fallback 可用"
+                    ),
+                )
+            return SourceStatus(
+                "douyin",
+                "heavy",
+                ok=False,
+                detail=f"原生 Chrome bridge 不可用 ({exc}); {opencli_probe.detail}",
+                fix_hint=(
+                    "运行 `omnireach bridge status --json`; "
+                    f"{opencli_probe.fix_hint}"
+                ),
+            )
+        version = details.get("extensionVersion") or "unknown"
+        return SourceStatus(
+            "douyin",
+            "heavy",
+            ok=True,
+            detail=f"原生 Chrome bridge 已连接 (extension {version})",
+        )
+    if opencli_probe.ok:
+        return SourceStatus(
+            "douyin", "heavy", ok=True, detail="OpenCLI fallback 可用"
+        )
+    return SourceStatus(
+        "douyin",
+        "heavy",
+        ok=False,
+        detail=f"原生 Chrome bridge 未安装; {opencli_probe.detail}",
+        fix_hint="omnireach bridge install",
+    )
+
 
 async def run_doctor() -> list[SourceStatus]:
     reg = load_registry()
     statuses: list[SourceStatus] = []
+    opencli_probe = (
+        run_opencli_doctor()
+        if any(spec.id in OPENCLI_SOURCE_IDS for spec in reg.sources)
+        else None
+    )
     for spec in reg.sources:
         sid = spec.id
         if spec.tier == "wip":
@@ -220,15 +352,23 @@ async def run_doctor() -> list[SourceStatus]:
                     detail=f"{env} 未配",
                     fix_hint=f"omnireach setup {sid}"))
             continue
-        if sid in ("reddit", "twitter", "xiaohongshu", "tiktok", "douyin"):
-            if shutil.which("opencli"):
-                statuses.append(SourceStatus(
-                    sid, spec.tier, ok=True, detail="opencli 在 PATH"
-                ))
-            else:
-                statuses.append(SourceStatus(sid, spec.tier, ok=False,
-                    detail="OpenCLI 不在 PATH",
-                    fix_hint=f"omnireach setup {sid}"))
+        if sid == "douyin":
+            assert opencli_probe is not None
+            statuses.append(run_douyin_doctor(opencli_probe))
+            continue
+        if sid in OPENCLI_SOURCE_IDS:
+            assert opencli_probe is not None
+            statuses.append(SourceStatus(
+                sid,
+                spec.tier,
+                ok=opencli_probe.ok,
+                detail=opencli_probe.detail,
+                fix_hint=(
+                    opencli_probe.fix_hint
+                    if shutil.which("opencli")
+                    else f"omnireach setup {sid}"
+                ),
+            ))
             continue
         statuses.append(SourceStatus(sid, spec.tier, ok=False,
             detail="未实现", fix_hint=""))

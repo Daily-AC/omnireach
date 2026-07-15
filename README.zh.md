@@ -144,6 +144,9 @@ omnireach search --on wechat --json "claude 4.7" \
 |---|---|
 | `omnireach search "<query>"` | 搜索；已连接 OpenCLI 时自动加入 Google + Twitter |
 | `omnireach search --on twitter,reddit "..."` | 指定源 |
+| `omnireach search --sources twitter,reddit "..."` | `--on` 的别名，与 MCP 参数名一致 |
+| `omnireach search --profile <name> "..."` | 为本次搜索选择 OpenCLI Browser Bridge profile |
+| `omnireach search --timeout 90 "..."` | 覆盖全部源的 timeout；浏览器 heavy 源默认 60 秒 |
 | `omnireach search --mode quick "..."` | 只查 HN，不调用浏览器源 |
 | `omnireach search --mode deep "..."` | 查所有就绪源 |
 | `omnireach search --json "..."` | 显式 JSON 输出 |
@@ -204,7 +207,7 @@ omnireach fetch  --json "<url>"
 export OMNIREACH_FORCE_JSON=1
 ```
 
-v0.9.2 加的 `not isatty()` 自动 JSON 在大多数场景够用，但有些 agent 终端（如 Antigravity）给子进程分配真 PTY 让 `isatty()=True`，自动检测失效 —— 显式 `--json` 或 env var 是 always-works 保险。
+v0.9.2 加的 `not isatty()` 自动 JSON 在大多数场景够用，但有些 agent 终端（如 Antigravity）给子进程分配真 PTY 让 `isatty()=True`，自动检测失效 —— 显式 `--json` 或 env var 是 always-works 保险。只要带 `--json`，CLI 参数错误也会从 stdout 输出 JSON error envelope。fetch 会拒绝短验证页和登录墙占位内容，不再把“非空”直接算成功；Reddit 验证墙错误会给出登录态 OpenCLI fallback。
 
 完整 Skill 契约：[`skills/omnireach/SKILL.md`](./skills/omnireach/SKILL.md)
 

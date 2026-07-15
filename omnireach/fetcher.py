@@ -34,6 +34,12 @@ CLOUDFLARE_CHALLENGE_SIGNALS = (
     "security verification",
 )
 
+SHORT_CHALLENGE_SIGNALS = (
+    "please wait for verification",
+    "verify you are human",
+    "verification required",
+)
+
 HTTP_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -51,10 +57,17 @@ def _host_of(url: str) -> str:
         return ""
 
 
-def _looks_like_captcha(markdown: str) -> tuple[bool, str | None]:
+def _looks_like_captcha(
+    markdown: str,
+    url: str | None = None,
+) -> tuple[bool, str | None]:
+    folded = markdown.casefold()
+    if len(markdown) < 1000:
+        for signal in SHORT_CHALLENGE_SIGNALS:
+            if signal in folded:
+                return True, signal
     if len(markdown) < 200:
         return False, None
-    folded = markdown.casefold()
     for keyword in CAPTCHA_KEYWORDS:
         if keyword.casefold() in folded:
             return True, keyword
@@ -74,6 +87,16 @@ def _looks_like_captcha(markdown: str) -> tuple[bool, str | None]:
         )
         return True, keyword
     return False, None
+
+
+def _challenge_fallback_hint(url: str) -> str:
+    host = _host_of(url)
+    if host == "reddit.com" or host.endswith(".reddit.com"):
+        return (
+            "; fallback: `opencli reddit read <url> --format md` "
+            "uses the logged-in Chrome session"
+        )
+    return ""
 
 
 def _now_iso() -> str:
@@ -212,11 +235,12 @@ def fetch(
     for name in _resolve_backends(url, backend):
         try:
             candidate = backends[name](url, timeout)
-            suspicious, keyword = _looks_like_captcha(candidate)
+            suspicious, keyword = _looks_like_captcha(candidate, url=url)
             if suspicious:
                 errors.append(
                     f"{name}: captcha_suspected: response contains "
                     f"verification-page keyword '{keyword}'"
+                    f"{_challenge_fallback_hint(url)}"
                 )
                 continue
             content = candidate

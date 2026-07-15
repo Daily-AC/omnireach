@@ -73,6 +73,31 @@ def test_search_tool_returns_structured_and_text_content(monkeypatch):
     assert result["isError"] is False
 
 
+def test_search_tool_omits_timeout_by_default_and_passes_profile(monkeypatch):
+    captured = {}
+
+    async def fake_search(query, **kwargs):
+        from omnireach.contract import SearchEnvelope
+
+        captured.update(kwargs)
+        return SearchEnvelope(query=query, ts="2026-07-15T00:00:00Z")
+
+    monkeypatch.setattr("omnireach.mcp_server.search", fake_search)
+    response = handle_message({
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "tools/call",
+        "params": {
+            "name": "omnireach_search",
+            "arguments": {"query": "q", "profile": "934ve3jn"},
+        },
+    })
+
+    assert "error" not in response
+    assert "timeout" not in captured
+    assert captured["profile"] == "934ve3jn"
+
+
 def test_fetch_exhaustion_is_a_tool_error(monkeypatch):
     from omnireach.contract import FetchEnvelope
 
