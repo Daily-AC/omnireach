@@ -6,6 +6,7 @@ import os
 import shutil
 
 from omnireach.contract import SearchEnvelope, SourceError
+from omnireach.adapters._opencli import opencli_profile
 from omnireach.dispatcher import Dispatcher
 from omnireach.normalizer import build_envelope
 from omnireach.registry import Registry, load_registry
@@ -70,7 +71,8 @@ async def search(
     sources: list[str] | None = None,
     mode: str = "auto",
     limit: int = 10,
-    timeout: float = 30.0,
+    timeout: float | None = None,
+    profile: str | None = None,
 ) -> SearchEnvelope:
     """Search routed sources and return the stable domain envelope."""
     registry = load_registry()
@@ -106,13 +108,18 @@ async def search(
             )
 
     dispatcher = Dispatcher(
-        timeout=timeout,
+        timeout=30.0 if timeout is None else timeout,
         per_source_limit=limit,
-        timeouts_by_source={
-            source.id: source.timeout_seconds for source in registry.sources
-        },
+        timeouts_by_source=(
+            {}
+            if timeout is not None
+            else {
+                source.id: source.timeout_seconds for source in registry.sources
+            }
+        ),
     )
-    results, errors = await dispatcher.run(adapters, query)
+    with opencli_profile(profile):
+        results, errors = await dispatcher.run(adapters, query)
     ranked = rank(
         results,
         trust_map={source.id: source.trust for source in registry.sources},

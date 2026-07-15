@@ -155,3 +155,40 @@ async def test_search_service_dispatches_auto_browser_sources(monkeypatch):
 
     assert "google" in captured
     assert "twitter" in captured
+
+
+@pytest.mark.asyncio
+async def test_explicit_timeout_overrides_per_source_defaults(monkeypatch):
+    captured = {}
+
+    class FakeDispatcher:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        async def run(self, adapters, query):
+            return [], []
+
+    monkeypatch.setattr("omnireach.service.Dispatcher", FakeDispatcher)
+
+    await search("python", sources=["hackernews"], timeout=17)
+
+    assert captured["timeout"] == 17
+    assert captured["timeouts_by_source"] == {}
+
+
+@pytest.mark.asyncio
+async def test_omitted_timeout_uses_registry_defaults(monkeypatch):
+    captured = {}
+
+    class FakeDispatcher:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        async def run(self, adapters, query):
+            return [], []
+
+    monkeypatch.setattr("omnireach.service.Dispatcher", FakeDispatcher)
+
+    await search("python", sources=["reddit"])
+
+    assert captured["timeouts_by_source"]["reddit"] == 60.0

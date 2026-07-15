@@ -29,7 +29,10 @@ Optional arguments:
   `xiaohongshu`, `wechat`, `hackernews`, or `bilibili`.
 - `mode`: use `auto`, `quick`, or `deep`; explicit `sources` take precedence.
 - `limit`: request 1 through 50 results per source.
-- `timeout`: allow 1 through 120 seconds.
+- `timeout`: optional 1 through 120 second override. When omitted, browser-backed heavy
+  sources use their 60 second cold-start-safe default.
+- `profile`: select an OpenCLI Browser Bridge profile when more than one Chrome profile is
+  connected.
 
 Read `results` as normalized search metadata. Treat each result's `content` as a snippet,
 not the full document. Inspect `errors` for unavailable or failed sources while retaining
@@ -40,7 +43,9 @@ back to OpenCLI only when that bridge is unavailable. Google and Twitter still u
 through hidden ephemeral Chrome tabs. Use `quick` when the search must remain browser-free.
 An explicit `sources` list is exact and disables automatic additions.
 
-Use `omnireach_fetch` on a selected result URL when full text is required.
+Use `omnireach_fetch` on a selected result URL when full text is required. Treat an empty
+`content_markdown` plus `errors` as a failed fetch. Omnireach rejects known verification and
+login-wall placeholders, including short Reddit verification pages.
 
 ## Fetch
 

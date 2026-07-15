@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from click.testing import CliRunner
 
 from omnireach.cli import main
@@ -277,6 +278,45 @@ def test_v092_doctor_auto_json_when_stdout_not_tty():
     assert "sources" in data
     assert "omnireach_version" in data
     assert isinstance(data["sources"], list) and len(data["sources"]) > 0
+
+
+def test_search_accepts_mcp_style_sources_alias(monkeypatch):
+    from omnireach.contract import SearchEnvelope
+
+    captured = {}
+
+    async def fake_search(query, **kwargs):
+        captured.update(kwargs)
+        return SearchEnvelope(query=query, ts="2026-07-15T00:00:00Z")
+
+    monkeypatch.setattr("omnireach.cli.search", fake_search)
+
+    result = CliRunner().invoke(
+        main, ["search", "--sources", "reddit,twitter", "--json", "python"]
+    )
+
+    assert result.exit_code == 0
+    assert captured["sources"] == ["reddit", "twitter"]
+
+
+def test_entrypoint_emits_json_for_usage_error_when_json_requested(
+    monkeypatch, capsys
+):
+    from omnireach.cli import _entrypoint
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["omnireach", "search", "--json", "--definitely-invalid", "python"],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        _entrypoint()
+
+    assert exc_info.value.code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert payload["error"]["type"] == "usage_error"
+    assert "--definitely-invalid" in payload["error"]["message"]
 
 
 def test_v092_sources_auto_json_when_stdout_not_tty():

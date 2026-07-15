@@ -338,6 +338,42 @@ def test_v0101_looks_like_captcha_short_payload_returns_false():
     assert suspicious is False
 
 
+def test_fetch_rejects_real_reddit_short_verification_wall(monkeypatch):
+    wall = "# Reddit - Please wait for verification"
+    monkeypatch.setattr(
+        "omnireach.fetcher._fetch_via_http", lambda *args, **kwargs: wall
+    )
+    monkeypatch.setattr(
+        "omnireach.fetcher._fetch_via_jina", lambda *args, **kwargs: wall
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["fetch", "https://www.reddit.com/r/python/comments/example", "--json"],
+    )
+
+    assert result.exit_code == 1
+    payload = _json.loads(next(line for line in result.output.splitlines() if line.startswith("{")))
+    assert payload["content_markdown"] == ""
+    assert payload["backend"] is None
+    assert len(payload["errors"]) == 2
+    assert all("captcha_suspected" in error for error in payload["errors"])
+    assert any("opencli reddit read" in error for error in payload["errors"])
+
+
+def test_long_article_mentioning_verification_is_not_a_block_page():
+    body = (
+        "# Authentication design\n\n"
+        "This article explains when verification required errors are appropriate. "
+        * 30
+    )
+
+    suspicious, keyword = _looks_like_captcha(body)
+
+    assert suspicious is False
+    assert keyword is None
+
+
 def test_v0101_looks_like_captcha_real_article_not_flagged():
     body = "# Real article title\n\n" + "This is a long-enough body paragraph with normal content. " * 20
     suspicious, kw = _looks_like_captcha(body)

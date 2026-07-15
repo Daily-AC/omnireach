@@ -180,11 +180,79 @@ def test_doctor_reports_reddit_through_opencli(monkeypatch):
     monkeypatch.setattr(
         "shutil.which", lambda b: "/usr/bin/opencli" if b == "opencli" else None
     )
+    from unittest.mock import MagicMock
+    proc = MagicMock(
+        returncode=0,
+        stdout="[OK] Extension: connected\n[OK] Connectivity: passed\n",
+        stderr="",
+    )
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: proc)
     statuses = asyncio.run(run_doctor())
     reddit = next(s for s in statuses if s.id == "reddit")
     assert reddit.ok is True
     assert reddit.tier == "heavy"
-    assert "opencli" in reddit.detail
+    assert "opencli doctor" in reddit.detail
+
+
+def test_doctor_reports_google_through_opencli(monkeypatch):
+    monkeypatch.setattr(
+        "shutil.which", lambda b: "/usr/bin/opencli" if b == "opencli" else None
+    )
+    from unittest.mock import MagicMock
+    proc = MagicMock(
+        returncode=0,
+        stdout="[OK] Extension: connected\n[OK] Connectivity: passed\n",
+        stderr="",
+    )
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: proc)
+
+    google = next(
+        status for status in asyncio.run(run_doctor()) if status.id == "google"
+    )
+
+    assert google.ok is True
+    assert "未实现" not in google.detail
+
+
+def test_opencli_doctor_detects_multiple_profile_conflict(monkeypatch):
+    from unittest.mock import MagicMock
+    from omnireach.doctor import run_opencli_doctor
+
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/opencli")
+    proc = MagicMock(
+        returncode=0,
+        stdout=(
+            "[MISSING] Extension: not connected\n"
+            "[FAIL] Connectivity: failed "
+            "(Multiple Browser Bridge profiles are connected)\n"
+        ),
+        stderr="",
+    )
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: proc)
+
+    probe = run_opencli_doctor()
+
+    assert probe.ok is False
+    assert "多 profile 冲突" in probe.detail
+    assert "--profile <name>" in probe.fix_hint
+
+
+def test_douyin_doctor_prefers_connected_native_bridge(monkeypatch):
+    from omnireach.doctor import OpenCLIProbe, run_douyin_doctor
+
+    monkeypatch.setattr("omnireach.doctor.bridge_configured", lambda: True)
+    monkeypatch.setattr(
+        "omnireach.doctor.probe_native_bridge",
+        lambda: {"extensionVersion": "0.1.1"},
+    )
+
+    status = run_douyin_doctor(
+        OpenCLIProbe(False, "OpenCLI Browser Bridge 多 profile 冲突", "pick one")
+    )
+
+    assert status.ok is True
+    assert "原生 Chrome bridge 已连接" in status.detail
+    assert "0.1.1" in status.detail
 
 
 def test_v0101_wechat_backend_doctor_opencli_missing_stdout_flag(monkeypatch):
