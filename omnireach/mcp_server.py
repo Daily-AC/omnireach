@@ -55,7 +55,11 @@ TOOLS = [
                     "type": "number",
                     "minimum": 1,
                     "maximum": 120,
-                    "default": 30,
+                },
+                "profile": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "OpenCLI Browser Bridge profile name or id",
                 },
             },
             "required": ["query"],
@@ -162,7 +166,9 @@ def _number(
 
 
 def _validate_search(arguments: dict[str, Any]) -> dict[str, Any]:
-    _reject_extra(arguments, {"query", "sources", "mode", "limit", "timeout"})
+    _reject_extra(
+        arguments, {"query", "sources", "mode", "limit", "timeout", "profile"}
+    )
     query = arguments.get("query")
     if not isinstance(query, str) or not query.strip():
         raise InvalidParams("query must be a non-empty string")
@@ -177,13 +183,21 @@ def _validate_search(arguments: dict[str, Any]) -> dict[str, Any]:
     mode = arguments.get("mode", "auto")
     if mode not in {"auto", "quick", "deep"}:
         raise InvalidParams("mode must be auto, quick, or deep")
-    return {
+    profile = arguments.get("profile")
+    if profile is not None and (
+        not isinstance(profile, str) or not profile.strip()
+    ):
+        raise InvalidParams("profile must be a non-empty string")
+    validated = {
         "query": query,
         "sources": sources,
         "mode": mode,
         "limit": _number(arguments, "limit", 10, integer=True),
-        "timeout": _number(arguments, "timeout", 30),
+        "profile": profile,
     }
+    if "timeout" in arguments:
+        validated["timeout"] = _number(arguments, "timeout", 30)
+    return validated
 
 
 def _validate_fetch(arguments: dict[str, Any]) -> dict[str, Any]:

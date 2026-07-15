@@ -37,9 +37,17 @@ class Dispatcher:
                 )
                 return name, results
             except asyncio.TimeoutError:
+                hint = ""
+                if name in {
+                    "google", "reddit", "twitter", "xiaohongshu", "tiktok", "douyin"
+                }:
+                    hint = (
+                        "; browser-backed source may be cold-starting, "
+                        "retry with a larger --timeout"
+                    )
                 return name, SourceError(
                     source=name,
-                    error=f"timeout (>{resolved:.1f}s)",
+                    error=f"timeout (>{resolved:.1f}s){hint}",
                     category="failed",
                 )
             except AdapterUnavailable as e:

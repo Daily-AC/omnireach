@@ -97,7 +97,7 @@ def test_registry_has_google_heavy_source():
     assert google.adapter.endswith("GoogleAdapter")
     assert google.default_in_auto is False
     assert google.trust == 0.85
-    assert google.timeout_seconds == 15.0
+    assert google.timeout_seconds == 60.0
     assert "google" in google.query_hints
     assert "谷歌" in google.query_hints
 
@@ -123,8 +123,9 @@ def test_sources_yml_per_source_timeout():
     reg = load_registry()
     by_id = {s.id: s for s in reg.sources}
     assert by_id["hackernews"].timeout_seconds == 10.0
-    assert by_id["twitter"].timeout_seconds == 30.0
-    assert by_id["xiaohongshu"].timeout_seconds == 30.0
+    heavy = {source.id: source for source in reg.sources if source.tier == "heavy"}
+    assert heavy
+    assert all(source.timeout_seconds == 60.0 for source in heavy.values())
 
 
 def test_sources_yml_timeout_none_when_unset():

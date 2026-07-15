@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 from pathlib import Path
@@ -68,13 +69,30 @@ def mcp_cmd() -> None:
 
 @main.command("search")
 @click.argument("query")
-@click.option("--on", "on_", help="只用这些源, 逗号分隔. 例: --on hackernews,web")
+@click.option(
+    "--on", "--sources", "on_",
+    help="只用这些源, 逗号分隔. 例: --on hackernews,web",
+)
 @click.option("--mode", type=click.Choice(["auto", "quick", "deep"]), default="auto")
 @click.option("--limit", type=int, default=10, help="每个源最多返回多少条")
-@click.option("--timeout", type=float, default=30.0,
-              help="全局默认 timeout (秒); 被 sources.yml 中各源的 timeout_seconds 覆盖")
+@click.option(
+    "--timeout", type=click.FloatRange(min=1, max=120), default=None,
+    help="显式覆盖所有源的 timeout (秒); heavy 源默认 60 秒",
+)
+@click.option(
+    "--profile",
+    help="选择 OpenCLI Browser Bridge profile (透传为 OPENCLI_PROFILE)",
+)
 @click.option("--json", "json_out", is_flag=True, help="输出 JSON, 适合下游 pipe")
-def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: float, json_out: bool) -> None:
+def search_cmd(
+    query: str,
+    on_: str | None,
+    mode: str,
+    limit: int,
+    timeout: float | None,
+    profile: str | None,
+    json_out: bool,
+) -> None:
     """运行一次搜索."""
     explicit: list[str] | None = None
     if on_:
@@ -97,6 +115,7 @@ def search_cmd(query: str, on_: str | None, mode: str, limit: int, timeout: floa
             mode=mode,
             limit=limit,
             timeout=timeout,
+            profile=profile,
         )
     )
     ranked = envelope.results
@@ -221,9 +240,25 @@ main.add_command(fetch_cmd)
 def _entrypoint() -> None:
     """Console-script wrapper that catches unhandled exceptions and points users at issues."""
     try:
-        main.main(standalone_mode=True)
-    except SystemExit:
-        raise
+        main.main(standalone_mode=False)
+    except click.ClickException as exc:
+        json_requested = "--json" in sys.argv[1:] or os.environ.get(
+            "OMNIREACH_FORCE_JSON", ""
+        ).lower() in ("1", "true", "yes")
+        if json_requested:
+            click.echo(json.dumps({
+                "ok": False,
+                "error": {
+                    "type": "usage_error",
+                    "message": exc.format_message(),
+                    "exit_code": exc.exit_code,
+                },
+            }, ensure_ascii=False))
+        else:
+            exc.show()
+        raise SystemExit(exc.exit_code)
+    except click.exceptions.Exit as exc:
+        raise SystemExit(exc.exit_code)
     except KeyboardInterrupt:
         console.print("\n[yellow]中断[/yellow]")
         raise SystemExit(130)
