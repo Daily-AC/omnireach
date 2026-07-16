@@ -38,10 +38,11 @@ Read `results` as normalized search metadata. Treat each result's `content` as a
 not the full document. Inspect `errors` for unavailable or failed sources while retaining
 successful results from other sources.
 
-Douyin search prefers the Omnireach native Chrome bridge when it is installed, and falls
-back to OpenCLI only when that bridge is unavailable. Google and Twitter still use OpenCLI
-through hidden ephemeral Chrome tabs. Use `quick` when the search must remain browser-free.
-An explicit `sources` list is exact and disables automatic additions.
+Google, Reddit, Twitter, Xiaohongshu, TikTok, and Douyin prefer the Omnireach native Chrome
+bridge when it is installed, and fall back to OpenCLI only when that bridge is unavailable.
+Use `quick` when the search must remain browser-free. An explicit `sources` list is exact
+and disables automatic additions. The experimental `agy` source is explicit-only and
+requires a configured dedicated conversation.
 
 Use `omnireach_fetch` on a selected result URL when full text is required. Treat an empty
 `content_markdown` plus `errors` as a failed fetch. Omnireach rejects known verification and
@@ -72,9 +73,10 @@ curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh 
 ```
 
 Do not invoke interactive `omnireach setup <source>` from an unattended agent process.
-For Douyin, run `omnireach bridge install`, ask the user to load the printed directory once
-as an unpacked Chrome extension, then check `omnireach bridge status --json`. Other
-login-backed sources may still require OpenCLI and its Chrome extension.
+For browser-backed search sources, run `omnireach bridge install`, ask the user to load the
+printed directory once as an unpacked Chrome extension, then check `omnireach bridge status
+--json`. OpenCLI remains an optional compatibility fallback. For agy grounded search, run
+`omnireach agy configure <conversation-id>` and verify `omnireach agy status --json`.
 
 Run `omnireach doctor --json` to diagnose source readiness and backend support. Prefer a
 different configured source or ordinary HTTP fallback when a nonessential source is

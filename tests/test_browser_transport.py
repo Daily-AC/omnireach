@@ -32,6 +32,29 @@ async def test_auto_prefers_configured_native_bridge(monkeypatch):
     opencli.assert_not_awaited()
 
 
+@pytest.mark.parametrize(
+    "source",
+    ["google", "reddit", "tiktok", "twitter", "xiaohongshu"],
+)
+async def test_remaining_browser_sources_support_native_transport(monkeypatch, source):
+    monkeypatch.setenv("OMNIREACH_BROWSER_TRANSPORT", "native")
+    monkeypatch.setattr("omnireach.browser_transport.bridge_configured", lambda: True)
+    monkeypatch.setattr(
+        "omnireach.browser_transport.run_native_job",
+        lambda command, payload, **kwargs: [{"command": command}],
+    )
+
+    result = await run_browser_json(
+        source,
+        "search",
+        {"query": "test", "limit": 1},
+        (source, "search", "test"),
+    )
+
+    assert result.adapter == "native-chrome"
+    assert result.items == [{"command": f"{source}.search"}]
+
+
 async def test_auto_falls_back_only_when_native_bridge_is_unavailable(monkeypatch):
     monkeypatch.delenv("OMNIREACH_BROWSER_TRANSPORT", raising=False)
     monkeypatch.setattr("omnireach.browser_transport.bridge_configured", lambda: True)
@@ -51,6 +74,27 @@ async def test_auto_falls_back_only_when_native_bridge_is_unavailable(monkeypatc
 
     assert result.adapter == "opencli"
     assert result.items == [{"desc": "fallback"}]
+
+
+async def test_auto_falls_back_from_pre_02_extension_command_allowlist(monkeypatch):
+    monkeypatch.delenv("OMNIREACH_BROWSER_TRANSPORT", raising=False)
+    monkeypatch.setattr("omnireach.browser_transport.bridge_configured", lambda: True)
+
+    def old_extension(*args, **kwargs):
+        raise NativeBridgeCommandError("command is not allowed")
+
+    monkeypatch.setattr("omnireach.browser_transport.run_native_job", old_extension)
+    monkeypatch.setattr(
+        "omnireach.browser_transport.run_opencli_json",
+        AsyncMock(return_value=[{"title": "fallback"}]),
+    )
+
+    result = await run_browser_json(
+        "google", "search", {"query": "x"}, ("google", "search", "x")
+    )
+
+    assert result.adapter == "opencli"
+    assert result.items == [{"title": "fallback"}]
 
 
 async def test_auto_does_not_hide_native_command_contract_failures(monkeypatch):

@@ -4,6 +4,16 @@
   const config = globalThis.OMNIREACH_BRIDGE_CONFIG;
   const retryDelayMs = 500;
 
+  if (
+    !config ||
+    !config.baseUrl ||
+    !config.token ||
+    typeof config.extensionVersion !== "string" ||
+    !config.extensionVersion
+  ) {
+    throw new Error("native bridge configuration is missing or invalid");
+  }
+
   function delay(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
@@ -12,6 +22,7 @@
     return {
       Authorization: `Bearer ${config.token}`,
       "Content-Type": "application/json",
+      "X-Omnireach-Extension-Version": config.extensionVersion,
     };
   }
 
@@ -28,7 +39,8 @@
   }
 
   async function pollOnce() {
-    const response = await fetch(`${config.baseUrl}/v1/job`, {
+    const version = encodeURIComponent(config.extensionVersion);
+    const response = await fetch(`${config.baseUrl}/v1/job?extension_version=${version}`, {
       headers: headers(),
       cache: "no-store",
     });
@@ -57,9 +69,6 @@
   }
 
   async function pollForever() {
-    if (!config || !config.baseUrl || !config.token) {
-      throw new Error("native bridge configuration is missing");
-    }
     for (;;) {
       try {
         await pollOnce();
