@@ -17,11 +17,11 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 ### MCP before Playwright
 
 For search and reading, start with two read-only MCP tools instead of browser automation.
-Ordinary page fetches never start Chrome. Douyin search can now use Omnireach's own small,
-read-only Chrome bridge; Google, Twitter, and the other browser-backed sources still use
-OpenCLI while they migrate. Browser-backed calls use temporary background surfaces that
-close after the call, and `quick` mode remains browser-free. Keep Playwright for clicks,
-forms, file transfer, screenshots, and visual assertions.
+Ordinary page fetches never start Chrome. Google, Reddit, Twitter, Xiaohongshu, TikTok,
+and Douyin search now use Omnireach's own small, read-only Chrome bridge first, with
+OpenCLI retained as a compatibility fallback. Browser-backed calls use temporary background
+tabs that close after the call, and `quick` mode remains browser-free. Keep Playwright for
+clicks, forms, file transfer, screenshots, and visual assertions.
 
 | Same RFC 9110 read | omnireach MCP | Playwright + headless system Chrome |
 |---|---:|---:|
@@ -64,7 +64,7 @@ loaded plugin MCP configuration.
 ## What you get
 
 **1. Reach the unreachable.**
-Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok — login-walled vertical platforms that no agent web search reaches. omnireach reads them through your own logged-in browser session. Douyin now uses the Omnireach native bridge first; OpenCLI remains the compatibility path for sources not migrated yet.
+Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok — login-walled vertical platforms that no agent web search reaches. omnireach reads them through your own logged-in browser session. Its native Chrome bridge handles all six browser-backed search sources, with OpenCLI retained as a compatibility fallback.
 
 **2. One uniform contract.**
 `omnireach search` → normalized metadata + URL, same shape across every source. `omnireach fetch` → clean markdown for any URL, with host-aware routing: ordinary pages use a built-in HTTP extractor with Jina fallback, while `mp.weixin.qq.com` uses your logged-in Chrome session. No Playwright or Crawl4AI is required for the default path.
@@ -116,7 +116,7 @@ downloads, screenshots, visual assertions, and unsupported interactive workflows
 | 微信公众号 WeChat | ✅ zero-config search (Sogou path) + full-text fetch via your logged-in Chrome | ❌ removed 2026-06 ([PR #347](https://github.com/Panniantong/Agent-Reach/pull/347)) after anti-bot breakage |
 | 抖音 Douyin | ✅ search via your logged-in Chrome | ❌ removed 2026-06 (upstream tool archived) |
 | TikTok | ✅ search | ❌ not supported |
-| Output contract | one pydantic JSON schema across all 16 sources; auto-JSON when piped | no wrapper layer by design — each upstream tool's own format (YAML / plain text / subtitle files / raw JSON) |
+| Output contract | one pydantic JSON schema across all 17 sources; auto-JSON when piped | no wrapper layer by design — each upstream tool's own format (YAML / plain text / subtitle files / raw JSON) |
 | `search` / `fetch` commands | built-in: `omnireach search`, `omnireach fetch <url>` with host-aware routing | no search/read commands — routes your agent to call upstream tools directly |
 | Facebook · Instagram · LinkedIn · 雪球 · podcast transcription | ❌ | ✅ |
 | Community | early — you found us before the crowd | 51k★, 30 contributors |
@@ -146,7 +146,7 @@ omnireach search --on wechat --json "claude 4.7" \
 
 | Command | What it does |
 |---|---|
-| `omnireach search "<query>"` | Search; connected OpenCLI automatically adds Google + Twitter |
+| `omnireach search "<query>"` | Search; a connected native bridge or OpenCLI automatically adds Google + Twitter |
 | `omnireach search --on twitter,reddit "..."` | Target specific sources |
 | `omnireach search --sources twitter,reddit "..."` | Alias for `--on`, matching the MCP argument name |
 | `omnireach search --profile <name> "..."` | Select an OpenCLI Browser Bridge profile for this search |
@@ -166,6 +166,8 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach bridge install` | Install/update the Omnireach native Chrome extension assets |
 | `omnireach bridge path` | Print the stable unpacked-extension directory |
 | `omnireach bridge status --json` | Ping the installed extension through the authenticated localhost bridge |
+| `omnireach agy configure <conversation-id>` | Configure the experimental agy grounded-search backend |
+| `omnireach agy status --json` | Check the configured agy conversation and AgentAPI endpoint |
 | `omnireach doctor` | Health check (sources / fetch backends / wechat backends) |
 
 ---
@@ -178,12 +180,13 @@ omnireach search --on wechat --json "claude 4.7" \
 | youtube | ✅ ready | `yt-dlp` (pip install) | `omnireach setup youtube` |
 | github | ✅ ready | `gh` CLI + `gh auth login` | `omnireach setup github` |
 | rss | ✅ ready | built-in feedparser | query must be a URL |
-| google | 🔴 heavy | OpenCLI + Chrome extension | Automatically included when OpenCLI is installed; silent background tab |
-| reddit | 🔴 heavy | OpenCLI + Chrome extension | Public search works logged out; Chrome login is inherited when present |
-| twitter | 🔴 heavy | OpenCLI + Chrome extension | Automatically included when OpenCLI is installed; inherits Chrome login |
-| xiaohongshu | 🔴 heavy | OpenCLI + Chrome extension | v0.3 path |
-| tiktok | 🔴 heavy | OpenCLI + Chrome extension | TikTok international (v0.7) |
+| google | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Automatically included when either transport is available; background tab |
+| reddit | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Public search works logged out; Chrome login is inherited when present |
+| twitter | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Automatically included when either transport is available; inherits Chrome login |
+| xiaohongshu | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Inherits the current Chrome login |
+| tiktok | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | TikTok international; real DOM result extraction |
 | douyin | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Reuses the current Chrome login without invoking OpenCLI on the native path |
+| agy | 🚧 experimental | authenticated agy CLI + dedicated conversation | Explicit `--on agy` only; reuses agy's server-side grounded WebSearch |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | paid (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | paid (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | paid (v0.4) |
@@ -191,7 +194,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | wechat | ✅ ready | none (optional `EXA_API_KEY` for enhancement) | WeChat Official Accounts — search via Sogou free path; `EXA_API_KEY` optionally enables semantic enhancement; v0.10.1+ `omnireach fetch <wechat-url>` auto-routes through OpenCLI logged-in Chrome |
 | bilibili | ✅ ready | none (optional `EXA_API_KEY` for enhancement) | B站 — v0.9+ defaults to B站 official search API; `EXA_API_KEY` optionally enables semantic enhancement |
 
-> **抖音 / douyin**: Run `omnireach bridge install`, load the printed directory once from `chrome://extensions` as an unpacked extension, and sign in to www.douyin.com in that Chrome profile. `auto` prefers this dependency-free native path and falls back to OpenCLI only when the extension is absent or disconnected. Set `OMNIREACH_BROWSER_TRANSPORT=native` to verify that OpenCLI is not invoked.
+> **Native browser sources**: Run `omnireach bridge install`, load the printed directory once from `chrome://extensions` as an unpacked extension, and sign in to the sites you need in that Chrome profile. `auto` prefers this dependency-free native path for Google, Reddit, Twitter, Xiaohongshu, TikTok, and Douyin, then falls back to OpenCLI. Set `OMNIREACH_BROWSER_TRANSPORT=native` to verify that OpenCLI is not invoked.
+
+> **agy grounded search**: Keep an authenticated `agy` CLI process running, create a dedicated conversation, then run `omnireach agy configure <conversation-id>`. Verify it with `omnireach agy status --json` and search explicitly with `omnireach search --on agy --json "query"`.
 
 > **WeChat fetch**: zero-config Sogou search now resolves signed result links to direct `mp.weixin.qq.com` URLs in the same HTTP session. Fetch then uses the Daily-AC/OpenCLI fork (`weixin download --stdout`, upstream PR [jackwener/OpenCLI#1770](https://github.com/jackwener/OpenCLI/pull/1770)) in an explicit background, ephemeral tab and releases it after the command.
 

@@ -1,12 +1,13 @@
-"""Google Search adapter backed by OpenCLI's silent Chrome bridge."""
+"""Google Search adapter backed by the native Chrome or OpenCLI bridge."""
 
 from __future__ import annotations
 
 import shutil
 from urllib.parse import urlparse
 
-from omnireach.adapters._opencli import run_opencli_json
-from omnireach.adapters.base import AdapterBase, AdapterUnavailable
+from omnireach.adapters.base import AdapterBase
+from omnireach.bridge_install import bridge_configured
+from omnireach.browser_transport import run_browser_json
 from omnireach.contract import SearchResult
 
 
@@ -19,29 +20,27 @@ def _is_external_http_url(value: object) -> bool:
 
 class GoogleAdapter(AdapterBase):
     name = "google"
-    requires = ["opencli"]
+    requires: list[str] = []
 
     async def is_ready(self) -> bool:
-        return shutil.which("opencli") is not None
+        return bridge_configured() or shutil.which("opencli") is not None
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        if not shutil.which("opencli"):
-            raise AdapterUnavailable(
-                "google", "opencli not installed", hint="omnireach setup google"
-            )
-
-        items = await run_opencli_json(
-            "google", "google", "search", query, "--limit", str(limit)
+        command_result = await run_browser_json(
+            "google",
+            "search",
+            {"query": query, "limit": limit},
+            ("google", "search", query, "--limit", str(limit)),
         )
         results: list[SearchResult] = []
-        for item in items:
+        for item in command_result.items:
             url = item.get("url")
             if not _is_external_http_url(url):
                 continue
             results.append(
                 SearchResult(
                     source="google",
-                    adapter="opencli",
+                    adapter=command_result.adapter,
                     title=str(item.get("title") or ""),
                     url=str(url),
                     content=str(item.get("snippet") or ""),

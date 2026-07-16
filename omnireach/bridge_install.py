@@ -35,8 +35,8 @@ def bridge_configured(*, home: Path | None = None) -> bool:
     )
 
 
-def _load_or_create_token(paths: BridgePaths) -> str:
-    if paths.token_path.exists():
+def _load_or_create_token(paths: BridgePaths, *, rotate: bool = False) -> str:
+    if paths.token_path.exists() and not rotate:
         token = paths.token_path.read_text(encoding="utf-8").strip()
         if token:
             return token
@@ -46,10 +46,12 @@ def _load_or_create_token(paths: BridgePaths) -> str:
     return token
 
 
-def install_extension(*, home: Path | None = None) -> BridgePaths:
+def install_extension(
+    *, home: Path | None = None, rotate_token: bool = False
+) -> BridgePaths:
     paths = bridge_paths(home=home)
     paths.extension_dir.mkdir(parents=True, exist_ok=True)
-    token = _load_or_create_token(paths)
+    token = _load_or_create_token(paths, rotate=rotate_token)
 
     asset_root = files("omnireach.chrome_extension")
     for asset in asset_root.iterdir():
@@ -60,8 +62,12 @@ def install_extension(*, home: Path | None = None) -> BridgePaths:
             continue
         (paths.extension_dir / asset.name).write_bytes(asset.read_bytes())
 
+    manifest = json.loads(
+        (paths.extension_dir / "manifest.json").read_text(encoding="utf-8")
+    )
     config = {
         "baseUrl": "http://127.0.0.1:19826",
+        "extensionVersion": manifest["version"],
         "token": token,
     }
     config_json = json.dumps(config, ensure_ascii=True, separators=(",", ":"))

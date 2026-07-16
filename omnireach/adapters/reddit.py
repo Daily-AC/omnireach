@@ -1,12 +1,13 @@
-"""Reddit adapter backed by OpenCLI's Chrome bridge."""
+"""Reddit adapter backed by the native Chrome or OpenCLI bridge."""
 
 from __future__ import annotations
 
 import shutil
 from datetime import datetime, timezone
 
-from omnireach.adapters._opencli import run_opencli_json
-from omnireach.adapters.base import AdapterBase, AdapterUnavailable
+from omnireach.adapters.base import AdapterBase
+from omnireach.bridge_install import bridge_configured
+from omnireach.browser_transport import run_browser_json
 from omnireach.contract import Engagement, SearchResult
 
 
@@ -18,26 +19,24 @@ def _unix_to_iso(ts: float | None) -> str | None:
 
 class RedditAdapter(AdapterBase):
     name = "reddit"
-    requires = ["opencli"]
+    requires: list[str] = []
 
     async def is_ready(self) -> bool:
-        return shutil.which("opencli") is not None
+        return bridge_configured() or shutil.which("opencli") is not None
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        if not shutil.which("opencli"):
-            raise AdapterUnavailable(
-                "reddit", "opencli not installed", hint="omnireach setup reddit"
-            )
-
-        items = await run_opencli_json(
-            "reddit", "reddit", "search", query, "--limit", str(limit)
+        command_result = await run_browser_json(
+            "reddit",
+            "search",
+            {"query": query, "limit": limit},
+            ("reddit", "search", query, "--limit", str(limit)),
         )
 
         results: list[SearchResult] = []
-        for item in items[:limit]:
+        for item in command_result.items[:limit]:
             results.append(SearchResult(
                 source="reddit",
-                adapter="opencli",
+                adapter=command_result.adapter,
                 title=item.get("title") or "",
                 url=item.get("url") or "",
                 content=item.get("selftext") or "",

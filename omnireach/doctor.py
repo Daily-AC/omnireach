@@ -253,49 +253,83 @@ def run_opencli_doctor() -> OpenCLIProbe:
     return OpenCLIProbe(ok=True, detail="opencli doctor 通过，Browser Bridge 可用")
 
 
-def run_douyin_doctor(opencli_probe: OpenCLIProbe) -> SourceStatus:
-    """Probe the native bridge first, then report the OpenCLI fallback."""
-    if bridge_configured():
-        try:
-            details = probe_native_bridge()
-        except (NativeBridgeUnavailable, NativeBridgeCommandError) as exc:
-            if opencli_probe.ok:
-                return SourceStatus(
-                    "douyin",
-                    "heavy",
-                    ok=True,
-                    detail=(
-                        f"原生 Chrome bridge 不可用 ({exc}); "
-                        "OpenCLI fallback 可用"
-                    ),
-                )
+def browser_source_status(
+    source_id: str,
+    tier: str,
+    opencli_probe: OpenCLIProbe,
+    *,
+    native_configured: bool,
+    native_details: dict[str, object] | None = None,
+    native_error: Exception | None = None,
+) -> SourceStatus:
+    """Report the shared native-first browser transport and its fallback."""
+    if native_configured and native_details is not None:
+        version = native_details.get("extensionVersion") or "unknown"
+        commands = native_details.get("commands")
+        supports_command = (
+            f"{source_id}.search" in commands
+            if isinstance(commands, list)
+            else source_id == "douyin"
+        )
+        if supports_command:
             return SourceStatus(
-                "douyin",
-                "heavy",
-                ok=False,
-                detail=f"原生 Chrome bridge 不可用 ({exc}); {opencli_probe.detail}",
-                fix_hint=(
-                    "运行 `omnireach bridge status --json`; "
-                    f"{opencli_probe.fix_hint}"
-                ),
+                source_id,
+                tier,
+                ok=True,
+                detail=f"原生 Chrome bridge 已连接 (extension {version})",
             )
-        version = details.get("extensionVersion") or "unknown"
+        native_error = NativeBridgeCommandError(
+            f"extension {version} 不支持 {source_id}.search；重新运行 "
+            "`omnireach bridge install` 并在 chrome://extensions reload"
+        )
+    if native_configured and native_error is not None:
+        if opencli_probe.ok:
+            return SourceStatus(
+                source_id,
+                tier,
+                ok=True,
+                detail=f"原生 Chrome bridge 不可用 ({native_error}); OpenCLI fallback 可用",
+            )
         return SourceStatus(
-            "douyin",
-            "heavy",
-            ok=True,
-            detail=f"原生 Chrome bridge 已连接 (extension {version})",
+            source_id,
+            tier,
+            ok=False,
+            detail=f"原生 Chrome bridge 不可用 ({native_error}); {opencli_probe.detail}",
+            fix_hint=(
+                "运行 `omnireach bridge status --json`; "
+                f"{opencli_probe.fix_hint}"
+            ),
         )
     if opencli_probe.ok:
         return SourceStatus(
-            "douyin", "heavy", ok=True, detail="OpenCLI fallback 可用"
+            source_id, tier, ok=True, detail="OpenCLI fallback 可用"
         )
     return SourceStatus(
-        "douyin",
-        "heavy",
+        source_id,
+        tier,
         ok=False,
         detail=f"原生 Chrome bridge 未安装; {opencli_probe.detail}",
         fix_hint="omnireach bridge install",
+    )
+
+
+def run_douyin_doctor(opencli_probe: OpenCLIProbe) -> SourceStatus:
+    """Backward-compatible single-source probe used by existing callers."""
+    configured = bridge_configured()
+    details: dict[str, object] | None = None
+    error: Exception | None = None
+    if configured:
+        try:
+            details = probe_native_bridge()
+        except (NativeBridgeUnavailable, NativeBridgeCommandError) as exc:
+            error = exc
+    return browser_source_status(
+        "douyin",
+        "heavy",
+        opencli_probe,
+        native_configured=configured,
+        native_details=details,
+        native_error=error,
     )
 
 
@@ -307,6 +341,14 @@ async def run_doctor() -> list[SourceStatus]:
         if any(spec.id in OPENCLI_SOURCE_IDS for spec in reg.sources)
         else None
     )
+    native_configured = bridge_configured()
+    native_details: dict[str, object] | None = None
+    native_error: Exception | None = None
+    if native_configured:
+        try:
+            native_details = probe_native_bridge()
+        except (NativeBridgeUnavailable, NativeBridgeCommandError) as exc:
+            native_error = exc
     for spec in reg.sources:
         sid = spec.id
         if spec.tier == "wip":
@@ -352,22 +394,15 @@ async def run_doctor() -> list[SourceStatus]:
                     detail=f"{env} 未配",
                     fix_hint=f"omnireach setup {sid}"))
             continue
-        if sid == "douyin":
-            assert opencli_probe is not None
-            statuses.append(run_douyin_doctor(opencli_probe))
-            continue
         if sid in OPENCLI_SOURCE_IDS:
             assert opencli_probe is not None
-            statuses.append(SourceStatus(
+            statuses.append(browser_source_status(
                 sid,
                 spec.tier,
-                ok=opencli_probe.ok,
-                detail=opencli_probe.detail,
-                fix_hint=(
-                    opencli_probe.fix_hint
-                    if shutil.which("opencli")
-                    else f"omnireach setup {sid}"
-                ),
+                opencli_probe,
+                native_configured=native_configured,
+                native_details=native_details,
+                native_error=native_error,
             ))
             continue
         statuses.append(SourceStatus(sid, spec.tier, ok=False,

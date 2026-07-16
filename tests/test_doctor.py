@@ -27,10 +27,10 @@ def test_doctor_marks_rss_ok(monkeypatch):
     assert rss.ok is True
 
 
-def test_doctor_no_wip_sources_in_v0_6():
+def test_doctor_marks_experimental_agy_source_wip():
     statuses = asyncio.run(run_doctor())
-    wip = [s for s in statuses if s.tier == "wip"]
-    assert wip == []
+    wip = {s.id for s in statuses if s.tier == "wip"}
+    assert wip == {"agy"}
 
 
 def test_doctor_marks_youtube_ok_with_binary(monkeypatch):
@@ -167,6 +167,7 @@ def test_wechat_backend_doctor_rejects_opencli_without_silent_tab_options(monkey
 
 
 def test_doctor_does_not_treat_openrouter_as_opencli(monkeypatch):
+    monkeypatch.setattr("omnireach.doctor.bridge_configured", lambda: False)
     monkeypatch.setattr(
         "shutil.which", lambda b: "/usr/bin/openrouter" if b == "openrouter" else None
     )
@@ -177,6 +178,7 @@ def test_doctor_does_not_treat_openrouter_as_opencli(monkeypatch):
 
 
 def test_doctor_reports_reddit_through_opencli(monkeypatch):
+    monkeypatch.setattr("omnireach.doctor.bridge_configured", lambda: False)
     monkeypatch.setattr(
         "shutil.which", lambda b: "/usr/bin/opencli" if b == "opencli" else None
     )
@@ -191,7 +193,7 @@ def test_doctor_reports_reddit_through_opencli(monkeypatch):
     reddit = next(s for s in statuses if s.id == "reddit")
     assert reddit.ok is True
     assert reddit.tier == "heavy"
-    assert "opencli doctor" in reddit.detail
+    assert "OpenCLI fallback" in reddit.detail
 
 
 def test_doctor_reports_google_through_opencli(monkeypatch):

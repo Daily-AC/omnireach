@@ -44,13 +44,16 @@ def test_setup_reports_failure(monkeypatch):
     assert "失败" in res.output or "failed" in res.output.lower()
 
 
-def test_setup_reddit_routes_to_opencli_wizard(monkeypatch):
+def test_setup_reddit_routes_to_native_bridge_wizard(monkeypatch):
     from omnireach import wizard as wiz_mod
     from omnireach.wizard import SetupReport
 
     async def fake_run_setup(spec, **kwargs):
         assert spec.id == "reddit"
-        assert [dep.name for dep in spec.deps_auto] == ["github:Daily-AC/OpenCLI"]
+        assert spec.deps_auto == []
+        assert "omnireach bridge install" in "\n".join(
+            dep.step for dep in spec.deps_manual
+        )
         return SetupReport(source_id="reddit", already_ready=True)
 
     monkeypatch.setattr(wiz_mod, "run_setup", fake_run_setup)
