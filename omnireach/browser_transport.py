@@ -11,10 +11,21 @@ from typing import Any
 from omnireach.adapters._opencli import run_opencli_json
 from omnireach.adapters.base import AdapterUnavailable
 from omnireach.bridge_install import bridge_configured
-from omnireach.native_bridge import NativeBridgeUnavailable, run_native_job
+from omnireach.native_bridge import (
+    NativeBridgeCommandError,
+    NativeBridgeUnavailable,
+    run_native_job,
+)
 
 _VALID_MODES = {"auto", "native", "opencli"}
-_NATIVE_COMMANDS = {("douyin", "search")}
+_NATIVE_COMMANDS = {
+    ("douyin", "search"),
+    ("google", "search"),
+    ("reddit", "search"),
+    ("tiktok", "search"),
+    ("twitter", "search"),
+    ("xiaohongshu", "search"),
+}
 
 
 @dataclass(frozen=True)
@@ -79,6 +90,12 @@ async def run_browser_json(
         try:
             items = await _run_native(f"{source}.{command}", payload)
             return BrowserCommandResult(items=items, adapter="native-chrome")
+        except NativeBridgeCommandError as exc:
+            if "command is not allowed" not in str(exc) or mode == "native":
+                raise
+            # Extension 0.1.x only allowed douyin.search. In auto mode an old
+            # unpacked extension should remain a compatibility fallback case,
+            # not turn every newly migrated adapter into a hard failure.
         except NativeBridgeUnavailable as exc:
             if mode == "native":
                 raise AdapterUnavailable(

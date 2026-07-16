@@ -1,19 +1,12 @@
-"""Twitter / X adapter — shells out to OpenCLI, which uses a logged-in Chrome session.
-
-Requires the `opencli` binary on PATH. The user must have:
-  1. installed the OpenCLI Chrome Bridge extension from chrome.google.com
-  2. logged into twitter.com in that Chrome profile
-
-The wizard (omnireach setup twitter) walks the user through both manual steps
-with `opencli doctor` and `opencli twitter state` as verify commands.
-"""
+"""Twitter / X adapter backed by the native Chrome or OpenCLI bridge."""
 
 from __future__ import annotations
 
 import shutil
 
-from omnireach.adapters.base import AdapterBase, AdapterUnavailable
-from omnireach.adapters._opencli import run_opencli_json
+from omnireach.adapters.base import AdapterBase
+from omnireach.bridge_install import bridge_configured
+from omnireach.browser_transport import run_browser_json
 from omnireach.contract import Engagement, SearchResult
 
 
@@ -28,29 +21,27 @@ def _int_or_none(value: object) -> int | None:
 
 class TwitterAdapter(AdapterBase):
     name = "twitter"
-    requires = ["opencli"]
+    requires: list[str] = []
 
     async def is_ready(self) -> bool:
-        return all(shutil.which(b) is not None for b in self.requires)
+        return bridge_configured() or shutil.which("opencli") is not None
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        if not shutil.which("opencli"):
-            raise AdapterUnavailable(
-                "twitter", "opencli not installed", hint="omnireach setup twitter"
-            )
-
-        items = await run_opencli_json(
-            "twitter", "twitter", "search", "--limit", str(limit), query
+        command_result = await run_browser_json(
+            "twitter",
+            "search",
+            {"query": query, "limit": limit},
+            ("twitter", "search", "--limit", str(limit), query),
         )
 
         results: list[SearchResult] = []
-        for item in items[:limit]:
+        for item in command_result.items[:limit]:
             text = item.get("text", "") or ""
             title = (text[:80] + "…") if len(text) > 80 else text
             results.append(
                 SearchResult(
                     source="twitter",
-                    adapter="opencli",
+                    adapter=command_result.adapter,
                     title=title,
                     url=item.get("url", ""),
                     content=text,
