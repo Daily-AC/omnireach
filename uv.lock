@@ -166,7 +166,7 @@ wheels = [
 
 [[package]]
 name = "omnireach"
-version = "0.16.0a0"
+version = "0.16.1a0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
