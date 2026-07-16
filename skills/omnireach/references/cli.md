@@ -26,10 +26,10 @@ Run a routed search:
 omnireach search --json "Claude Code prompt caching"
 ```
 
-With OpenCLI installed, normal and deep searches automatically include Google and Twitter
-through hidden ephemeral Chrome tabs. `--mode quick` stays browser-free. `--on` is exact and
-does not add either source unless requested. `--sources` is an alias for `--on`, matching the
-MCP argument name.
+With the native bridge or OpenCLI installed, normal and deep searches automatically include
+Google and Twitter through background ephemeral Chrome tabs. `--mode quick` stays
+browser-free. `--on` is exact and does not add either source unless requested. `--sources`
+is an alias for `--on`, matching the MCP argument name.
 
 Restrict sources:
 
@@ -39,18 +39,26 @@ omnireach search --on wechat --json "AI 编程"
 omnireach search --sources reddit --profile work --timeout 90 --json "Claude Code"
 ```
 
-Set up the native Douyin bridge once:
+Set up the native browser bridge once:
 
 ```bash
 omnireach bridge install
 omnireach bridge path
 omnireach bridge status --json
-OMNIREACH_BROWSER_TRANSPORT=native omnireach search --on douyin --json "AI 编程"
+OMNIREACH_BROWSER_TRANSPORT=native omnireach search --on google,twitter --json "AI 编程"
 ```
 
 Load the directory printed by `bridge install` once as an unpacked Chrome extension.
 Transport modes are `auto` (native first, OpenCLI fallback), `native` (never call OpenCLI),
 and `opencli` (force the compatibility path).
+
+Configure the experimental agy grounded-search backend with a dedicated conversation:
+
+```bash
+omnireach agy configure <conversation-id>
+omnireach agy status --json
+omnireach search --on agy --json "Python free threading"
+```
 
 The search envelope contains:
 
@@ -163,7 +171,7 @@ omnireach setup twitter
 omnireach setup google
 ```
 
-Douyin prefers the Omnireach native Chrome bridge. Other login-backed adapters still
-require OpenCLI and its Chrome extension while they migrate. OpenCLI calls pass `--window
-background --site-session ephemeral --keep-tab false`; direct calls to old OpenCLI versions
-may still create visible tabs.
+Google, Reddit, Twitter, Xiaohongshu, TikTok, and Douyin prefer the Omnireach native Chrome
+bridge. OpenCLI remains the compatibility fallback and receives `--window background
+--site-session ephemeral --keep-tab false`; direct calls to old OpenCLI versions may still
+create visible tabs.

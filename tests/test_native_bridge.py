@@ -11,6 +11,7 @@ import pytest
 from omnireach.bridge_install import install_extension
 from omnireach.native_bridge import (
     MAX_RESULT_BYTES,
+    NATIVE_EXTENSION_MIN_VERSION,
     NativeBridgeCommandError,
     NativeBridgeUnavailable,
     run_native_job,
@@ -30,6 +31,7 @@ def _request(
     method: str = "GET",
     body: bytes | None = None,
     path: str = "/v1/job",
+    extension_version: str = NATIVE_EXTENSION_MIN_VERSION,
 ):
     request = urllib.request.Request(
         f"http://127.0.0.1:{port}{path}",
@@ -38,6 +40,7 @@ def _request(
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
+            "X-Omnireach-Extension-Version": extension_version,
         },
     )
     return urllib.request.urlopen(request, timeout=2)
@@ -121,6 +124,47 @@ def test_native_bridge_rejects_wrong_token_then_accepts_correct_one(tmp_path):
         ):
             pass
         assert future.result() == [{"pong": True}]
+
+
+def test_native_bridge_ignores_outdated_extension_pollers(tmp_path):
+    paths = install_extension(home=tmp_path)
+    token = paths.token_path.read_text().strip()
+    port = _free_port()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            run_native_job,
+            "tiktok.search",
+            {"query": "python", "limit": 1},
+            home=tmp_path,
+            port=port,
+            connect_timeout=2,
+            result_timeout=2,
+        )
+        deadline = time.monotonic() + 2
+        while True:
+            try:
+                with _request(
+                    port, token, extension_version="0.1.1"
+                ) as response:
+                    assert response.status == 204
+                break
+            except (ConnectionError, urllib.error.URLError):
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.02)
+
+        job = _poll_job(port, token)
+        result = {"id": job["id"], "ok": True, "items": []}
+        with _request(
+            port,
+            token,
+            method="POST",
+            path="/v1/result",
+            body=json.dumps(result).encode(),
+        ):
+            pass
+        assert future.result() == []
 
 
 def test_native_bridge_rejects_wrong_result_id(tmp_path):

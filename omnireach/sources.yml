@@ -78,77 +78,77 @@
 - id: google
   tier: heavy
   adapter: omnireach.adapters.google.GoogleAdapter
-  description: Google 网页搜索 (OpenCLI 后台临时 tab)
+  description: Google 网页搜索 (Omnireach 原生 Chrome 桥优先, OpenCLI 兼容回退)
   query_hints: [google, "谷歌", "网页搜索"]
   default_in_auto: false
   trust: 0.85
   timeout_seconds: 60
   deps:
-    auto:
-      - { kind: npm, name: "github:Daily-AC/OpenCLI" }
+    auto: []
     manual:
-      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
+      - { step: "运行 omnireach bridge install，并在 chrome://extensions 加载输出目录", verify: "omnireach bridge status --json" }
+      - { step: "OpenCLI 仅作为可选兼容回退: npm i -g github:Daily-AC/OpenCLI", verify: "opencli doctor" }
 
 - id: reddit
   tier: heavy
   adapter: omnireach.adapters.reddit.RedditAdapter
-  description: Reddit 帖子搜索 (OpenCLI 后台临时 tab；Chrome 登录态可选)
+  description: Reddit 帖子搜索 (Omnireach 原生 Chrome 桥优先, OpenCLI 兼容回退)
   query_hints: [reddit, "r/", subreddit]
   # Browser-backed sources stay opt-in so auto fanout never opens Chrome tabs.
   default_in_auto: false
   trust: 0.70
   timeout_seconds: 60
   deps:
-    auto:
-      - { kind: npm, name: "github:Daily-AC/OpenCLI" }
+    auto: []
     manual:
-      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk (装完后启用 chrome://extensions 里的开发者模式)", verify: "opencli doctor" }
+      - { step: "运行 omnireach bridge install，并在 chrome://extensions 加载输出目录", verify: "omnireach bridge status --json" }
       - { step: "可选：在 Chrome 中登录 reddit.com，以继承账号可见内容和偏好" }
+      - { step: "OpenCLI 仅作为可选兼容回退: npm i -g github:Daily-AC/OpenCLI", verify: "opencli doctor" }
 
 - id: twitter
   tier: heavy
   adapter: omnireach.adapters.twitter.TwitterAdapter
-  description: Twitter / X 搜索 (登录态 Chrome, OpenCLI 后台临时 tab)
+  description: Twitter / X 搜索 (原生 Chrome 桥优先, OpenCLI 兼容回退)
   query_hints: [twitter, "x.com", "推特"]
   default_in_auto: false
   trust: 0.60
   timeout_seconds: 60
   deps:
-    auto:
-      - { kind: npm, name: "github:Daily-AC/OpenCLI" }
+    auto: []
     manual:
-      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk (装完后启用 chrome://extensions 里的开发者模式)", verify: "opencli doctor" }
-      - { step: "在 Chrome 中登录 Twitter / X 账号 (打开 twitter.com 完成登录)", verify: "opencli twitter state" }
+      - { step: "运行 omnireach bridge install，并在 chrome://extensions 加载输出目录", verify: "omnireach bridge status --json" }
+      - { step: "在 Chrome 中登录 Twitter / X 账号 (打开 x.com 完成登录)" }
+      - { step: "OpenCLI 仅作为可选兼容回退: npm i -g github:Daily-AC/OpenCLI", verify: "opencli doctor" }
 
 - id: xiaohongshu
   tier: heavy
   adapter: omnireach.adapters.xiaohongshu.XiaohongshuAdapter
-  description: 小红书 搜索 + 笔记内容 (登录态 Chrome, OpenCLI 后台临时 tab)
+  description: 小红书搜索 (原生 Chrome 桥优先, OpenCLI 兼容回退)
   query_hints: ["小红书", xiaohongshu, "种草", "笔记"]
   default_in_auto: false
   trust: 0.50
   timeout_seconds: 60
   deps:
-    auto:
-      - { kind: npm, name: "github:Daily-AC/OpenCLI" }
+    auto: []
     manual:
-      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
-      - { step: "在 Chrome 中登录 小红书 账号 (打开 xiaohongshu.com 完成登录)", verify: "opencli xiaohongshu state" }
+      - { step: "运行 omnireach bridge install，并在 chrome://extensions 加载输出目录", verify: "omnireach bridge status --json" }
+      - { step: "在 Chrome 中登录小红书账号 (打开 xiaohongshu.com 完成登录)" }
+      - { step: "OpenCLI 仅作为可选兼容回退: npm i -g github:Daily-AC/OpenCLI", verify: "opencli doctor" }
 
 - id: tiktok
   tier: heavy
   adapter: omnireach.adapters.tiktok.TikTokAdapter
-  description: TikTok 视频搜索 (国际版, 登录态 Chrome, OpenCLI 后台临时 tab)
+  description: TikTok 视频搜索 (原生 Chrome 桥优先, OpenCLI 兼容回退)
   query_hints: [tiktok, "海外短视频"]
   default_in_auto: false
   trust: 0.55
   timeout_seconds: 60
   deps:
-    auto:
-      - { kind: npm, name: "github:Daily-AC/OpenCLI" }
+    auto: []
     manual:
-      - { step: "在 Chrome Web Store 安装 OpenCLI 扩展: https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk", verify: "opencli doctor" }
-      - { step: "在 Chrome 中登录 TikTok 账号 (打开 tiktok.com 完成登录)", verify: "opencli tiktok explore --limit 1 --format json" }
+      - { step: "运行 omnireach bridge install，并在 chrome://extensions 加载输出目录", verify: "omnireach bridge status --json" }
+      - { step: "在 Chrome 中登录 TikTok 账号 (打开 tiktok.com 完成登录)" }
+      - { step: "OpenCLI 仅作为可选兼容回退: npm i -g github:Daily-AC/OpenCLI", verify: "opencli doctor" }
 
 - id: douyin
   tier: heavy
@@ -164,6 +164,19 @@
       - { step: "运行 omnireach bridge install，记下输出的 chrome-extension 目录", verify: "omnireach bridge path --json" }
       - { step: "在 chrome://extensions 开启开发者模式，加载上一步目录中的未打包扩展", verify: "omnireach bridge status --json" }
       - { step: "在当前 Chrome 中登录 www.douyin.com", verify: "omnireach search 登录测试 --on douyin --limit 1 --json" }
+
+- id: agy
+  tier: wip
+  adapter: omnireach.adapters.agy.AgyGroundedAdapter
+  description: agy 服务端 Grounded WebSearch (实验性, 仅显式 --on agy)
+  query_hints: []
+  default_in_auto: false
+  trust: 0.80
+  timeout_seconds: 90
+  deps:
+    auto: []
+    manual:
+      - { step: "在 agy 中创建一个专用搜索会话，然后运行 omnireach agy configure <conversation-id>；搜索时保持 agy 运行", verify: "omnireach agy status --json" }
 
 - id: tavily
   tier: booster

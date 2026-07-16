@@ -115,12 +115,24 @@ def test_explicit_sources_are_exact(monkeypatch):
 
 def test_auto_search_skips_browser_sources_without_opencli(monkeypatch):
     monkeypatch.setattr("omnireach.service.shutil.which", lambda _: None)
+    monkeypatch.setattr("omnireach.service.bridge_configured", lambda: False)
 
     result = augment_with_active_browser_sources(
         ["hackernews"], load_registry(), explicit_sources=None, mode="auto"
     )
 
     assert result == ["hackernews"]
+
+
+def test_auto_search_adds_browser_sources_with_native_bridge(monkeypatch):
+    monkeypatch.setattr("omnireach.service.shutil.which", lambda _: None)
+    monkeypatch.setattr("omnireach.service.bridge_configured", lambda: True)
+
+    result = augment_with_active_browser_sources(
+        ["hackernews"], load_registry(), explicit_sources=None, mode="auto"
+    )
+
+    assert result == ["hackernews", "google", "twitter"]
 
 
 def test_auto_search_does_not_duplicate_browser_sources(monkeypatch):

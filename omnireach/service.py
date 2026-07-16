@@ -7,6 +7,7 @@ import shutil
 
 from omnireach.contract import SearchEnvelope, SourceError
 from omnireach.adapters._opencli import opencli_profile
+from omnireach.bridge_install import bridge_configured
 from omnireach.dispatcher import Dispatcher
 from omnireach.normalizer import build_envelope
 from omnireach.registry import Registry, load_registry
@@ -32,7 +33,11 @@ def augment_with_active_browser_sources(
     mode: str,
 ) -> list[str]:
     """Add silent Chrome-backed sources only to non-explicit, non-quick routes."""
-    if explicit_sources or mode == "quick" or not shutil.which("opencli"):
+    if (
+        explicit_sources
+        or mode == "quick"
+        or not (bridge_configured() or shutil.which("opencli"))
+    ):
         return list(source_ids)
     output = list(source_ids)
     for source_id in AUTO_BROWSER_SOURCES:

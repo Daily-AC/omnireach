@@ -1,12 +1,17 @@
 {
   "manifest_version": 3,
   "name": "Omnireach Native Bridge",
-  "version": "0.1.1",
+  "version": "0.2.8",
   "description": "Read-only Chrome session bridge for Omnireach.",
-  "permissions": ["offscreen", "scripting", "tabs", "windows"],
+  "permissions": ["offscreen", "scripting", "tabs"],
   "host_permissions": [
     "http://127.0.0.1:19826/*",
-    "https://www.douyin.com/*"
+    "https://www.douyin.com/*",
+    "https://www.google.com/*",
+    "https://www.reddit.com/*",
+    "https://www.tiktok.com/*",
+    "https://www.xiaohongshu.com/*",
+    "https://x.com/*"
   ],
   "background": {
     "service_worker": "service-worker.js"

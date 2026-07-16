@@ -16,7 +16,8 @@ def test_load_registry_returns_all_sources():
     assert "xiaohongshu" in ids
     assert "tiktok" in ids
     assert "douyin" in ids
-    assert len(reg.sources) == 16
+    assert "agy" in ids
+    assert len(reg.sources) == 17
 
 
 def test_get_by_id():
@@ -80,7 +81,7 @@ def test_registry_includes_wip_tier():
     from omnireach.registry import load_registry
     reg = load_registry()
     wip = {s.id for s in reg.sources if s.tier == "wip"}
-    assert wip == set()  # v0.6: wechat & bilibili promoted to booster
+    assert wip == {"agy"}
 
 
 def test_registry_has_exa_booster():

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 await import("../../omnireach/chrome_extension/douyin.js");
+await import("../../omnireach/chrome_extension/sites.js");
 
 const douyin = globalThis.OmnireachDouyin;
+const sites = globalThis.OmnireachSites;
 
 test("parses Douyin display counts", () => {
   assert.equal(douyin.parseCount("4702"), 4702);
@@ -98,4 +100,118 @@ test("validates search limit without clamping", () => {
   assert.throws(() => douyin.normalizeLimit(0), /between 1 and 30/);
   assert.throws(() => douyin.normalizeLimit(31), /between 1 and 30/);
   assert.throws(() => douyin.normalizeLimit("1.5"), /integer/);
+});
+
+test("projects the real Google search shape", () => {
+  const projected = sites.projectGoogle(
+    [
+      {
+        snippet: "Python 3.14.0 is the newest major release.",
+        title: "Python Release Python 3.14.0",
+        type: "result",
+        url: "https://www.python.org/downloads/release/python-3140/",
+      },
+    ],
+    3,
+  );
+
+  assert.equal(projected.invalidCount, 0);
+  assert.equal(projected.rows[0].type, "result");
+  assert.match(projected.rows[0].url, /^https:\/\/www\.python\.org\//);
+});
+
+test("projects the real Reddit JSON shape and rejects verification HTML", () => {
+  const projected = sites.projectReddit(
+    [
+      {
+        id: "abc",
+        title: "Python 3.14",
+        author: "reader",
+        score: 561,
+        comments: 169,
+        url: "https://www.reddit.com/r/Python/comments/abc/python_314/",
+        created_utc: 1781529030,
+        selftext: "Details",
+      },
+      { title: "Reddit - Please wait for verification", url: "" },
+    ],
+    3,
+  );
+
+  assert.equal(projected.rows.length, 1);
+  assert.equal(projected.invalidCount, 1);
+  assert.equal(projected.rows[0].score, 561);
+});
+
+test("projects real TikTok API fields", () => {
+  const projected = sites.projectTikTok(
+    [
+      {
+        author: "dev",
+        desc: "Python coding tutorial",
+        likes: 8400,
+        plays: 120000,
+        comments: 312,
+        shares: 540,
+        url: "https://www.tiktok.com/@dev/video/7234",
+      },
+    ],
+    3,
+  );
+
+  assert.deepEqual(projected.rows[0], {
+    rank: 1,
+    desc: "Python coding tutorial",
+    author: "dev",
+    url: "https://www.tiktok.com/@dev/video/7234",
+    plays: 120000,
+    likes: 8400,
+    comments: 312,
+    shares: 540,
+  });
+});
+
+test("normalizes Xiaohongshu note rows and derives the date", () => {
+  const projected = sites.projectXiaohongshu(
+    [
+      {
+        title: "Python 3.14 changes",
+        author: "AI dev 3天前",
+        likes: "1.2万",
+        url: "https://www.xiaohongshu.com/explore/697f6c740000000000000000",
+      },
+    ],
+    3,
+  );
+
+  assert.equal(projected.rows[0].published_at, "2026-02-01");
+  assert.equal(projected.rows[0].author, "AI dev");
+  assert.equal(projected.rows[0].likes, "1.2万");
+});
+
+test("normalizes Twitter DOM counters and canonical status rows", () => {
+  const projected = sites.projectTwitter(
+    [
+      {
+        text: "Python 3.14 is out",
+        author: "python",
+        likes: "1.2K",
+        retweets: "42",
+        replies: "7",
+        views: "56.7K",
+        url: "https://x.com/python/status/123456",
+      },
+    ],
+    3,
+  );
+
+  assert.equal(projected.rows[0].id, "123456");
+  assert.equal(projected.rows[0].likes, 1200);
+  assert.equal(projected.rows[0].views, 56700);
+});
+
+test("shared site limits are strict", () => {
+  assert.equal(sites.normalizeLimit(10), 10);
+  assert.throws(() => sites.normalizeLimit(0), /between 1 and 30/);
+  assert.throws(() => sites.normalizeLimit(31), /between 1 and 30/);
 });

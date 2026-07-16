@@ -1,41 +1,32 @@
-"""TikTok adapter — shells out to OpenCLI's logged-in Chrome session.
-
-Requires the `opencli` binary on PATH plus a Chrome profile logged into
-tiktok.com. The wizard (omnireach setup tiktok) walks the user through the
-Chrome extension install + tiktok login.
-
-Note: this adapter targets TikTok (international, tiktok.com), NOT 抖音 (douyin.com).
-For 抖音 see omnireach/adapters/douyin.py once OpenCLI ships douyin search support.
-"""
+"""TikTok adapter backed by the native Chrome or OpenCLI bridge."""
 
 from __future__ import annotations
 
 import shutil
 
-from omnireach.adapters.base import AdapterBase, AdapterUnavailable
-from omnireach.adapters._opencli import run_opencli_json
+from omnireach.adapters.base import AdapterBase
+from omnireach.bridge_install import bridge_configured
+from omnireach.browser_transport import run_browser_json
 from omnireach.contract import Engagement, SearchResult
 
 
 class TikTokAdapter(AdapterBase):
     name = "tiktok"
-    requires = ["opencli"]
+    requires: list[str] = []
 
     async def is_ready(self) -> bool:
-        return all(shutil.which(b) is not None for b in self.requires)
+        return bridge_configured() or shutil.which("opencli") is not None
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        if not shutil.which("opencli"):
-            raise AdapterUnavailable(
-                "tiktok", "opencli not installed", hint="omnireach setup tiktok"
-            )
-
-        items = await run_opencli_json(
-            "tiktok", "tiktok", "search", "--limit", str(limit), query
+        command_result = await run_browser_json(
+            "tiktok",
+            "search",
+            {"query": query, "limit": limit},
+            ("tiktok", "search", "--limit", str(limit), query),
         )
 
         results: list[SearchResult] = []
-        for item in items[:limit]:
+        for item in command_result.items[:limit]:
             desc = item.get("desc") or item.get("description") or item.get("title") or ""
             title = (desc[:80] + "…") if len(desc) > 80 else desc
             # OpenCLI v1.7.22 tiktok search returns: author, comments, desc, likes,
@@ -43,7 +34,7 @@ class TikTokAdapter(AdapterBase):
             results.append(
                 SearchResult(
                     source="tiktok",
-                    adapter="opencli",
+                    adapter=command_result.adapter,
                     title=title,
                     url=item.get("url", ""),
                     content=desc,

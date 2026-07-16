@@ -17,9 +17,10 @@ omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
 ### 先读网页，再启动 Playwright
 
 搜索和读取任务先用两个只读 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
-完全不启动 Chrome；抖音现在可走 Omnireach 自己的轻量只读 Chrome 桥，Google、
-Twitter 和其余浏览器源在逐个迁移期间仍使用 OpenCLI。浏览器路径用完即关，`quick`
-模式仍完全不碰浏览器。点击、表单、文件传输、截图和视觉断言继续交给 Playwright。
+完全不启动 Chrome；Google、Reddit、Twitter、小红书、TikTok、抖音现在都优先走
+Omnireach 自己的轻量只读 Chrome 桥，OpenCLI 保留为兼容回退。浏览器路径使用后台
+临时 tab，用完即关；`quick` 模式仍完全不碰浏览器。点击、表单、文件传输、截图和
+视觉断言继续交给 Playwright。
 
 | 同一次 RFC 9110 读取 | omnireach MCP | Playwright + 无头系统 Chrome |
 |---|---:|---:|
@@ -61,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh 
 ## 你能得到什么
 
 **1. 触达那些触达不了的地方。**
-Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— 这些有登录墙的纵向平台，任何 agent 网络搜索都够不着。omnireach 复用你自己的已登录浏览器会话；抖音已优先走 Omnireach 原生桥，尚未迁移的源继续保留 OpenCLI 兼容路径。
+Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— 这些有登录墙的纵向平台，任何 agent 网络搜索都够不着。omnireach 复用你自己的已登录浏览器会话；六个浏览器搜索源都已优先走 Omnireach 原生桥，OpenCLI 保留为兼容回退。
 
 **2. 统一的数据契约。**
 `omnireach search` → 归一化 metadata + URL，跨所有源格式统一。`omnireach fetch` → 任意 URL 的干净 markdown：普通网页走内置 HTTP 提取 + Jina 兜底，只有 `mp.weixin.qq.com` 走登录态 Chrome。默认路径不需要 Playwright 或 Crawl4AI。
@@ -112,7 +113,7 @@ Chrome；登录墙 adapter 可能通过后台临时 tab 继承现有 Chrome 登�
 | 微信公众号 | ✅ 零配置搜索（Sogou 路径）+ 登录态 Chrome 全文抓取 | ❌ 2026-06 整体删除（[PR #347](https://github.com/Panniantong/Agent-Reach/pull/347)，反爬失效） |
 | 抖音 | ✅ 登录态 Chrome 搜索 | ❌ 2026-06 删除（上游工具已 archive） |
 | TikTok | ✅ 搜索 | ❌ 从未支持 |
-| 输出契约 | 全部 16 源统一 pydantic JSON schema；管道自动 JSON | 设计上无包装层 —— 各上游工具各自的格式（YAML / 纯文本 / 字幕文件 / 裸 JSON） |
+| 输出契约 | 全部 17 源统一 pydantic JSON schema；管道自动 JSON | 设计上无包装层 —— 各上游工具各自的格式（YAML / 纯文本 / 字幕文件 / 裸 JSON） |
 | `search` / `fetch` 命令 | 内置 `omnireach search` + `omnireach fetch <url>`（host 感知路由） | 无 search/read 命令 —— 引导 agent 直接调各上游工具 |
 | Facebook · Instagram · LinkedIn · 雪球 · 播客转录 | ❌ | ✅ |
 | 社区 | 早期 —— 你比大部队先找到了这里 | 51k★，30 位贡献者 |
@@ -142,7 +143,7 @@ omnireach search --on wechat --json "claude 4.7" \
 
 | 命令 | 干嘛 |
 |---|---|
-| `omnireach search "<query>"` | 搜索；已连接 OpenCLI 时自动加入 Google + Twitter |
+| `omnireach search "<query>"` | 搜索；原生 bridge 或 OpenCLI 可用时自动加入 Google + Twitter |
 | `omnireach search --on twitter,reddit "..."` | 指定源 |
 | `omnireach search --sources twitter,reddit "..."` | `--on` 的别名，与 MCP 参数名一致 |
 | `omnireach search --profile <name> "..."` | 为本次搜索选择 OpenCLI Browser Bridge profile |
@@ -162,6 +163,8 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach bridge install` | 安装或更新 Omnireach 原生 Chrome 扩展文件 |
 | `omnireach bridge path` | 输出稳定的未打包扩展目录 |
 | `omnireach bridge status --json` | 通过鉴权 localhost 桥真实 ping 扩展 |
+| `omnireach agy configure <conversation-id>` | 配置实验性 agy grounded-search backend |
+| `omnireach agy status --json` | 检查 agy conversation 与 AgentAPI endpoint |
 | `omnireach doctor` | 健康检查 (含 sources / fetch backends / wechat backends) |
 
 ---
@@ -174,12 +177,13 @@ omnireach search --on wechat --json "claude 4.7" \
 | youtube | ✅ ready | `yt-dlp` (pip install) | `omnireach setup youtube` |
 | github | ✅ ready | `gh` CLI + `gh auth login` | `omnireach setup github` |
 | rss | ✅ ready | 内置 feedparser | query 必须是 URL |
-| google | 🔴 heavy | OpenCLI + Chrome 扩展 | OpenCLI 可用时自动加入；后台临时 tab |
-| reddit | 🔴 heavy | OpenCLI + Chrome 扩展 | 未登录可搜公开内容；Chrome 已登录时自动继承登录态 |
-| twitter | 🔴 heavy | OpenCLI + Chrome 扩展 | OpenCLI 可用时自动加入；继承 Chrome 登录态 |
-| xiaohongshu | 🔴 heavy | OpenCLI + Chrome 扩展 | v0.3 路径 |
-| tiktok | 🔴 heavy | OpenCLI + Chrome 扩展 | TikTok 国际版 (v0.7) |
+| google | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | 任一 transport 可用时自动加入；后台临时 tab |
+| reddit | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | 未登录可搜公开内容；Chrome 已登录时自动继承登录态 |
+| twitter | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | 任一 transport 可用时自动加入；继承 Chrome 登录态 |
+| xiaohongshu | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | 继承当前 Chrome 登录态 |
+| tiktok | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | TikTok 国际版；从真实 DOM 提取结果 |
 | douyin | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | 原生路径继承当前 Chrome 登录态，不调用 OpenCLI |
+| agy | 🚧 experimental | 已登录 agy CLI + 专用 conversation | 仅显式 `--on agy`；复用 agy 服务端 grounded WebSearch |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | 付费 (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | 付费 (v0.4) |
 | 💎 perplexity | booster | env `PERPLEXITY_API_KEY` | 付费 (v0.4) |
@@ -187,7 +191,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | wechat | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | 微信公众号 — search 走 Sogou 免费搜索; `EXA_API_KEY` 可选启用语义增强; v0.10.1 起 `omnireach fetch <wechat-url>` 自动走 OpenCLI 登录态 Chrome 拿正文 |
 | bilibili | ✅ ready | 无 (可选 `EXA_API_KEY` 增强) | B站 — v0.9 起默认走 B站官方 search API; `EXA_API_KEY` 可选启用语义增强 |
 
-> **抖音 (douyin.com)**: 运行 `omnireach bridge install`，在 `chrome://extensions` 中一次性加载输出目录里的未打包扩展，并在同一 Chrome profile 登录 www.douyin.com。默认 `auto` 优先走这个零新增依赖的原生路径，仅在扩展缺失或未连接时回退 OpenCLI。设置 `OMNIREACH_BROWSER_TRANSPORT=native` 可验证全程没有调用 OpenCLI。
+> **原生浏览器源**: 运行 `omnireach bridge install`，在 `chrome://extensions` 中一次性加载输出目录里的未打包扩展，并在同一 Chrome profile 登录需要的网站。默认 `auto` 对 Google、Reddit、Twitter、小红书、TikTok、抖音优先走这个零新增依赖的原生路径，再回退 OpenCLI。设置 `OMNIREACH_BROWSER_TRANSPORT=native` 可验证全程没有调用 OpenCLI。
+
+> **agy grounded search**: 保持一个已登录的 `agy` CLI 进程运行，创建专用 conversation，然后执行 `omnireach agy configure <conversation-id>`。用 `omnireach agy status --json` 验证，再通过 `omnireach search --on agy --json "query"` 显式调用。
 
 > **微信公众号 fetch**: Sogou 零配置搜索现在会在同一 HTTP session 内把签名跳转链接解成直达 `mp.weixin.qq.com` URL；fetch 再用 Daily-AC/OpenCLI fork 的 `weixin download --stdout`，显式创建后台临时 tab，命令结束立即释放。
 

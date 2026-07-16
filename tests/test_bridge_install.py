@@ -16,6 +16,17 @@ def test_install_extension_is_idempotent_and_preserves_token(tmp_path):
     assert stat.S_IMODE(first.token_path.stat().st_mode) == 0o600
 
 
+def test_install_extension_can_rotate_existing_token(tmp_path):
+    first = install_extension(home=tmp_path)
+    first_token = first.token_path.read_text().strip()
+
+    second = install_extension(home=tmp_path, rotate_token=True)
+
+    assert second.token_path.read_text().strip() != first_token
+    config = (second.extension_dir / "bridge-config.js").read_text()
+    assert second.token_path.read_text().strip() in config
+
+
 def test_install_extension_copies_assets_and_generates_config(tmp_path):
     paths = install_extension(home=tmp_path)
 
@@ -25,6 +36,10 @@ def test_install_extension_copies_assets_and_generates_config(tmp_path):
     assert manifest["name"] == "Omnireach Native Bridge"
     assert (paths.extension_dir / "offscreen.html").exists()
     assert paths.token_path.read_text().strip() in config
+    assert f'"extensionVersion":"{manifest["version"]}"' in config
+    assert "chrome.runtime.getManifest" not in (
+        paths.extension_dir / "offscreen.js"
+    ).read_text()
     assert "bridge-config.example.js" not in {
         item.name for item in paths.extension_dir.iterdir()
     }

@@ -11,12 +11,14 @@ from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from omnireach.bridge_install import bridge_configured, bridge_paths
 
 BRIDGE_HOST = "127.0.0.1"
 BRIDGE_PORT = 19826
 MAX_RESULT_BYTES = 4 * 1024 * 1024
+NATIVE_EXTENSION_MIN_VERSION = "0.2.8"
 
 
 class NativeBridgeUnavailable(Exception):
@@ -36,6 +38,7 @@ class _BridgeState:
     delivered_event: threading.Event = field(default_factory=threading.Event)
     result_event: threading.Event = field(default_factory=threading.Event)
     lock: threading.Lock = field(default_factory=threading.Lock)
+    seen_versions: set[str] = field(default_factory=set)
 
 
 class _BridgeServer(ThreadingHTTPServer):
@@ -45,6 +48,18 @@ class _BridgeServer(ThreadingHTTPServer):
     def __init__(self, address: tuple[str, int], state: _BridgeState) -> None:
         self.state = state
         super().__init__(address, _BridgeHandler)
+
+
+def _version_at_least(value: str, minimum: str) -> bool:
+    def parse(version: str) -> tuple[int, ...] | None:
+        try:
+            return tuple(int(part) for part in version.split("."))
+        except ValueError:
+            return None
+
+    parsed = parse(value)
+    required = parse(minimum)
+    return parsed is not None and required is not None and parsed >= required
 
 
 class _BridgeHandler(BaseHTTPRequestHandler):
@@ -57,7 +72,10 @@ class _BridgeHandler(BaseHTTPRequestHandler):
         body = b"" if payload is None else json.dumps(payload).encode()
         self.send_response(status)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Authorization, Content-Type, X-Omnireach-Extension-Version",
+        )
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Cache-Control", "no-store")
         if body:
@@ -79,10 +97,21 @@ class _BridgeHandler(BaseHTTPRequestHandler):
         self._send_json(204)
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path != "/v1/job":
+        parsed_path = urlparse(self.path)
+        if parsed_path.path != "/v1/job":
             self._send_json(404, {"error": "not found"})
             return
         if not self._authorized():
+            return
+        query = parse_qs(parsed_path.query)
+        extension_version = (
+            query.get("extension_version", [""])[0]
+            or self.headers.get("X-Omnireach-Extension-Version", "")
+        )
+        with self.server.state.lock:
+            self.server.state.seen_versions.add(extension_version or "missing")
+        if not _version_at_least(extension_version, NATIVE_EXTENSION_MIN_VERSION):
+            self._send_json(204)
             return
         state = self.server.state
         with state.lock:
@@ -180,7 +209,7 @@ def run_native_job(
     home: Path | None = None,
     port: int = BRIDGE_PORT,
     connect_timeout: float = 2.0,
-    result_timeout: float = 22.0,
+    result_timeout: float = 60.0,
     cancel_event: threading.Event | None = None,
 ) -> list[dict[str, Any]]:
     if cancel_event is not None and cancel_event.is_set():
@@ -215,8 +244,10 @@ def run_native_job(
     thread.start()
     try:
         if not _wait_for(state.delivered_event, connect_timeout, cancel_event):
+            seen = ", ".join(sorted(state.seen_versions)) or "none"
             raise NativeBridgeUnavailable(
-                "native bridge extension did not connect before timeout"
+                "native bridge extension did not connect before timeout "
+                f"(poller versions seen: {seen}; required: {NATIVE_EXTENSION_MIN_VERSION})"
             )
         if not _wait_for(state.result_event, result_timeout, cancel_event):
             raise NativeBridgeCommandError("native bridge result timeout")
@@ -233,6 +264,6 @@ def probe_native_bridge(*, home: Path | None = None) -> dict[str, Any]:
         {},
         home=home,
         connect_timeout=1.0,
-        result_timeout=2.0,
+        result_timeout=5.0,
     )
     return items[0] if items else {"pong": True}

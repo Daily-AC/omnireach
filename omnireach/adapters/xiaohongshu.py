@@ -1,9 +1,4 @@
-"""小红书 (Xiaohongshu) adapter — shells out to OpenCLI's logged-in Chrome session.
-
-Requires the `opencli` binary on PATH plus a Chrome profile logged into
-xiaohongshu.com. The wizard (omnireach setup xiaohongshu) walks the user
-through the Chrome extension install + xiaohongshu login.
-"""
+"""Xiaohongshu adapter backed by the native Chrome or OpenCLI bridge."""
 
 from __future__ import annotations
 
@@ -11,8 +6,9 @@ import re
 import shutil
 from decimal import Decimal, InvalidOperation
 
-from omnireach.adapters.base import AdapterBase, AdapterUnavailable
-from omnireach.adapters._opencli import run_opencli_json
+from omnireach.adapters.base import AdapterBase
+from omnireach.bridge_install import bridge_configured
+from omnireach.browser_transport import run_browser_json
 from omnireach.contract import Engagement, SearchResult
 
 
@@ -41,19 +37,17 @@ def _parse_likes(v: object) -> int | None:
 
 class XiaohongshuAdapter(AdapterBase):
     name = "xiaohongshu"
-    requires = ["opencli"]
+    requires: list[str] = []
 
     async def is_ready(self) -> bool:
-        return all(shutil.which(b) is not None for b in self.requires)
+        return bridge_configured() or shutil.which("opencli") is not None
 
     async def search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
-        if not shutil.which("opencli"):
-            raise AdapterUnavailable(
-                "xiaohongshu", "opencli not installed", hint="omnireach setup xiaohongshu"
-            )
-
-        items = await run_opencli_json(
-            "xiaohongshu", "xiaohongshu", "search", "--limit", str(limit), query
+        command_result = await run_browser_json(
+            "xiaohongshu",
+            "search",
+            {"query": query, "limit": limit},
+            ("xiaohongshu", "search", "--limit", str(limit), query),
         )
 
         # OpenCLI xhs search keys observed (v0.8.1 hotfix, real E2E 2026-05-27):
@@ -61,11 +55,11 @@ class XiaohongshuAdapter(AdapterBase):
         # body / comment_count / collect_count are NOT exposed in search results,
         # so content stays "" and comments/shares stay None.
         results: list[SearchResult] = []
-        for item in items[:limit]:
+        for item in command_result.items[:limit]:
             results.append(
                 SearchResult(
                     source="xiaohongshu",
-                    adapter="opencli",
+                    adapter=command_result.adapter,
                     title=item.get("title", ""),
                     url=item.get("url", ""),
                     content=item.get("content", ""),
