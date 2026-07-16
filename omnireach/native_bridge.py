@@ -19,6 +19,7 @@ BRIDGE_HOST = "127.0.0.1"
 BRIDGE_PORT = 19826
 MAX_RESULT_BYTES = 4 * 1024 * 1024
 NATIVE_EXTENSION_MIN_VERSION = "0.2.8"
+_NATIVE_JOB_LOCK = threading.Lock()
 
 
 class NativeBridgeUnavailable(Exception):
@@ -180,6 +181,17 @@ def _wait_for(
             return True
 
 
+def _acquire_native_job_lock(cancel_event: threading.Event | None) -> None:
+    while True:
+        if cancel_event is not None and cancel_event.is_set():
+            raise NativeBridgeUnavailable("native bridge command cancelled")
+        if _NATIVE_JOB_LOCK.acquire(timeout=0.05):
+            if cancel_event is not None and cancel_event.is_set():
+                _NATIVE_JOB_LOCK.release()
+                raise NativeBridgeUnavailable("native bridge command cancelled")
+            return
+
+
 def _validate_response(response: dict[str, Any] | None) -> list[dict[str, Any]]:
     if response is None:
         raise NativeBridgeCommandError("native bridge returned no result envelope")
@@ -222,6 +234,7 @@ def run_native_job(
     token = paths.token_path.read_text(encoding="utf-8").strip()
     if not token:
         raise NativeBridgeUnavailable("native bridge token is empty")
+    _acquire_native_job_lock(cancel_event)
     state = _BridgeState(
         token=token,
         job={
@@ -231,31 +244,34 @@ def run_native_job(
         },
     )
     try:
-        server = _BridgeServer((BRIDGE_HOST, port), state)
-    except OSError as exc:
-        raise NativeBridgeUnavailable(
-            f"native bridge port {port} is unavailable: {exc}"
-        ) from exc
-    thread = threading.Thread(
-        target=server.serve_forever,
-        kwargs={"poll_interval": 0.05},
-        daemon=True,
-    )
-    thread.start()
-    try:
-        if not _wait_for(state.delivered_event, connect_timeout, cancel_event):
-            seen = ", ".join(sorted(state.seen_versions)) or "none"
+        try:
+            server = _BridgeServer((BRIDGE_HOST, port), state)
+        except OSError as exc:
             raise NativeBridgeUnavailable(
-                "native bridge extension did not connect before timeout "
-                f"(poller versions seen: {seen}; required: {NATIVE_EXTENSION_MIN_VERSION})"
-            )
-        if not _wait_for(state.result_event, result_timeout, cancel_event):
-            raise NativeBridgeCommandError("native bridge result timeout")
-        return _validate_response(state.response)
+                f"native bridge port {port} is unavailable: {exc}"
+            ) from exc
+        thread = threading.Thread(
+            target=server.serve_forever,
+            kwargs={"poll_interval": 0.05},
+            daemon=True,
+        )
+        thread.start()
+        try:
+            if not _wait_for(state.delivered_event, connect_timeout, cancel_event):
+                seen = ", ".join(sorted(state.seen_versions)) or "none"
+                raise NativeBridgeUnavailable(
+                    "native bridge extension did not connect before timeout "
+                    f"(poller versions seen: {seen}; required: {NATIVE_EXTENSION_MIN_VERSION})"
+                )
+            if not _wait_for(state.result_event, result_timeout, cancel_event):
+                raise NativeBridgeCommandError("native bridge result timeout")
+            return _validate_response(state.response)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1)
     finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=1)
+        _NATIVE_JOB_LOCK.release()
 
 
 def probe_native_bridge(*, home: Path | None = None) -> dict[str, Any]:

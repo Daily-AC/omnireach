@@ -330,6 +330,48 @@ def test_native_bridge_reuses_fixed_port_after_completed_job(tmp_path):
     run_once()
 
 
+def test_native_bridge_serializes_concurrent_jobs_on_fixed_port(tmp_path):
+    paths = install_extension(home=tmp_path)
+    token = paths.token_path.read_text().strip()
+    port = _free_port()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(
+                run_native_job,
+                command,
+                {"query": command},
+                home=tmp_path,
+                port=port,
+                connect_timeout=2,
+                result_timeout=2,
+            )
+            for command in ("google.search", "twitter.search")
+        ]
+        seen_commands = set()
+        for _ in range(2):
+            job = _poll_job(port, token)
+            seen_commands.add(job["command"])
+            result = {
+                "id": job["id"],
+                "ok": True,
+                "items": [{"command": job["command"]}],
+            }
+            with _request(
+                port,
+                token,
+                method="POST",
+                path="/v1/result",
+                body=json.dumps(result).encode(),
+            ):
+                pass
+
+        assert seen_commands == {"google.search", "twitter.search"}
+        assert {
+            future.result()[0]["command"] for future in futures
+        } == seen_commands
+
+
 def test_native_bridge_cancellation_stops_waiting(tmp_path):
     install_extension(home=tmp_path)
     cancel = threading.Event()
