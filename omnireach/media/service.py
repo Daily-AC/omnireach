@@ -11,7 +11,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlparse
 
 import httpx
 
@@ -40,6 +40,7 @@ _SUBTITLE_FORMAT_PREFERENCE = ("vtt", "json3", "srt", "json")
 _PREVIEW_LIMIT = 5000
 _PUBLIC_TRACK_LIMIT = 40
 _SUBTITLE_MAX_BYTES = 20 * 1024 * 1024
+_DEFAULT_DOWNLOAD_MAX_BYTES = 500 * 1024 * 1024
 _BVID_RE = re.compile(r"(?:^|/)(BV[0-9A-Za-z]+)(?:[/?#]|$)")
 _HTTP_HEADERS = {
     "User-Agent": (
@@ -65,6 +66,13 @@ def _source(url: str) -> str:
         return "youtube"
     if host == "bilibili.com" or host.endswith(".bilibili.com") or host == "b23.tv":
         return "bilibili"
+    if (
+        host == "douyin.com"
+        or host.endswith(".douyin.com")
+        or host == "iesdouyin.com"
+        or host.endswith(".iesdouyin.com")
+    ):
+        return "douyin"
     return "direct"
 
 
@@ -115,6 +123,19 @@ def _published_at(value: Any) -> str | None:
             int(raw), timezone.utc,
         ).isoformat().replace("+00:00", "Z")
     return raw
+
+
+def _safe_public_url(value: Any) -> str | None:
+    if not isinstance(value, str) or not value:
+        return None
+    parsed = urlparse(value)
+    sensitive = {
+        "auth", "expire", "expires", "key-pair-id", "policy", "sig",
+        "signature", "token", "x-expires", "x-signature",
+    }
+    if any(key.casefold() in sensitive for key, _ in parse_qsl(parsed.query)):
+        return None
+    return value
 
 
 def _subtitle_tracks(
@@ -168,11 +189,11 @@ def _subtitle_tracks(
     return tracks[:_PUBLIC_TRACK_LIMIT], internal, omitted
 
 
-def _inspect_ytdlp(
+def _ytdlp_payload(
     url: str,
     timeout: float,
     cookies_from_browser: str | None = None,
-) -> tuple[MediaEnvelope, list[dict[str, str]]]:
+) -> dict[str, Any]:
     if not shutil.which("yt-dlp"):
         raise FileNotFoundError("yt-dlp is not installed")
     command = ["yt-dlp", "--dump-single-json", "--skip-download", "--no-warnings"]
@@ -181,7 +202,14 @@ def _inspect_ytdlp(
     if cookies_from_browser:
         command.extend(["--cookies-from-browser", cookies_from_browser])
     command.append(url)
-    payload = _run_json(command, timeout)
+    return _run_json(command, timeout)
+
+
+def _normalize_ytdlp(
+    url: str,
+    payload: dict[str, Any],
+    timeout: float,
+) -> tuple[MediaEnvelope, list[dict[str, str]]]:
     tracks, internal_tracks, omitted_tracks = _subtitle_tracks(payload)
     duration = payload.get("duration")
     media_type: Literal["video", "audio", "unknown"] = "unknown"
@@ -189,6 +217,7 @@ def _inspect_ytdlp(
         media_type = "video"
     elif payload.get("acodec") not in {None, "none"}:
         media_type = "audio"
+    thumbnail_url = _safe_public_url(payload.get("thumbnail"))
     envelope = MediaEnvelope(
         ok=True,
         url=url,
@@ -204,7 +233,7 @@ def _inspect_ytdlp(
             description=payload.get("description"),
             duration_ms=round(float(duration) * 1000) if duration is not None else None,
             published_at=_published_at(payload.get("upload_date") or payload.get("timestamp")),
-            thumbnail_url=payload.get("thumbnail"),
+            thumbnail_url=thumbnail_url,
             width=payload.get("width"),
             height=payload.get("height"),
             codec=payload.get("vcodec") or payload.get("acodec"),
@@ -219,7 +248,20 @@ def _inspect_ytdlp(
             f"Subtitle track listing omitted {omitted_tracks} languages; "
             "request a language explicitly when parsing"
         )
+    if payload.get("thumbnail") and thumbnail_url is None:
+        envelope.warnings.append(
+            "Signed thumbnail URL omitted from public metadata"
+        )
     return envelope, internal_tracks
+
+
+def _inspect_ytdlp(
+    url: str,
+    timeout: float,
+    cookies_from_browser: str | None = None,
+) -> tuple[MediaEnvelope, list[dict[str, str]]]:
+    payload = _ytdlp_payload(url, timeout, cookies_from_browser)
+    return _normalize_ytdlp(url, payload, timeout)
 
 
 def _bilibili_bvid(url: str, timeout: float) -> str:
@@ -379,11 +421,19 @@ def _inspect_direct(url: str, timeout: float) -> tuple[MediaEnvelope, list[dict[
     return envelope, []
 
 
-def _failed_envelope(url: str, mode: Literal["inspect", "quick"], backend: str, exc: Exception) -> MediaEnvelope:
+def _failed_envelope(
+    url: str,
+    mode: Literal["inspect", "quick", "download"],
+    backend: str,
+    exc: Exception,
+) -> MediaEnvelope:
     unavailable = isinstance(exc, FileNotFoundError)
+    invalid = isinstance(exc, ValueError)
+    limited = isinstance(exc, OverflowError)
     folded = str(exc).casefold()
     blocked = any(marker in folded for marker in (
-        "http error 401", "http error 403", "http error 412", "captcha", "verification",
+        "http error 401", "http error 403", "http error 412", "captcha",
+        "verification", "fresh cookies", "login required", "sign in",
     ))
     retryable = isinstance(exc, subprocess.TimeoutExpired) or any(
         marker in folded for marker in ("ssl", "eof", "connection", "temporarily unavailable")
@@ -395,6 +445,11 @@ def _failed_envelope(url: str, mode: Literal["inspect", "quick"], backend: str, 
         hint = "Install ffmpeg (which includes ffprobe) and retry"
     elif isinstance(exc, subprocess.TimeoutExpired):
         hint = "Retry with a larger --timeout value"
+    elif "cookie" in folded or "login required" in folded or "sign in" in folded:
+        hint = (
+            "Retry with an explicitly authorized browser profile, for example "
+            "--cookies-from-browser 'chrome:Profile 1'"
+        )
     elif blocked:
         hint = "The upstream blocked anonymous access; retry on another network or with an authenticated backend"
     elif retryable:
@@ -410,7 +465,13 @@ def _failed_envelope(url: str, mode: Literal["inspect", "quick"], backend: str, 
         errors=[MediaError(
             stage="inspect",
             backend=backend,
-            category="unavailable" if unavailable else "blocked" if blocked else "failed",
+            category=(
+                "unavailable" if unavailable
+                else "blocked" if blocked
+                else "limit" if limited
+                else "invalid" if invalid
+                else "failed"
+            ),
             message=str(exc),
             hint=hint,
             retryable=retryable,
@@ -502,6 +563,22 @@ def _write_artifact(path: Path, content: bytes, kind: str, mime: str) -> MediaAr
     )
 
 
+def _file_artifact(path: Path, kind: str, mime: str) -> MediaArtifact:
+    digest = hashlib.sha256()
+    size = 0
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            size += len(chunk)
+            digest.update(chunk)
+    return MediaArtifact(
+        kind=kind,
+        path=str(path.resolve()),
+        mime=mime,
+        bytes=size,
+        sha256=digest.hexdigest(),
+    )
+
+
 def _parse_cache_key(
     url: str,
     backend: str,
@@ -573,6 +650,236 @@ def _load_cached_envelope(
         sha256=hashlib.sha256(manifest_bytes).hexdigest(),
     ))
     envelope.cache_hit = True
+    return envelope
+
+
+def _download_cache_key(
+    url: str,
+    quality: str,
+    cookies_from_browser: str | None,
+    max_bytes: int,
+) -> str:
+    payload = json.dumps({
+        "operation": "download",
+        "url": url,
+        "quality": quality,
+        "cookies_from_browser": cookies_from_browser,
+        "max_bytes": max_bytes,
+    }, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _download_artifact_dir(
+    url: str,
+    output_dir: Path | None,
+    cache_key: str,
+) -> Path:
+    base = (
+        output_dir.expanduser()
+        if output_dir is not None
+        else Path.home() / ".cache" / "omnireach" / "media" / "downloads"
+    )
+    url_key = hashlib.sha256(url.encode()).hexdigest()[:16]
+    root = base / f"douyin-{url_key}-{cache_key[:12]}"
+    root.mkdir(parents=True, exist_ok=True)
+    return root.resolve()
+
+
+def _download_formats(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    formats = payload.get("formats")
+    if not isinstance(formats, list):
+        return []
+    return [
+        item for item in formats
+        if isinstance(item, dict)
+        and item.get("format_id")
+        and str(item.get("ext") or "").lower() == "mp4"
+        and item.get("vcodec") not in {None, "none"}
+        and item.get("acodec") not in {None, "none"}
+    ]
+
+
+def _format_bytes(item: dict[str, Any]) -> int | None:
+    value = item.get("filesize") or item.get("filesize_approx")
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+        return round(value)
+    return None
+
+
+def _select_download_format(
+    payload: dict[str, Any],
+    quality: Literal["compatible", "best", "small"],
+    max_bytes: int,
+) -> dict[str, Any]:
+    formats = _download_formats(payload)
+    bounded = [item for item in formats if _format_bytes(item) is not None]
+    eligible = [item for item in bounded if (_format_bytes(item) or 0) <= max_bytes]
+    if not eligible:
+        if bounded:
+            smallest = min(_format_bytes(item) or 0 for item in bounded)
+            raise OverflowError(
+                f"smallest downloadable MP4 is {smallest} bytes, above the "
+                f"{max_bytes} byte limit"
+            )
+        raise RuntimeError(
+            "Douyin did not report a bounded combined MP4 format; refusing an "
+            "unbounded download"
+        )
+
+    def score(item: dict[str, Any]) -> tuple[int, float, int]:
+        pixels = int(item.get("width") or 0) * int(item.get("height") or 0)
+        bitrate = float(item.get("tbr") or 0)
+        return pixels, bitrate, _format_bytes(item) or 0
+
+    if quality == "small":
+        return min(eligible, key=lambda item: (_format_bytes(item) or 0, *score(item)))
+    if quality == "compatible":
+        h264 = [
+            item for item in eligible
+            if str(item.get("vcodec") or "").casefold().startswith(("h264", "avc"))
+        ]
+        return max(h264 or eligible, key=score)
+    return max(eligible, key=score)
+
+
+def _run_download(command: list[str], timeout: float) -> Path:
+    proc = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()
+        raise RuntimeError(detail[-1000:])
+    paths = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+    if not paths:
+        raise RuntimeError("yt-dlp completed without reporting the downloaded file")
+    return Path(paths[-1]).expanduser().resolve()
+
+
+def download_media(
+    url: str,
+    *,
+    quality: Literal["compatible", "best", "small"] = "compatible",
+    cookies_from_browser: str | None = None,
+    output_dir: Path | None = None,
+    reuse_cache: bool = True,
+    max_bytes: int = _DEFAULT_DOWNLOAD_MAX_BYTES,
+    timeout: float = 600,
+) -> MediaEnvelope:
+    """Download one bounded Douyin MP4 and return a verified local artifact."""
+    try:
+        _validate_url(url)
+    except ValueError as exc:
+        return _failed_envelope(url, "download", "yt-dlp", exc)
+    if _source(url) != "douyin":
+        return MediaEnvelope(
+            ok=False,
+            url=url,
+            source=_source(url),
+            media_type="unknown",
+            backend="yt-dlp",
+            mode="download",
+            parsed_at=_now(),
+            errors=[MediaError(
+                stage="resolve",
+                backend="yt-dlp",
+                category="invalid",
+                message="media download currently supports Douyin URLs only",
+            )],
+        )
+    if quality not in {"compatible", "best", "small"}:
+        return _failed_envelope(
+            url, "download", "yt-dlp", ValueError("unknown download quality")
+        )
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 1:
+        return _failed_envelope(
+            url, "download", "yt-dlp", ValueError("max_bytes must be a positive integer")
+        )
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout < 1:
+        return _failed_envelope(
+            url, "download", "yt-dlp", ValueError("timeout must be a positive number")
+        )
+
+    cache_key = _download_cache_key(
+        url, quality, cookies_from_browser, max_bytes,
+    )
+    try:
+        root = _download_artifact_dir(url, output_dir, cache_key)
+    except OSError as exc:
+        failed = _failed_envelope(url, "download", "yt-dlp", exc)
+        failed.errors[0].stage = "artifact"
+        return failed
+    if reuse_cache:
+        cached = _load_cached_envelope(root, url, cache_key)
+        if cached is not None and cached.mode == "download":
+            return cached
+
+    try:
+        payload = _ytdlp_payload(url, min(timeout, 120), cookies_from_browser)
+        envelope, _ = _normalize_ytdlp(url, payload, min(timeout, 10))
+        selected = _select_download_format(payload, quality, max_bytes)
+        extension = str(selected.get("ext") or "mp4").lower()
+        expected_path = (root / f"video.{extension}").resolve()
+        for stale in root.glob("video.*"):
+            if stale.is_file():
+                stale.unlink()
+        command = [
+            "yt-dlp", "--no-playlist", "--no-warnings", "--no-progress",
+            "--format", str(selected["format_id"]),
+            "--max-filesize", str(max_bytes),
+            "--output", str(root / "video.%(ext)s"),
+            "--print", "after_move:filepath",
+        ]
+        if cookies_from_browser:
+            command.extend(["--cookies-from-browser", cookies_from_browser])
+        command.append(url)
+        downloaded_path = _run_download(command, timeout)
+        if not downloaded_path.is_relative_to(root) or downloaded_path != expected_path:
+            raise RuntimeError("yt-dlp reported a file outside the managed download path")
+        if not downloaded_path.is_file():
+            raise RuntimeError("yt-dlp reported a downloaded file that does not exist")
+        actual_bytes = downloaded_path.stat().st_size
+        if actual_bytes > max_bytes:
+            downloaded_path.unlink(missing_ok=True)
+            raise OverflowError(
+                f"downloaded file is {actual_bytes} bytes, above the {max_bytes} byte limit"
+            )
+    except (
+        FileNotFoundError,
+        RuntimeError,
+        subprocess.TimeoutExpired,
+        OSError,
+        ValueError,
+        OverflowError,
+    ) as exc:
+        for partial in root.glob("video.*"):
+            if partial.is_file():
+                try:
+                    partial.unlink(missing_ok=True)
+                except OSError:
+                    pass
+        failed = _failed_envelope(url, "download", "yt-dlp", exc)
+        failed.errors[0].stage = "download"
+        if isinstance(exc, OverflowError):
+            failed.errors[0].category = "limit"
+            failed.errors[0].hint = "Retry with a larger --max-size-mb value"
+        return failed
+
+    envelope.mode = "download"
+    envelope.cache_key = cache_key
+    if envelope.metadata is not None:
+        envelope.metadata.width = selected.get("width")
+        envelope.metadata.height = selected.get("height")
+        envelope.metadata.codec = str(selected.get("vcodec") or "") or None
+    mime = mimetypes.guess_type(downloaded_path.name)[0] or "video/mp4"
+    envelope.artifacts.append(_file_artifact(downloaded_path, "media", mime))
+    envelope.warnings.append(
+        f"Downloaded yt-dlp format {selected['format_id']} ({quality})"
+    )
+    manifest_payload = envelope.model_dump(mode="json")
+    manifest_bytes = json.dumps(
+        manifest_payload, ensure_ascii=False, indent=2,
+    ).encode()
+    envelope.artifacts.append(_write_artifact(
+        root / "manifest.json", manifest_bytes, "manifest", "application/json",
+    ))
     return envelope
 
 

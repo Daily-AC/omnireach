@@ -46,6 +46,7 @@ def test_skill_requires_mcp_before_browser_automation():
     assert "omnireach_search" in text
     assert "omnireach_fetch" in text
     assert "omnireach_parse_media" in text
+    assert "omnireach_download_media" in text
     assert "playwright" in text
     assert text.index("omnireach_search") < text.index("playwright")
 

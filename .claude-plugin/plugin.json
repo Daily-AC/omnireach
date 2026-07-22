@@ -1,7 +1,7 @@
 {
   "name": "omnireach",
-  "version": "0.17.0-alpha",
-  "description": "Search, read, and parse media across the login-walled Chinese internet for AI agents. Stable JSON contracts and zero-config WeChat search.",
+  "version": "0.18.0-alpha",
+  "description": "Search and read the login-walled Chinese internet, parse media, and download bounded Douyin videos for AI agents.",
   "author": {"name": "Daily-AC"},
   "license": "MIT",
   "homepage": "https://github.com/Daily-AC/omnireach"

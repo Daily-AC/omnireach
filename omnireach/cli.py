@@ -261,7 +261,9 @@ main.add_command(media_cmd)
 def _entrypoint() -> None:
     """Console-script wrapper that catches unhandled exceptions and points users at issues."""
     try:
-        main.main(standalone_mode=False)
+        exit_code = main.main(standalone_mode=False)
+        if isinstance(exit_code, int) and exit_code != 0:
+            raise SystemExit(exit_code)
     except click.ClickException as exc:
         json_requested = "--json" in sys.argv[1:] or os.environ.get(
             "OMNIREACH_FORCE_JSON", ""
