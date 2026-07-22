@@ -1,0 +1,34 @@
+{
+  "_fixture": "Captured from yt-dlp 2026.06.09 on 2026-07-22; signed caption URLs replaced with non-routable examples.",
+  "id": "dQw4w9WgXcQ",
+  "title": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+  "description": "The official video for Never Gonna Give You Up by Rick Astley.",
+  "channel": "Rick Astley",
+  "duration": 213,
+  "upload_date": "20091025",
+  "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+  "width": 3840,
+  "height": 2160,
+  "vcodec": "av01.0.12M.08",
+  "acodec": "mp4a.40.2",
+  "subtitles": {
+    "en": [
+      {"ext": "json3", "url": "https://signed.example/en.json3?redacted=1"},
+      {"ext": "srt", "url": "https://signed.example/en.srt?redacted=1"},
+      {"ext": "vtt", "url": "https://signed.example/en.vtt?redacted=1"}
+    ],
+    "de-DE": [
+      {"ext": "vtt", "url": "https://signed.example/de-DE.vtt?redacted=1"}
+    ]
+  },
+  "automatic_captions": {
+    "en-orig": [
+      {"ext": "json3", "url": "https://signed.example/en-orig.json3?redacted=1"},
+      {"ext": "vtt", "url": "https://signed.example/en-orig.vtt?redacted=1"}
+    ],
+    "zh-Hans": [
+      {"ext": "json3", "url": "https://signed.example/zh-Hans.json3?redacted=1"},
+      {"ext": "vtt", "url": "https://signed.example/zh-Hans.vtt?redacted=1"}
+    ]
+  }
+}
