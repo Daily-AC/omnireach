@@ -1,0 +1,31 @@
+{
+  "_fixture": "Captured from Bilibili anonymous APIs on 2026-07-22.",
+  "view": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "bvid": "BV1R1e4zKEh1",
+      "title": "【4KHDR 真彩®】《最佳 4K HDR》—— ULTRA HD 60帧 杜比视界测试片源",
+      "desc": "",
+      "duration": 1207,
+      "pubdate": 1755859632,
+      "cid": 31870356198,
+      "owner": {"name": "般若0999"},
+      "dimension": {"width": 3840, "height": 2160, "rotate": 0},
+      "pic": "http://i2.hdslb.com/bfs/archive/9e9f6f07b5488b91dccdcdfd270e4d351c04d645.jpg"
+    }
+  },
+  "player": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "need_login_subtitle": true,
+      "subtitle": {
+        "allow_submit": false,
+        "lan": "",
+        "lan_doc": "",
+        "subtitles": []
+      }
+    }
+  }
+}
