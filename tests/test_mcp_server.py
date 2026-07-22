@@ -22,7 +22,7 @@ def test_initialize_advertises_static_tools():
     }
 
 
-def test_tools_list_exposes_search_and_fetch():
+def test_tools_list_exposes_search_fetch_and_media():
     response = handle_message({
         "jsonrpc": "2.0",
         "id": 2,
@@ -31,9 +31,13 @@ def test_tools_list_exposes_search_and_fetch():
     })
 
     tools = {tool["name"]: tool for tool in response["result"]["tools"]}
-    assert set(tools) == {"omnireach_search", "omnireach_fetch"}
+    assert set(tools) == {
+        "omnireach_search", "omnireach_fetch", "omnireach_parse_media",
+    }
     assert tools["omnireach_search"]["inputSchema"]["required"] == ["query"]
     assert tools["omnireach_fetch"]["annotations"]["readOnlyHint"] is True
+    assert tools["omnireach_parse_media"]["annotations"]["readOnlyHint"] is False
+    assert tools["omnireach_parse_media"]["outputSchema"]["title"] == "MediaEnvelope"
 
 
 def test_initialized_notification_has_no_response():
@@ -123,6 +127,77 @@ def test_fetch_exhaustion_is_a_tool_error(monkeypatch):
     assert response["result"]["structuredContent"]["errors"] == [
         "http: blocked"
     ]
+
+
+def test_media_inspect_tool_does_not_materialize_artifacts(monkeypatch):
+    from omnireach.media.contract import MediaEnvelope
+
+    captured = {}
+
+    def fake_inspect(url, **kwargs):
+        captured.update(kwargs)
+        return MediaEnvelope(
+            ok=True,
+            url=url,
+            source="youtube",
+            media_type="video",
+            backend="yt-dlp",
+            mode="inspect",
+            parsed_at="2026-07-22T00:00:00Z",
+        )
+
+    monkeypatch.setattr("omnireach.mcp_server.inspect_media", fake_inspect)
+    response = handle_message({
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+            "name": "omnireach_parse_media",
+            "arguments": {
+                "url": "https://www.youtube.com/watch?v=abc",
+                "mode": "inspect",
+                "backend": "yt-dlp",
+            },
+        },
+    })
+
+    assert response["result"]["isError"] is False
+    assert response["result"]["structuredContent"]["artifacts"] == []
+    assert captured == {"backend": "yt-dlp", "timeout": 60}
+
+
+def test_media_tool_rejects_non_http_subtitle_url():
+    response = handle_message({
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {
+            "name": "omnireach_parse_media",
+            "arguments": {
+                "url": "https://example.com/video.mp4",
+                "subtitle_url": "file:///tmp/subtitle.vtt",
+            },
+        },
+    })
+
+    assert response["error"]["code"] == -32602
+
+
+def test_media_tool_rejects_arbitrary_output_directory():
+    response = handle_message({
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "tools/call",
+        "params": {
+            "name": "omnireach_parse_media",
+            "arguments": {
+                "url": "https://example.com/video.mp4",
+                "output_dir": "/tmp/arbitrary",
+            },
+        },
+    })
+
+    assert response["error"]["code"] == -32602
 
 
 def test_invalid_tool_arguments_return_minus_32602():

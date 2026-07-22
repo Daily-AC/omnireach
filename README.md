@@ -4,7 +4,7 @@
 
 **Your agent reads Twitter. It still can't read WeChat. omnireach fixes that.**
 
-omnireach searches Google and the login-walled Chinese internet — 微信公众号 · 小红书 · 抖音 · B站 · TikTok — plus Twitter, Reddit, HN, YouTube and more, through one uniform interface: `omnireach search` returns one normalized JSON schema across every source, `omnireach fetch` returns clean markdown for any URL. WeChat search works with **zero config** — no key, no login:
+omnireach searches Google and the login-walled Chinese internet — 微信公众号 · 小红书 · 抖音 · B站 · TikTok — plus Twitter, Reddit, HN, YouTube and more. `omnireach search` returns normalized results, `omnireach fetch` returns clean Markdown, and `omnireach media` turns videos into bounded metadata and transcript artifacts. WeChat search works with **zero config** — no key, no login:
 
 ```bash
 omnireach search --on wechat "Claude Code 技巧"   # works 60 seconds after install
@@ -16,7 +16,7 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 
 ### MCP before Playwright
 
-For search and reading, start with two read-only MCP tools instead of browser automation.
+For search, reading, and media parsing, start with the three focused MCP tools instead of browser automation.
 Ordinary page fetches never start Chrome. Google, Reddit, Twitter, Xiaohongshu, TikTok,
 and Douyin search now use Omnireach's own small, read-only Chrome bridge first, with
 OpenCLI retained as a compatibility fallback. Browser-backed calls use temporary background
@@ -66,8 +66,8 @@ loaded plugin MCP configuration.
 **1. Reach the unreachable.**
 Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok — login-walled vertical platforms that no agent web search reaches. omnireach reads them through your own logged-in browser session. Its native Chrome bridge handles all six browser-backed search sources, with OpenCLI retained as a compatibility fallback.
 
-**2. One uniform contract.**
-`omnireach search` → normalized metadata + URL, same shape across every source. `omnireach fetch` → clean markdown for any URL, with host-aware routing: ordinary pages use a built-in HTTP extractor with Jina fallback, while `mp.weixin.qq.com` uses your logged-in Chrome session. No Playwright or Crawl4AI is required for the default path.
+**2. Stable agent contracts.**
+`omnireach search` returns normalized results, `omnireach fetch` returns clean Markdown, and `omnireach media` returns a `MediaEnvelope` with bounded previews plus absolute artifact paths. Long transcripts stay in local files instead of flooding model context.
 
 **3. Works even when WebSearch doesn't.**
 On proxy / relay-station / Bedrock / Vertex-Claude-3.x setups where the built-in WebSearch server tool isn't available, omnireach gives search back — it runs entirely on the client side, bypassing both gate layers.
@@ -76,10 +76,11 @@ On proxy / relay-station / Bedrock / Vertex-Claude-3.x setups where the built-in
 
 ## Agent fast path — MCP before Playwright
 
-The plugin exposes two model-controlled tools:
+The plugin exposes three model-controlled tools:
 
 - `omnireach_search` for web research and platform search
 - `omnireach_fetch` for reading an HTTP or HTTPS URL as Markdown
+- `omnireach_parse_media` for YouTube, Bilibili, and direct-media metadata or transcripts
 
 Both tools are served by the dependency-free stdio command:
 
@@ -134,6 +135,9 @@ omnireach search --on xiaohongshu --json "Claude Code 使用技巧"
 # Fetch a WeChat article — login-walled, via your session
 omnireach fetch --json "https://mp.weixin.qq.com/s/<token>"
 
+# Parse captions without downloading the full YouTube video
+omnireach media parse --language en --json "https://www.youtube.com/watch?v=<id>"
+
 # Full pipeline: search → fetch all results
 omnireach search --on wechat --json "claude 4.7" \
   | jq -r '.results[].url' \
@@ -159,7 +163,10 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach fetch <url> --backend jina` | Force Jina Reader SaaS (zero local deps) |
 | `omnireach fetch <url> --backend crwl` | Explicitly opt into local Crawl4AI |
 | `omnireach fetch <url> --backend opencli` | Force OpenCLI wechat logged-in path (v0.10.1+) |
-| `omnireach mcp` | Serve `omnireach_search` and `omnireach_fetch` over MCP stdio |
+| `omnireach media inspect <url>` | Inspect normalized metadata and subtitle tracks without writing files |
+| `omnireach media parse <url> --language en` | Materialize metadata, selected captions, transcript JSON/Markdown, and a manifest |
+| `omnireach media parse <media-url> --subtitle-url <vtt>` | Parse a direct audio/video URL with a sidecar VTT/SRT/JSON3 subtitle |
+| `omnireach mcp` | Serve search, fetch, and media parsing over MCP stdio |
 | `omnireach init` | Write default `~/.omnireach/preferences.toml` |
 | `omnireach sources` | List all sources + tier status |
 | `omnireach setup <source>` | Guided setup for a 🟡 / 🔴 source |
@@ -168,7 +175,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach bridge status --json` | Ping the installed extension through the authenticated localhost bridge |
 | `omnireach agy configure <conversation-id>` | Configure the experimental agy grounded-search backend |
 | `omnireach agy status --json` | Check the configured agy conversation and AgentAPI endpoint |
-| `omnireach doctor` | Health check (sources / fetch backends / wechat backends) |
+| `omnireach doctor` | Health check (sources / fetch / media / wechat backends) |
 
 ---
 
@@ -204,14 +211,15 @@ omnireach search --on wechat --json "claude 4.7" \
 
 ## Agent calling convention
 
-Prefer the MCP tools: call `omnireach_search` for research, then
-`omnireach_fetch` for selected URLs. Fall back to the CLI only when MCP is unavailable.
+Prefer the MCP tools: call `omnireach_search` for research, `omnireach_fetch` for pages,
+and `omnireach_parse_media` for video/audio metadata or captions. Fall back to the CLI only when MCP is unavailable.
 When using that fallback, **always request JSON explicitly**:
 
 ```bash
 # Option 1: explicit flag per command
 omnireach search --json "..."
 omnireach fetch  --json "<url>"
+omnireach media parse --json "<media-url>"
 
 # Option 2: env var (recommended for agent harnesses)
 export OMNIREACH_FORCE_JSON=1

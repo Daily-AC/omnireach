@@ -81,6 +81,19 @@ def test_v093_fetch_backend_doctor_lists_crwl():
     assert "crwl" in tools
 
 
+def test_media_backend_doctor_reports_ytdlp_and_ffprobe(monkeypatch):
+    from omnireach.doctor import run_media_backend_doctor
+
+    monkeypatch.setattr(
+        "shutil.which", lambda tool: f"/usr/bin/{tool}" if tool == "yt-dlp" else None,
+    )
+    statuses = {status.tool: status for status in run_media_backend_doctor()}
+
+    assert statuses["yt-dlp"].ok is True
+    assert statuses["ffprobe"].ok is False
+    assert "ffmpeg" in statuses["ffprobe"].fix_hint
+
+
 def test_fetch_backend_doctor_reports_builtin_http_without_external_binary(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda b: None)
     from omnireach.doctor import run_fetch_backend_doctor
