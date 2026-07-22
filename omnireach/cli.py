@@ -18,6 +18,7 @@ from omnireach.commands.agy import agy_cmd
 from omnireach.commands.bridge import bridge_cmd
 from omnireach.commands.fetch import fetch_cmd
 from omnireach.commands.init import init_cmd
+from omnireach.commands.media import media_cmd
 from omnireach.commands.setup import setup_cmd
 from omnireach.commands.preferences import preferences_cmd
 from omnireach.commands.sources import sources_cmd
@@ -160,6 +161,7 @@ def doctor_cmd(json_out: bool) -> None:
     from omnireach.doctor import (
         run_doctor,
         run_fetch_backend_doctor,
+        run_media_backend_doctor,
         run_wechat_backend_doctor,
     )
 
@@ -168,6 +170,7 @@ def doctor_cmd(json_out: bool) -> None:
 
     statuses = asyncio.run(run_doctor())
     fetch_backends = run_fetch_backend_doctor()
+    media_backends = run_media_backend_doctor()
     wechat_backends = run_wechat_backend_doctor()
 
     if _should_emit_json(json_out):
@@ -184,6 +187,11 @@ def doctor_cmd(json_out: bool) -> None:
                 {"tool": b.tool, "ok": b.ok,
                  "detail": b.detail, "fix_hint": b.fix_hint}
                 for b in fetch_backends
+            ],
+            "media_backends": [
+                {"tool": b.tool, "ok": b.ok,
+                 "detail": b.detail, "fix_hint": b.fix_hint}
+                for b in media_backends
             ],
             "wechat_backends": [
                 {"tool": b.tool, "ok": b.ok,
@@ -217,6 +225,16 @@ def doctor_cmd(json_out: bool) -> None:
         fb_table.add_row(b.tool, icon, b.detail, b.fix_hint)
     console.print(fb_table)
 
+    media_table = Table(title="media backends — metadata + transcript parsing")
+    media_table.add_column("工具", style="cyan")
+    media_table.add_column("状态")
+    media_table.add_column("说明", style="dim")
+    media_table.add_column("修复")
+    for b in media_backends:
+        icon = "✅" if b.ok else "❌"
+        media_table.add_row(b.tool, icon, b.detail, b.fix_hint)
+    console.print(media_table)
+
     # v0.10.1: host-specific cookie-strategy backend for mp.weixin.qq.com
     wb_table = Table(title="wechat backends — mp.weixin.qq.com 登录态全文 (可选, 检测 OpenCLI + --stdout flag)")
     wb_table.add_column("工具", style="cyan")
@@ -237,6 +255,7 @@ main.add_command(sources_cmd)
 main.add_command(preferences_cmd)
 main.add_command(check_update_cmd)
 main.add_command(fetch_cmd)
+main.add_command(media_cmd)
 
 
 def _entrypoint() -> None:
