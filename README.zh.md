@@ -4,7 +4,7 @@
 
 **你的 agent 读得了 Twitter，却读不了微信公众号。omnireach 解决这件事。**
 
-omnireach 让你的 agent 搜索 Google 和登录墙后的中文互联网 —— 微信公众号 · 小红书 · 抖音 · B站 · TikTok —— 外加 Twitter、Reddit、HN、YouTube 等，统一接口：`omnireach search` 跨全部源返回同一套归一化 JSON schema，`omnireach fetch` 对任意 URL 返回干净 markdown。微信搜索**零配置**开箱即用 —— 无 key、无登录：
+omnireach 让你的 agent 搜索 Google 和登录墙后的中文互联网 —— 微信公众号 · 小红书 · 抖音 · B站 · TikTok —— 外加 Twitter、Reddit、HN、YouTube 等。`search` 返回归一化结果，`fetch` 返回干净 Markdown，`media` 把视频整理成有界的元数据和字幕产物。微信搜索**零配置**开箱即用 —— 无 key、无登录：
 
 ```bash
 omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
@@ -16,7 +16,7 @@ omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
 
 ### 先读网页，再启动 Playwright
 
-搜索和读取任务先用两个只读 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
+搜索、读取和媒体解析先用三个聚焦的 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
 完全不启动 Chrome；Google、Reddit、Twitter、小红书、TikTok、抖音现在都优先走
 Omnireach 自己的轻量只读 Chrome 桥，OpenCLI 保留为兼容回退。浏览器路径使用后台
 临时 tab，用完即关；`quick` 模式仍完全不碰浏览器。点击、表单、文件传输、截图和
@@ -64,8 +64,8 @@ curl -fsSL https://raw.githubusercontent.com/Daily-AC/omnireach/main/install.sh 
 **1. 触达那些触达不了的地方。**
 Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— 这些有登录墙的纵向平台，任何 agent 网络搜索都够不着。omnireach 复用你自己的已登录浏览器会话；六个浏览器搜索源都已优先走 Omnireach 原生桥，OpenCLI 保留为兼容回退。
 
-**2. 统一的数据契约。**
-`omnireach search` → 归一化 metadata + URL，跨所有源格式统一。`omnireach fetch` → 任意 URL 的干净 markdown：普通网页走内置 HTTP 提取 + Jina 兜底，只有 `mp.weixin.qq.com` 走登录态 Chrome。默认路径不需要 Playwright 或 Crawl4AI。
+**2. 稳定的 agent 契约。**
+`search` 返回归一化结果，`fetch` 返回干净 Markdown，`media` 返回 `MediaEnvelope`：短预览放 JSON，长字幕写入本地文件并提供绝对路径，不挤爆模型上下文。
 
 **3. WebSearch 不可用时照样能搜。**
 在 proxy / 中转站 / Bedrock / Vertex-Claude-3.x 等内置 WebSearch server tool 不可用的环境下，omnireach 在客户端直接实现搜索，绕过两层 gate，把搜索能力还给 agent。
@@ -74,10 +74,11 @@ Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— �
 
 ## Agent 快路径 —— MCP 优先于 Playwright
 
-plugin 暴露两个由模型直接调用的工具：
+plugin 暴露三个由模型直接调用的工具：
 
 - `omnireach_search`：联网研究与平台搜索
 - `omnireach_fetch`：把 HTTP/HTTPS URL 读取为 Markdown
+- `omnireach_parse_media`：解析 YouTube、B站和直接媒体的元数据或字幕
 
 二者由零新增依赖的 stdio 命令提供：
 
@@ -131,6 +132,9 @@ omnireach search --on xiaohongshu --json "Claude Code 使用技巧"
 # 抓取微信文章 —— 有登录墙，走你的浏览器会话
 omnireach fetch --json "https://mp.weixin.qq.com/s/<token>"
 
+# 不下载完整视频，只解析 YouTube 字幕
+omnireach media parse --language en --json "https://www.youtube.com/watch?v=<id>"
+
 # 完整流水线：搜索 → 批量抓全文
 omnireach search --on wechat --json "claude 4.7" \
   | jq -r '.results[].url' \
@@ -156,7 +160,10 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach fetch <url> --backend jina` | 强制走 Jina Reader SaaS (零本地依赖) |
 | `omnireach fetch <url> --backend crwl` | 显式选择本地 Crawl4AI |
 | `omnireach fetch <url> --backend opencli` | 强制走 OpenCLI weixin 登录态路径 (v0.10.1+) |
-| `omnireach mcp` | 通过 MCP stdio 提供 `omnireach_search` 与 `omnireach_fetch` |
+| `omnireach media inspect <url>` | 只检查归一化元数据和字幕轨，不写文件 |
+| `omnireach media parse <url> --language zh-CN` | 生成元数据、字幕、时间轴 JSON/Markdown 和 manifest |
+| `omnireach media parse <media-url> --subtitle-url <vtt>` | 给直接音视频解析旁挂 VTT/SRT/JSON3 字幕 |
+| `omnireach mcp` | 通过 MCP stdio提供搜索、抓取和媒体解析 |
 | `omnireach init` | 写默认 `~/.omnireach/preferences.toml` |
 | `omnireach sources` | 列出所有源 + 状态 |
 | `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 |
@@ -165,7 +172,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach bridge status --json` | 通过鉴权 localhost 桥真实 ping 扩展 |
 | `omnireach agy configure <conversation-id>` | 配置实验性 agy grounded-search backend |
 | `omnireach agy status --json` | 检查 agy conversation 与 AgentAPI endpoint |
-| `omnireach doctor` | 健康检查 (含 sources / fetch backends / wechat backends) |
+| `omnireach doctor` | 健康检查 (含 sources / fetch / media / wechat backends) |
 
 ---
 
@@ -201,13 +208,14 @@ omnireach search --on wechat --json "claude 4.7" \
 
 ## Agent 调用约定
 
-Agent 应优先调用 `omnireach_search` 做搜索，再调用 `omnireach_fetch` 读取选中的
-URL。只有 MCP 不可用时才回退 CLI；走 CLI 时，**永远显式拿 JSON**：
+Agent 应优先调用 `omnireach_search` 做搜索、`omnireach_fetch` 读取网页，并用
+`omnireach_parse_media` 解析音视频元数据或字幕。只有 MCP 不可用时才回退 CLI；走 CLI 时，**永远显式拿 JSON**：
 
 ```bash
 # 方式 1：每条命令加 --json
 omnireach search --json "..."
 omnireach fetch  --json "<url>"
+omnireach media parse --json "<media-url>"
 
 # 方式 2：env var（推荐给 agent harness 统一设）
 export OMNIREACH_FORCE_JSON=1

@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 from omnireach import __version__
 from omnireach.contract import FetchEnvelope, SearchEnvelope
 from omnireach.fetcher import fetch
+from omnireach.media.contract import MediaEnvelope
+from omnireach.media.service import inspect_media, parse_media
 from omnireach.service import search
 
 PROTOCOL_VERSION = "2025-06-18"
@@ -96,6 +98,48 @@ TOOLS = [
         },
         "outputSchema": FetchEnvelope.model_json_schema(),
         "annotations": TOOL_ANNOTATIONS,
+    },
+    {
+        "name": "omnireach_parse_media",
+        "title": "Inspect or parse media with omnireach",
+        "description": (
+            "Inspect YouTube, Bilibili, or direct media metadata. Quick mode "
+            "also materializes available captions as bounded agent-friendly "
+            "transcript artifacts without downloading the full video."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "format": "uri"},
+                "mode": {
+                    "type": "string",
+                    "enum": ["inspect", "quick"],
+                    "default": "quick",
+                },
+                "backend": {
+                    "type": "string",
+                    "enum": ["auto", "direct", "yt-dlp", "bilibili-api"],
+                    "default": "auto",
+                },
+                "language": {"type": "string", "minLength": 1},
+                "subtitle_url": {"type": "string", "format": "uri"},
+                "timeout": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 300,
+                    "default": 60,
+                },
+            },
+            "required": ["url"],
+            "additionalProperties": False,
+        },
+        "outputSchema": MediaEnvelope.model_json_schema(),
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
     },
 ]
 
@@ -218,6 +262,46 @@ def _validate_fetch(arguments: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _validate_media(arguments: dict[str, Any]) -> dict[str, Any]:
+    _reject_extra(
+        arguments,
+        {"url", "mode", "backend", "language", "subtitle_url", "timeout"},
+    )
+    url = arguments.get("url")
+    if not isinstance(url, str):
+        raise InvalidParams("url must be an HTTP or HTTPS URL")
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise InvalidParams("url must be an absolute HTTP or HTTPS URL")
+    mode = arguments.get("mode", "quick")
+    if mode not in {"inspect", "quick"}:
+        raise InvalidParams("mode must be inspect or quick")
+    backend = arguments.get("backend", "auto")
+    if backend not in {"auto", "direct", "yt-dlp", "bilibili-api"}:
+        raise InvalidParams("unknown media backend")
+    language = arguments.get("language")
+    if language is not None and (not isinstance(language, str) or not language.strip()):
+        raise InvalidParams("language must be a non-empty string")
+    subtitle_url = arguments.get("subtitle_url")
+    if subtitle_url is not None:
+        if not isinstance(subtitle_url, str):
+            raise InvalidParams("subtitle_url must be an HTTP or HTTPS URL")
+        subtitle_parsed = urlparse(subtitle_url)
+        if subtitle_parsed.scheme not in {"http", "https"} or not subtitle_parsed.netloc:
+            raise InvalidParams("subtitle_url must be an absolute HTTP or HTTPS URL")
+    timeout = arguments.get("timeout", 60)
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= 300:
+        raise InvalidParams("timeout must be between 1 and 300")
+    return {
+        "url": url,
+        "mode": mode,
+        "backend": backend,
+        "language": language,
+        "subtitle_url": subtitle_url,
+        "timeout": timeout,
+    }
+
+
 def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if name == "omnireach_search":
         kwargs = _validate_search(arguments)
@@ -240,6 +324,26 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             envelope.model_dump(mode="json"),
             is_error=not bool(envelope.content_markdown),
         )
+    if name == "omnireach_parse_media":
+        kwargs = _validate_media(arguments)
+        url = kwargs.pop("url")
+        mode = kwargs.pop("mode")
+        try:
+            if mode == "inspect":
+                kwargs.pop("language")
+                kwargs.pop("subtitle_url")
+                envelope = inspect_media(url, **kwargs)
+            else:
+                envelope = parse_media(
+                    url,
+                    mode="quick",
+                    **kwargs,
+                )
+        except Exception as exc:  # noqa: BLE001
+            return _tool_result({"error": str(exc)}, is_error=True)
+        return _tool_result(
+            envelope.model_dump(mode="json"), is_error=not envelope.ok,
+        )
     raise KeyError(name)
 
 
@@ -260,8 +364,9 @@ def handle_message(message: object) -> dict[str, Any] | None:
             "capabilities": {"tools": {"listChanged": False}},
             "serverInfo": SERVER_INFO,
             "instructions": (
-                "Use omnireach_search for research and omnireach_fetch for reading "
-                "URLs before launching browser automation."
+                "Use omnireach_search for research, omnireach_fetch for reading pages, "
+                "and omnireach_parse_media for media metadata or transcripts before "
+                "launching browser automation."
             ),
         })
     if method == "ping":
