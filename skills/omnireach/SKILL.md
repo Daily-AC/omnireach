@@ -75,6 +75,13 @@ live in the absolute paths under `artifacts`; `transcript.text_preview` is inten
 bounded. Treat `ok=false` as failure and inspect structured `errors`; transient TLS and
 network failures are marked `retryable=true`.
 
+Bilibili reports when captions require login. Only then, and only with explicit user
+authorization, set `cookies_from_browser` to a yt-dlp browser spec such as
+`chrome:Profile 1`. Omit it by default. The browser spec and cookies never appear in the
+envelope or artifacts. Quick parse reuses a cache entry only after checking every artifact's
+size and SHA-256; set `reuse_cache=false` to force a fresh parse. Use `max_duration` to reject
+media longer than the requested number of seconds.
+
 ## Setup and Recovery
 
 If the MCP tools are absent but `omnireach` is installed, use the CLI fallback documented

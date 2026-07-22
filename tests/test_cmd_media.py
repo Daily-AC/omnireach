@@ -14,6 +14,13 @@ def test_media_help_exposes_inspect_and_parse():
     assert "parse" in result.output
 
 
+def test_media_parse_help_documents_explicit_browser_cookies():
+    result = CliRunner().invoke(main, ["media", "parse", "--help"])
+
+    assert result.exit_code == 0
+    assert "--cookies-from-browser" in result.output
+
+
 def test_media_inspect_json(monkeypatch):
     monkeypatch.setattr(
         "omnireach.commands.media.inspect_media",

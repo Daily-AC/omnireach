@@ -1,0 +1,26 @@
+{
+  "_fixture": "Captured with yt-dlp 2026.06.09 and chrome:Profile 1 on 2026-07-22; subtitle body shortened after three real cues.",
+  "id": "BV12N4y1M7rh",
+  "title": "游戏帧数增加40%？下代联发科天玑芯片或将支持光线追踪！从Immortalis-G715看下代联发科SoC的GPU表现 | Arm: 可以不用咬打火机了！",
+  "description": "上周的TCS22上，Arm更新了三款GPU。",
+  "uploader": "小夫太渴",
+  "duration": 313.557,
+  "upload_date": "20220709",
+  "thumbnail": "http://i0.hdslb.com/bfs/archive/77995173719c252fa6ff7a80ce8f57e199d08b27.jpg",
+  "width": 1920,
+  "height": 1080,
+  "vcodec": "hev1.1.6.L150.90",
+  "acodec": "mp4a.40.2",
+  "subtitles": {
+    "danmaku": [
+      {"ext": "xml", "url": "https://comment.bilibili.com/redacted.xml"}
+    ],
+    "zh-Hans": [
+      {
+        "ext": "srt",
+        "data": "1\n00:00:00,130 --> 00:00:00,670\n你好\n\n2\n00:00:00,670 --> 00:00:01,430\n我是小夫\n\n3\n00:00:01,870 --> 00:00:03,700\n在上周的TCS22上\n"
+      }
+    ]
+  },
+  "automatic_captions": {}
+}
