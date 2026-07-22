@@ -161,6 +161,10 @@ messages to stdout.
 uses upstream captions when available and writes normalized artifacts under
 `~/.cache/omnireach/media/` by default. Override this with `--output-dir`. Direct media can
 use `--subtitle-url <url>` for a sidecar VTT, SRT, JSON3, or Bilibili BCC subtitle.
+When Bilibili reports that captions require login, explicitly pass
+`--cookies-from-browser "chrome:Profile 1"` for an authorized logged-in profile. Cached
+artifacts are reused only after size and SHA-256 verification; `--no-cache` forces a fresh
+parse. `--max-duration <seconds>` rejects unexpectedly long media before writing artifacts.
 
 ## Diagnosis
 

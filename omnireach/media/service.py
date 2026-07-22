@@ -131,18 +131,22 @@ def _subtitle_tracks(
                 continue
             seen: set[str] = set()
             for item in formats:
-                if not isinstance(item, dict) or not item.get("url"):
+                if not isinstance(item, dict) or not (item.get("url") or item.get("data")):
                     continue
                 extension = str(item.get("ext") or "vtt").lower()
                 if extension in seen or extension not in _SUBTITLE_FORMAT_PREFERENCE:
                     continue
                 seen.add(extension)
-                internal.append({
+                internal_track = {
                     "language": str(language),
                     "format": extension,
                     "source": source,
-                    "url": str(item["url"]),
-                })
+                }
+                if item.get("url"):
+                    internal_track["url"] = str(item["url"])
+                else:
+                    internal_track["data"] = str(item["data"])
+                internal.append(internal_track)
                 key = (str(language), source)
                 current = tracks_by_key.get(key)
                 if (
@@ -164,12 +168,20 @@ def _subtitle_tracks(
     return tracks[:_PUBLIC_TRACK_LIMIT], internal, omitted
 
 
-def _inspect_ytdlp(url: str, timeout: float) -> tuple[MediaEnvelope, list[dict[str, str]]]:
+def _inspect_ytdlp(
+    url: str,
+    timeout: float,
+    cookies_from_browser: str | None = None,
+) -> tuple[MediaEnvelope, list[dict[str, str]]]:
     if not shutil.which("yt-dlp"):
         raise FileNotFoundError("yt-dlp is not installed")
-    payload = _run_json([
-        "yt-dlp", "--dump-single-json", "--skip-download", "--no-warnings", url,
-    ], timeout)
+    command = ["yt-dlp", "--dump-single-json", "--skip-download", "--no-warnings"]
+    if _source(url) == "bilibili":
+        command.extend(["--write-subs", "--sub-langs", "all"])
+    if cookies_from_browser:
+        command.extend(["--cookies-from-browser", cookies_from_browser])
+    command.append(url)
+    payload = _run_json(command, timeout)
     tracks, internal_tracks, omitted_tracks = _subtitle_tracks(payload)
     duration = payload.get("duration")
     media_type: Literal["video", "audio", "unknown"] = "unknown"
@@ -260,10 +272,16 @@ def _inspect_bilibili(url: str, timeout: float) -> tuple[MediaEnvelope, list[dic
     if cid:
         try:
             player = _http_json(
-                f"https://api.bilibili.com/x/player/v2?bvid={bvid}&cid={cid}",
+                f"https://api.bilibili.com/x/player/wbi/v2?bvid={bvid}&cid={cid}",
                 timeout,
                 referer=canonical_url,
             ).get("data")
+            if isinstance(player, dict) and player.get("need_login_subtitle"):
+                warnings.append(
+                    "Bilibili subtitles require login; retry with "
+                    "--cookies-from-browser <browser[:profile]> "
+                    "(for example, 'chrome:Profile 1')"
+                )
             subtitle = player.get("subtitle") if isinstance(player, dict) else None
             subtitles = subtitle.get("subtitles") if isinstance(subtitle, dict) else None
             if isinstance(subtitles, list):
@@ -404,6 +422,7 @@ def _inspect_with_tracks(
     url: str,
     *,
     backend: Literal["auto", "direct", "yt-dlp", "bilibili-api"] = "auto",
+    cookies_from_browser: str | None = None,
     timeout: float = 60,
 ) -> tuple[MediaEnvelope, list[dict[str, str]]]:
     try:
@@ -417,13 +436,17 @@ def _inspect_with_tracks(
         ), []
     selected = "direct" if backend == "auto" and _is_direct_url(url) else backend
     if selected == "auto":
-        selected = "bilibili-api" if _source(url) == "bilibili" else "yt-dlp"
+        selected = (
+            "bilibili-api"
+            if _source(url) == "bilibili" and not cookies_from_browser
+            else "yt-dlp"
+        )
     try:
         if selected == "direct":
             return _inspect_direct(url, timeout)
         if selected == "bilibili-api":
             return _inspect_bilibili(url, timeout)
-        return _inspect_ytdlp(url, timeout)
+        return _inspect_ytdlp(url, timeout, cookies_from_browser)
     except (
         FileNotFoundError,
         RuntimeError,
@@ -439,9 +462,15 @@ def inspect_media(
     url: str,
     *,
     backend: Literal["auto", "direct", "yt-dlp", "bilibili-api"] = "auto",
+    cookies_from_browser: str | None = None,
     timeout: float = 60,
 ) -> MediaEnvelope:
-    envelope, _ = _inspect_with_tracks(url, backend=backend, timeout=timeout)
+    envelope, _ = _inspect_with_tracks(
+        url,
+        backend=backend,
+        cookies_from_browser=cookies_from_browser,
+        timeout=timeout,
+    )
     return envelope
 
 
@@ -473,14 +502,78 @@ def _write_artifact(path: Path, content: bytes, kind: str, mime: str) -> MediaAr
     )
 
 
-def _artifact_dir(url: str, source: str, output_dir: Path | None) -> Path:
+def _parse_cache_key(
+    url: str,
+    backend: str,
+    language: str | None,
+    subtitle_url: str | None,
+    cookies_from_browser: str | None,
+    max_duration: float | None,
+) -> str:
+    payload = json.dumps({
+        "url": url,
+        "backend": backend,
+        "language": language,
+        "subtitle_url": subtitle_url,
+        "cookies_from_browser": cookies_from_browser,
+        "max_duration": max_duration,
+    }, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _artifact_dir(
+    url: str,
+    source: str,
+    output_dir: Path | None,
+    cache_key: str,
+) -> Path:
     if output_dir is not None:
         root = output_dir.expanduser()
     else:
         key = hashlib.sha256(url.encode()).hexdigest()[:16]
-        root = Path.home() / ".cache" / "omnireach" / "media" / f"{source}-{key}"
+        root = (
+            Path.home() / ".cache" / "omnireach" / "media"
+            / f"{source}-{key}" / cache_key[:16]
+        )
     root.mkdir(parents=True, exist_ok=True)
     return root.resolve()
+
+
+def _load_cached_envelope(
+    root: Path,
+    url: str,
+    cache_key: str,
+) -> MediaEnvelope | None:
+    manifest_path = root / "manifest.json"
+    try:
+        manifest_bytes = manifest_path.read_bytes()
+        envelope = MediaEnvelope.model_validate_json(manifest_bytes)
+    except (OSError, ValueError):
+        return None
+    if not envelope.ok or envelope.url != url or envelope.cache_key != cache_key:
+        return None
+    root = root.resolve()
+    for artifact in envelope.artifacts:
+        path = Path(artifact.path).resolve()
+        if not path.is_relative_to(root) or path == manifest_path.resolve():
+            return None
+        try:
+            content = path.read_bytes()
+        except OSError:
+            return None
+        if len(content) != artifact.bytes:
+            return None
+        if hashlib.sha256(content).hexdigest() != artifact.sha256:
+            return None
+    envelope.artifacts.append(MediaArtifact(
+        kind="manifest",
+        path=str(manifest_path.resolve()),
+        mime="application/json",
+        bytes=len(manifest_bytes),
+        sha256=hashlib.sha256(manifest_bytes).hexdigest(),
+    ))
+    envelope.cache_hit = True
+    return envelope
 
 
 def parse_media(
@@ -490,15 +583,66 @@ def parse_media(
     backend: Literal["auto", "direct", "yt-dlp", "bilibili-api"] = "auto",
     language: str | None = None,
     subtitle_url: str | None = None,
+    cookies_from_browser: str | None = None,
     output_dir: Path | None = None,
+    reuse_cache: bool = True,
+    max_duration: float | None = None,
     timeout: float = 60,
 ) -> MediaEnvelope:
     """Inspect media and materialize normalized metadata/transcript artifacts."""
-    envelope, internal_tracks = _inspect_with_tracks(url, backend=backend, timeout=timeout)
+    try:
+        _validate_url(url)
+    except ValueError:
+        envelope, _ = _inspect_with_tracks(
+            url,
+            backend=backend,
+            cookies_from_browser=cookies_from_browser,
+            timeout=timeout,
+        )
+        envelope.mode = mode
+        return envelope
+    cache_key = _parse_cache_key(
+        url,
+        backend,
+        language,
+        subtitle_url,
+        cookies_from_browser,
+        max_duration,
+    )
+    root = _artifact_dir(url, _source(url), output_dir, cache_key)
+    if reuse_cache:
+        cached = _load_cached_envelope(root, url, cache_key)
+        if cached is not None:
+            return cached
+
+    envelope, internal_tracks = _inspect_with_tracks(
+        url,
+        backend=backend,
+        cookies_from_browser=cookies_from_browser,
+        timeout=timeout,
+    )
     envelope.mode = mode
+    envelope.cache_key = cache_key
     if not envelope.ok:
         return envelope
-    root = _artifact_dir(url, envelope.source, output_dir)
+    if (
+        max_duration is not None
+        and envelope.metadata is not None
+        and envelope.metadata.duration_ms is not None
+        and envelope.metadata.duration_ms > max_duration * 1000
+    ):
+        envelope.ok = False
+        envelope.errors.append(MediaError(
+            stage="resolve",
+            backend=envelope.backend or "none",
+            category="limit",
+            message=(
+                f"media duration {envelope.metadata.duration_ms / 1000:.3f}s "
+                f"exceeds {max_duration:g}s limit"
+            ),
+            hint="Retry with a larger --max-duration value",
+        ))
+        return envelope
     metadata_payload = envelope.metadata.model_dump(mode="json") if envelope.metadata else {}
     metadata_bytes = json.dumps(metadata_payload, ensure_ascii=False, indent=2).encode()
     envelope.artifacts.append(_write_artifact(
@@ -536,19 +680,25 @@ def parse_media(
         envelope.warnings.append(message)
     else:
         try:
-            response = httpx.get(selected["url"], timeout=timeout, follow_redirects=True)
-            response.raise_for_status()
-            content_length = response.headers.get("content-length")
-            if content_length and int(content_length) > _SUBTITLE_MAX_BYTES:
-                raise OverflowError(
-                    f"subtitle exceeds {_SUBTITLE_MAX_BYTES} byte limit"
+            if "data" in selected:
+                raw = selected["data"].encode()
+                content = selected["data"]
+            else:
+                response = httpx.get(
+                    selected["url"], timeout=timeout, follow_redirects=True,
                 )
-            raw = response.content
+                response.raise_for_status()
+                content_length = response.headers.get("content-length")
+                if content_length and int(content_length) > _SUBTITLE_MAX_BYTES:
+                    raise OverflowError(
+                        f"subtitle exceeds {_SUBTITLE_MAX_BYTES} byte limit"
+                    )
+                raw = response.content
+                content = raw.decode(response.encoding or "utf-8", errors="replace")
             if len(raw) > _SUBTITLE_MAX_BYTES:
                 raise OverflowError(
                     f"subtitle exceeds {_SUBTITLE_MAX_BYTES} byte limit"
                 )
-            content = raw.decode(response.encoding or "utf-8", errors="replace")
             segments = parse_subtitle(content, selected["format"])
             if not segments:
                 raise ValueError("subtitle track contained no parseable cues")
@@ -565,12 +715,34 @@ def parse_media(
             OverflowError,
         ) as exc:
             envelope.ok = False
+            category: Literal["failed", "blocked", "limit"] = "failed"
+            hint = "Try another --language or provide --subtitle-url"
+            retryable = False
+            if isinstance(exc, OverflowError):
+                category = "limit"
+                hint = "Use a smaller subtitle track"
+            elif isinstance(exc, httpx.HTTPStatusError):
+                status = exc.response.status_code
+                if status in {401, 403}:
+                    category = "blocked"
+                    hint = "The subtitle host rejected access; retry with an authorized source"
+                elif status == 429:
+                    category = "limit"
+                    hint = "Subtitle host rate-limited the request; retry later"
+                    retryable = True
+                elif status >= 500:
+                    hint = "Subtitle host failed temporarily; retry the same command"
+                    retryable = True
+            elif isinstance(exc, httpx.HTTPError):
+                hint = "Transient subtitle download failure; retry the same command"
+                retryable = True
             envelope.errors.append(MediaError(
                 stage="subtitle",
                 backend=envelope.backend or "none",
-                category="limit" if isinstance(exc, OverflowError) else "failed",
-                message=str(exc), hint="Try another --language or provide --subtitle-url",
-                retryable=isinstance(exc, httpx.HTTPError),
+                category=category,
+                message=str(exc),
+                hint=hint,
+                retryable=retryable,
             ))
 
     if segments and selected:

@@ -135,6 +135,10 @@ omnireach fetch --json "https://mp.weixin.qq.com/s/<token>"
 # 不下载完整视频，只解析 YouTube 字幕
 omnireach media parse --language en --json "https://www.youtube.com/watch?v=<id>"
 
+# B站字幕需要登录时，显式指定已登录的 Chrome profile
+omnireach media parse --cookies-from-browser "chrome:Profile 1" \
+  --language zh-Hans --json "https://www.bilibili.com/video/<BV-id>"
+
 # 完整流水线：搜索 → 批量抓全文
 omnireach search --on wechat --json "claude 4.7" \
   | jq -r '.results[].url' \
@@ -163,6 +167,8 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach media inspect <url>` | 只检查归一化元数据和字幕轨，不写文件 |
 | `omnireach media parse <url> --language zh-CN` | 生成元数据、字幕、时间轴 JSON/Markdown 和 manifest |
 | `omnireach media parse <media-url> --subtitle-url <vtt>` | 给直接音视频解析旁挂 VTT/SRT/JSON3 字幕 |
+| `omnireach media parse <url> --cookies-from-browser "chrome:Profile 1"` | B站字幕需要登录时，显式复用该浏览器 profile |
+| `omnireach media parse <url> --no-cache --max-duration 3600` | 跳过哈希校验缓存，并拒绝超过一小时的媒体 |
 | `omnireach mcp` | 通过 MCP stdio提供搜索、抓取和媒体解析 |
 | `omnireach init` | 写默认 `~/.omnireach/preferences.toml` |
 | `omnireach sources` | 列出所有源 + 状态 |
