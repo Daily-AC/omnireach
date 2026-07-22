@@ -11,7 +11,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from omnireach.media.service import inspect_media, parse_media
+from omnireach.media.service import download_media, inspect_media, parse_media
 
 console = Console()
 
@@ -56,7 +56,7 @@ def _backend_option(function):
 
 @click.group("media")
 def media_cmd() -> None:
-    """Inspect media metadata and materialize transcript artifacts."""
+    """Inspect, parse, or download supported media."""
 
 
 @media_cmd.command("inspect")
@@ -130,6 +130,60 @@ def media_parse_cmd(
         output_dir=output_dir,
         reuse_cache=reuse_cache,
         max_duration=max_duration,
+        timeout=timeout,
+    )
+    _render(envelope, json_out)
+    if not envelope.ok:
+        raise click.exceptions.Exit(1)
+
+
+@media_cmd.command("download")
+@click.argument("url")
+@click.option(
+    "--quality",
+    type=click.Choice(["compatible", "best", "small"]),
+    default="compatible",
+    show_default=True,
+    help="Prefer H.264 compatibility, maximum quality, or smallest file",
+)
+@click.option(
+    "--cookies-from-browser",
+    help="Explicitly reuse yt-dlp browser cookies, e.g. chrome:Profile 1",
+)
+@click.option("--output-dir", type=click.Path(path_type=Path, file_okay=False))
+@click.option("--cache/--no-cache", "reuse_cache", default=True, show_default=True)
+@click.option(
+    "--max-size-mb",
+    type=click.IntRange(min=1, max=5120),
+    default=500,
+    show_default=True,
+    help="Reject formats larger than this many MiB",
+)
+@click.option(
+    "--timeout",
+    type=click.FloatRange(min=1, max=3600),
+    default=600,
+    show_default=True,
+)
+@click.option("--json", "json_out", is_flag=True, help="Output a JSON envelope")
+def media_download_cmd(
+    url: str,
+    quality: str,
+    cookies_from_browser: str | None,
+    output_dir: Path | None,
+    reuse_cache: bool,
+    max_size_mb: int,
+    timeout: float,
+    json_out: bool,
+) -> None:
+    """Download one bounded Douyin video as a verified local artifact."""
+    envelope = download_media(
+        url,
+        quality=quality,
+        cookies_from_browser=cookies_from_browser,
+        output_dir=output_dir,
+        reuse_cache=reuse_cache,
+        max_bytes=max_size_mb * 1024 * 1024,
         timeout=timeout,
     )
     _render(envelope, json_out)

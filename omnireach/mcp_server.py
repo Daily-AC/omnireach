@@ -12,7 +12,7 @@ from omnireach import __version__
 from omnireach.contract import FetchEnvelope, SearchEnvelope
 from omnireach.fetcher import fetch
 from omnireach.media.contract import MediaEnvelope
-from omnireach.media.service import inspect_media, parse_media
+from omnireach.media.service import download_media, inspect_media, parse_media
 from omnireach.service import search
 
 PROTOCOL_VERSION = "2025-06-18"
@@ -146,6 +146,56 @@ TOOLS = [
                     "minimum": 1,
                     "maximum": 300,
                     "default": 60,
+                },
+            },
+            "required": ["url"],
+            "additionalProperties": False,
+        },
+        "outputSchema": MediaEnvelope.model_json_schema(),
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    },
+    {
+        "name": "omnireach_download_media",
+        "title": "Download a bounded Douyin video with omnireach",
+        "description": (
+            "Download one Douyin video through yt-dlp into an OmniReach-managed "
+            "directory. The result contains a verified media artifact path, byte "
+            "count, and SHA-256. Fresh browser cookies are usually required."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "format": "uri"},
+                "quality": {
+                    "type": "string",
+                    "enum": ["compatible", "best", "small"],
+                    "default": "compatible",
+                },
+                "cookies_from_browser": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": (
+                        "Explicit yt-dlp browser cookie source, e.g. chrome:Profile 1. "
+                        "Omit to avoid reading browser cookies."
+                    ),
+                },
+                "reuse_cache": {"type": "boolean", "default": True},
+                "max_size_mb": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5120,
+                    "default": 500,
+                },
+                "timeout": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 3600,
+                    "default": 600,
                 },
             },
             "required": ["url"],
@@ -326,7 +376,11 @@ def _validate_media(arguments: dict[str, Any]) -> dict[str, Any]:
     ):
         raise InvalidParams("max_duration must be between 1 and 86400")
     timeout = arguments.get("timeout", 60)
-    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= 300:
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not 1 <= timeout <= 300
+    ):
         raise InvalidParams("timeout must be between 1 and 300")
     return {
         "url": url,
@@ -337,6 +391,55 @@ def _validate_media(arguments: dict[str, Any]) -> dict[str, Any]:
         "cookies_from_browser": cookies_from_browser,
         "reuse_cache": reuse_cache,
         "max_duration": max_duration,
+        "timeout": timeout,
+    }
+
+
+def _validate_media_download(arguments: dict[str, Any]) -> dict[str, Any]:
+    _reject_extra(
+        arguments,
+        {
+            "url", "quality", "cookies_from_browser", "reuse_cache",
+            "max_size_mb", "timeout",
+        },
+    )
+    url = arguments.get("url")
+    if not isinstance(url, str):
+        raise InvalidParams("url must be an HTTP or HTTPS URL")
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise InvalidParams("url must be an absolute HTTP or HTTPS URL")
+    quality = arguments.get("quality", "compatible")
+    if quality not in {"compatible", "best", "small"}:
+        raise InvalidParams("quality must be compatible, best, or small")
+    cookies_from_browser = arguments.get("cookies_from_browser")
+    if cookies_from_browser is not None and (
+        not isinstance(cookies_from_browser, str) or not cookies_from_browser.strip()
+    ):
+        raise InvalidParams("cookies_from_browser must be a non-empty string")
+    reuse_cache = arguments.get("reuse_cache", True)
+    if not isinstance(reuse_cache, bool):
+        raise InvalidParams("reuse_cache must be a boolean")
+    max_size_mb = arguments.get("max_size_mb", 500)
+    if (
+        isinstance(max_size_mb, bool)
+        or not isinstance(max_size_mb, int)
+        or not 1 <= max_size_mb <= 5120
+    ):
+        raise InvalidParams("max_size_mb must be an integer between 1 and 5120")
+    timeout = arguments.get("timeout", 600)
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not 1 <= timeout <= 3600
+    ):
+        raise InvalidParams("timeout must be between 1 and 3600")
+    return {
+        "url": url,
+        "quality": quality,
+        "cookies_from_browser": cookies_from_browser,
+        "reuse_cache": reuse_cache,
+        "max_bytes": max_size_mb * 1024 * 1024,
         "timeout": timeout,
     }
 
@@ -385,6 +488,16 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         return _tool_result(
             envelope.model_dump(mode="json"), is_error=not envelope.ok,
         )
+    if name == "omnireach_download_media":
+        kwargs = _validate_media_download(arguments)
+        url = kwargs.pop("url")
+        try:
+            envelope = download_media(url, **kwargs)
+        except Exception as exc:  # noqa: BLE001
+            return _tool_result({"error": str(exc)}, is_error=True)
+        return _tool_result(
+            envelope.model_dump(mode="json"), is_error=not envelope.ok,
+        )
     raise KeyError(name)
 
 
@@ -406,7 +519,8 @@ def handle_message(message: object) -> dict[str, Any] | None:
             "serverInfo": SERVER_INFO,
             "instructions": (
                 "Use omnireach_search for research, omnireach_fetch for reading pages, "
-                "and omnireach_parse_media for media metadata or transcripts before "
+                "omnireach_parse_media for media metadata or transcripts, and "
+                "omnireach_download_media for bounded Douyin downloads before "
                 "launching browser automation."
             ),
         })
