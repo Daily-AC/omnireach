@@ -1,3 +1,3 @@
 """omnireach: give your agent the senses of a logged-in human across the whole internet — search + read 15+ platforms incl. login-walled verticals."""
 
-__version__ = "0.17.0-alpha"
+__version__ = "0.18.0-alpha"

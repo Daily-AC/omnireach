@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import httpx
 
-from omnireach.media.service import inspect_media, parse_media
+from omnireach.media.service import download_media, inspect_media, parse_media
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -13,6 +13,9 @@ YTDLP_PAYLOAD = json.loads(
 )
 BILIBILI_YTDLP_PAYLOAD = json.loads(
     (FIXTURES / "ytdlp_bilibili_captioned_sanitized.json").read_text()
+)
+DOUYIN_YTDLP_PAYLOAD = json.loads(
+    (FIXTURES / "ytdlp_douyin_sanitized.json").read_text()
 )
 
 
@@ -109,6 +112,137 @@ def test_ytdlp_ssl_eof_is_retryable(monkeypatch):
     assert envelope.ok is False
     assert envelope.errors[0].retryable is True
     assert "retry" in envelope.errors[0].hint.lower()
+
+
+def test_douyin_download_writes_bounded_h264_artifact(monkeypatch, tmp_path):
+    commands = []
+    monkeypatch.setattr(
+        "omnireach.media.service._ytdlp_payload",
+        lambda *args, **kwargs: DOUYIN_YTDLP_PAYLOAD,
+    )
+    monkeypatch.setattr(
+        "omnireach.media.service._yt_dlp_version",
+        lambda timeout: "2026.06.09",
+    )
+
+    def fake_download(command, timeout):
+        commands.append(command)
+        template = Path(command[command.index("--output") + 1])
+        path = Path(str(template).replace("%(ext)s", "mp4"))
+        path.write_bytes(b"downloaded-douyin-video")
+        return path.resolve()
+
+    monkeypatch.setattr("omnireach.media.service._run_download", fake_download)
+
+    envelope = download_media(
+        "https://www.douyin.com/video/7664188112177079482",
+        cookies_from_browser="chrome:Profile 1",
+        output_dir=tmp_path,
+        max_bytes=20 * 1024 * 1024,
+    )
+
+    assert envelope.ok is True
+    assert envelope.source == "douyin"
+    assert envelope.mode == "download"
+    assert envelope.metadata.codec == "h264"
+    media = next(item for item in envelope.artifacts if item.kind == "media")
+    assert media.bytes == len(b"downloaded-douyin-video")
+    assert Path(media.path).read_bytes() == b"downloaded-douyin-video"
+    assert commands[0][commands[0].index("--format") + 1] == "h264_720p_441058-0"
+    assert commands[0][commands[0].index("--max-filesize") + 1] == str(20 * 1024 * 1024)
+    serialized = envelope.model_dump_json()
+    assert "Profile 1" not in serialized
+    assert "cookie" not in serialized.casefold()
+    assert "x-signature" not in serialized
+    assert "signed.example" not in serialized
+    assert envelope.metadata.thumbnail_url is None
+    assert "Signed thumbnail URL omitted" in envelope.warnings[0]
+
+
+def test_douyin_download_reuses_hash_verified_cache(monkeypatch, tmp_path):
+    calls = 0
+    monkeypatch.setattr(
+        "omnireach.media.service._ytdlp_payload",
+        lambda *args, **kwargs: DOUYIN_YTDLP_PAYLOAD,
+    )
+    monkeypatch.setattr(
+        "omnireach.media.service._yt_dlp_version",
+        lambda timeout: "2026.06.09",
+    )
+
+    def fake_download(command, timeout):
+        nonlocal calls
+        calls += 1
+        template = Path(command[command.index("--output") + 1])
+        path = Path(str(template).replace("%(ext)s", "mp4"))
+        path.write_bytes(b"cached-douyin-video")
+        return path.resolve()
+
+    monkeypatch.setattr("omnireach.media.service._run_download", fake_download)
+    kwargs = {
+        "cookies_from_browser": "chrome:Profile 1",
+        "output_dir": tmp_path,
+        "max_bytes": 20 * 1024 * 1024,
+    }
+
+    first = download_media(
+        "https://www.douyin.com/video/7664188112177079482", **kwargs,
+    )
+    second = download_media(
+        "https://www.douyin.com/video/7664188112177079482", **kwargs,
+    )
+
+    assert first.cache_hit is False
+    assert second.cache_hit is True
+    assert calls == 1
+
+
+def test_douyin_download_rejects_formats_over_size_limit(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "omnireach.media.service._ytdlp_payload",
+        lambda *args, **kwargs: DOUYIN_YTDLP_PAYLOAD,
+    )
+    monkeypatch.setattr(
+        "omnireach.media.service._run_download",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not download")),
+    )
+
+    envelope = download_media(
+        "https://www.douyin.com/video/7664188112177079482",
+        output_dir=tmp_path,
+        max_bytes=5 * 1024 * 1024,
+    )
+
+    assert envelope.ok is False
+    assert envelope.errors[0].category == "limit"
+    assert "smallest downloadable MP4" in envelope.errors[0].message
+
+
+def test_douyin_download_explains_fresh_cookie_requirement(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "omnireach.media.service._ytdlp_payload",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("Fresh cookies (not necessarily logged in) are needed")
+        ),
+    )
+
+    envelope = download_media(
+        "https://www.douyin.com/video/7664188112177079482",
+        output_dir=tmp_path,
+    )
+
+    assert envelope.ok is False
+    assert envelope.errors[0].category == "blocked"
+    assert "--cookies-from-browser" in envelope.errors[0].hint
+
+
+def test_media_download_rejects_non_douyin_url(tmp_path):
+    envelope = download_media(
+        "https://www.youtube.com/watch?v=abc", output_dir=tmp_path,
+    )
+
+    assert envelope.ok is False
+    assert envelope.errors[0].category == "invalid"
 
 
 def test_bilibili_browser_cookies_select_ytdlp_and_inline_subtitles(

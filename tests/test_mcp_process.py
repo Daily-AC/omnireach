@@ -90,6 +90,7 @@ def test_mcp_stdio_lifecycle_and_fetch(article_url):
             "omnireach_search",
             "omnireach_fetch",
             "omnireach_parse_media",
+            "omnireach_download_media",
         }
 
         _send(proc, {

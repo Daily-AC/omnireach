@@ -14,7 +14,7 @@ _DESCRIPTION_MAX = 10000
 class MediaError(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    stage: Literal["resolve", "inspect", "subtitle", "artifact"]
+    stage: Literal["resolve", "inspect", "subtitle", "download", "artifact"]
     backend: str
     category: Literal["unavailable", "failed", "blocked", "limit", "invalid"]
     message: str
@@ -25,7 +25,10 @@ class MediaError(BaseModel):
 class MediaArtifact(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["metadata", "subtitle", "transcript_json", "transcript_markdown", "manifest"]
+    kind: Literal[
+        "metadata", "subtitle", "transcript_json", "transcript_markdown",
+        "media", "manifest",
+    ]
     path: str = Field(description="Absolute local filesystem path")
     mime: str
     bytes: int = Field(ge=0)
@@ -106,7 +109,7 @@ class MediaEnvelope(BaseModel):
     source: str
     media_type: Literal["video", "audio", "unknown"]
     backend: Literal["direct", "yt-dlp", "bilibili-api"] | None = None
-    mode: Literal["inspect", "quick"]
+    mode: Literal["inspect", "quick", "download"]
     parsed_at: str
     cache_key: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     cache_hit: bool = False

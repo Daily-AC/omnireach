@@ -1,21 +1,22 @@
 ---
 name: omnireach
-description: This skill should be used to call `omnireach_search`, `omnireach_fetch`, or `omnireach_parse_media` when the user asks to search the web, read a URL, parse video/audio metadata or captions, or avoid browser automation for read-only web work.
+description: This skill should be used to call `omnireach_search`, `omnireach_fetch`, `omnireach_parse_media`, or `omnireach_download_media` when the user asks to search the web, read a URL, parse video/audio metadata or captions, download a Douyin video, or avoid browser automation for supported web work.
 ---
 
 # omnireach
 
-Use omnireach as the read-only web fast path. Search across ordinary web sources and
-login-walled vertical platforms, then fetch full page Markdown through one stable schema.
-Keep browser automation for interactions that search and fetch cannot perform.
+Use omnireach as the supported web and media fast path. Search across ordinary web sources
+and login-walled vertical platforms, fetch full page Markdown, parse media, or download a
+bounded Douyin MP4 through stable schemas. Keep browser automation for unsupported actions.
 
 ## Tool Choice Policy
 
 1. Call `omnireach_search` first for web research or platform search.
 2. Call `omnireach_fetch` first to read an HTTP or HTTPS URL.
 3. Call `omnireach_parse_media` first for video/audio metadata or captions.
-4. Use the omnireach CLI fallback only when these MCP tools are unavailable.
-5. Use Playwright or browser control only for clicks, forms, uploads, downloads,
+4. Call `omnireach_download_media` for an explicitly requested Douyin video download.
+5. Use the omnireach CLI fallback only when these MCP tools are unavailable.
+6. Use Playwright or browser control only for clicks, forms, uploads, unsupported downloads,
    screenshots, visual inspection, or unsupported interactive workflows.
 
 Do not launch Playwright merely to search or extract readable page content.
@@ -82,6 +83,14 @@ envelope or artifacts. Quick parse reuses a cache entry only after checking ever
 size and SHA-256; set `reuse_cache=false` to force a fresh parse. Use `max_duration` to reject
 media longer than the requested number of seconds.
 
+Call `omnireach_download_media` only when the user explicitly requests a Douyin download.
+It writes one combined MP4 into an OmniReach-managed directory and returns a `media`
+artifact with an absolute path, byte count, and SHA-256. `quality=compatible` prefers H.264;
+`best` maximizes resolution/bitrate and `small` minimizes bytes. Keep `max_size_mb` bounded.
+Douyin currently requires fresh cookies, so set `cookies_from_browser` only with explicit
+user authorization. MCP does not accept an arbitrary output directory. Cached files are
+reused only after size and SHA-256 verification.
+
 ## Setup and Recovery
 
 If the MCP tools are absent but `omnireach` is installed, use the CLI fallback documented
@@ -105,9 +114,10 @@ unavailable.
 
 ## Boundary
 
-Use omnireach for finding and reading information. Do not claim it replaces full browser
-automation. Switch to browser control only when the requested outcome requires page state
-changes, visual evidence, or an interaction sequence.
+Use omnireach for finding and reading information, parsing media, and bounded Douyin
+downloads. Do not claim it replaces full browser automation. Switch to browser control only
+when the requested outcome requires page state changes, visual evidence, or an unsupported
+interaction sequence.
 
 ## Additional Resources
 

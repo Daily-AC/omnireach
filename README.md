@@ -16,12 +16,12 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 
 ### MCP before Playwright
 
-For search, reading, and media parsing, start with the three focused MCP tools instead of browser automation.
+For search, reading, media parsing, and bounded Douyin downloads, start with the four focused MCP tools instead of browser automation.
 Ordinary page fetches never start Chrome. Google, Reddit, Twitter, Xiaohongshu, TikTok,
 and Douyin search now use Omnireach's own small, read-only Chrome bridge first, with
 OpenCLI retained as a compatibility fallback. Browser-backed calls use temporary background
 tabs that close after the call, and `quick` mode remains browser-free. Keep Playwright for
-clicks, forms, file transfer, screenshots, and visual assertions.
+clicks, forms, unsupported file transfer, screenshots, and visual assertions.
 
 | Same RFC 9110 read | omnireach MCP | Playwright + headless system Chrome |
 |---|---:|---:|
@@ -76,13 +76,14 @@ On proxy / relay-station / Bedrock / Vertex-Claude-3.x setups where the built-in
 
 ## Agent fast path — MCP before Playwright
 
-The plugin exposes three model-controlled tools:
+The plugin exposes four model-controlled tools:
 
 - `omnireach_search` for web research and platform search
 - `omnireach_fetch` for reading an HTTP or HTTPS URL as Markdown
 - `omnireach_parse_media` for YouTube, Bilibili, and direct-media metadata or transcripts
+- `omnireach_download_media` for bounded Douyin MP4 downloads with verified local artifacts
 
-Both tools are served by the dependency-free stdio command:
+All tools are served by the dependency-free stdio command:
 
 ```bash
 omnireach mcp
@@ -115,7 +116,7 @@ downloads, screenshots, visual assertions, and unsupported interactive workflows
 | | omnireach | Agent-Reach (v1.5.0, as of 2026-07) |
 |---|---|---|
 | 微信公众号 WeChat | ✅ zero-config search (Sogou path) + full-text fetch via your logged-in Chrome | ❌ removed 2026-06 ([PR #347](https://github.com/Panniantong/Agent-Reach/pull/347)) after anti-bot breakage |
-| 抖音 Douyin | ✅ search via your logged-in Chrome | ❌ removed 2026-06 (upstream tool archived) |
+| 抖音 Douyin | ✅ search via logged-in Chrome + bounded MP4 download | ❌ removed 2026-06 (upstream tool archived) |
 | TikTok | ✅ search | ❌ not supported |
 | Output contract | one pydantic JSON schema across all 17 sources; auto-JSON when piped | no wrapper layer by design — each upstream tool's own format (YAML / plain text / subtitle files / raw JSON) |
 | `search` / `fetch` commands | built-in: `omnireach search`, `omnireach fetch <url>` with host-aware routing | no search/read commands — routes your agent to call upstream tools directly |
@@ -141,6 +142,10 @@ omnireach media parse --language en --json "https://www.youtube.com/watch?v=<id>
 # Bilibili captions can require an explicitly selected logged-in Chrome profile
 omnireach media parse --cookies-from-browser "chrome:Profile 1" \
   --language zh-Hans --json "https://www.bilibili.com/video/<BV-id>"
+
+# Douyin currently requires fresh browser cookies; output includes path, bytes, and SHA-256
+omnireach media download --cookies-from-browser "chrome:Profile 1" \
+  --max-size-mb 500 --json "https://www.douyin.com/video/<id>"
 
 # Full pipeline: search → fetch all results
 omnireach search --on wechat --json "claude 4.7" \
@@ -172,7 +177,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach media parse <media-url> --subtitle-url <vtt>` | Parse a direct audio/video URL with a sidecar VTT/SRT/JSON3 subtitle |
 | `omnireach media parse <url> --cookies-from-browser "chrome:Profile 1"` | Explicitly reuse that browser profile when Bilibili captions require login |
 | `omnireach media parse <url> --no-cache --max-duration 3600` | Bypass verified artifact reuse and reject media longer than one hour |
-| `omnireach mcp` | Serve search, fetch, and media parsing over MCP stdio |
+| `omnireach media download <douyin-url> --cookies-from-browser "chrome:Profile 1"` | Download a bounded H.264 MP4 by default and return a hash-verified local artifact |
+| `omnireach media download <douyin-url> --quality small --max-size-mb 100` | Prefer the smallest combined MP4 and reject formats over 100 MiB |
+| `omnireach mcp` | Serve search, fetch, media parsing, and bounded Douyin download over MCP stdio |
 | `omnireach init` | Write default `~/.omnireach/preferences.toml` |
 | `omnireach sources` | List all sources + tier status |
 | `omnireach setup <source>` | Guided setup for a 🟡 / 🔴 source |
@@ -182,6 +189,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach agy configure <conversation-id>` | Configure the experimental agy grounded-search backend |
 | `omnireach agy status --json` | Check the configured agy conversation and AgentAPI endpoint |
 | `omnireach doctor` | Health check (sources / fetch / media / wechat backends) |
+
+See the [real Douyin download verification](docs/verification/douyin-download.md) for the
+upstream format shape, authenticated download, cache, size-limit, privacy, and MCP evidence.
 
 ---
 
@@ -218,7 +228,8 @@ omnireach search --on wechat --json "claude 4.7" \
 ## Agent calling convention
 
 Prefer the MCP tools: call `omnireach_search` for research, `omnireach_fetch` for pages,
-and `omnireach_parse_media` for video/audio metadata or captions. Fall back to the CLI only when MCP is unavailable.
+`omnireach_parse_media` for video/audio metadata or captions, and
+`omnireach_download_media` for bounded Douyin MP4 downloads. Fall back to the CLI only when MCP is unavailable.
 When using that fallback, **always request JSON explicitly**:
 
 ```bash

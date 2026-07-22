@@ -12,6 +12,8 @@ omnireach search --json "Claude Code"
 omnireach fetch --json "https://example.com/article"
 omnireach media inspect --json "https://www.youtube.com/watch?v=<id>"
 omnireach media parse --language en --json "https://www.youtube.com/watch?v=<id>"
+omnireach media download --cookies-from-browser "chrome:Profile 1" --json \
+  "https://www.douyin.com/video/<id>"
 ```
 
 Alternatively, force JSON for the entire harness:
@@ -152,8 +154,8 @@ Use this standard MCP configuration in clients that do not install the omnireach
 }
 ```
 
-The server exposes `omnireach_search`, `omnireach_fetch`, and `omnireach_parse_media` and writes only MCP JSON-RPC
-messages to stdout.
+The server exposes `omnireach_search`, `omnireach_fetch`, `omnireach_parse_media`, and
+`omnireach_download_media` and writes only MCP JSON-RPC messages to stdout.
 
 ## Media
 
@@ -165,6 +167,13 @@ When Bilibili reports that captions require login, explicitly pass
 `--cookies-from-browser "chrome:Profile 1"` for an authorized logged-in profile. Cached
 artifacts are reused only after size and SHA-256 verification; `--no-cache` forces a fresh
 parse. `--max-duration <seconds>` rejects unexpectedly long media before writing artifacts.
+
+`media download` currently accepts Douyin URLs. It defaults to a combined H.264 MP4,
+500 MiB maximum, and a managed directory under `~/.cache/omnireach/media/downloads/`.
+Use `--quality best|compatible|small`, `--max-size-mb`, or CLI-only `--output-dir` as needed.
+Douyin currently requires fresh cookies, so pass `--cookies-from-browser "chrome:Profile 1"`
+only for an explicitly authorized profile. JSON and manifests never contain cookies or
+signed media URLs.
 
 ## Diagnosis
 

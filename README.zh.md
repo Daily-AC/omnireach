@@ -16,11 +16,11 @@ omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
 
 ### 先读网页，再启动 Playwright
 
-搜索、读取和媒体解析先用三个聚焦的 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
+搜索、读取、媒体解析和有界抖音下载先用四个聚焦的 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
 完全不启动 Chrome；Google、Reddit、Twitter、小红书、TikTok、抖音现在都优先走
 Omnireach 自己的轻量只读 Chrome 桥，OpenCLI 保留为兼容回退。浏览器路径使用后台
 临时 tab，用完即关；`quick` 模式仍完全不碰浏览器。点击、表单、文件传输、截图和
-视觉断言继续交给 Playwright。
+视觉断言和其他不支持的文件传输继续交给 Playwright。
 
 | 同一次 RFC 9110 读取 | omnireach MCP | Playwright + 无头系统 Chrome |
 |---|---:|---:|
@@ -74,13 +74,14 @@ Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— �
 
 ## Agent 快路径 —— MCP 优先于 Playwright
 
-plugin 暴露三个由模型直接调用的工具：
+plugin 暴露四个由模型直接调用的工具：
 
 - `omnireach_search`：联网研究与平台搜索
 - `omnireach_fetch`：把 HTTP/HTTPS URL 读取为 Markdown
 - `omnireach_parse_media`：解析 YouTube、B站和直接媒体的元数据或字幕
+- `omnireach_download_media`：有界下载抖音 MP4，并返回经过哈希校验的本地产物
 
-二者由零新增依赖的 stdio 命令提供：
+全部工具由零新增依赖的 stdio 命令提供：
 
 ```bash
 omnireach mcp
@@ -112,7 +113,7 @@ Chrome；登录墙 adapter 可能通过后台临时 tab 继承现有 Chrome 登�
 | | omnireach | Agent-Reach（v1.5.0，截至 2026-07） |
 |---|---|---|
 | 微信公众号 | ✅ 零配置搜索（Sogou 路径）+ 登录态 Chrome 全文抓取 | ❌ 2026-06 整体删除（[PR #347](https://github.com/Panniantong/Agent-Reach/pull/347)，反爬失效） |
-| 抖音 | ✅ 登录态 Chrome 搜索 | ❌ 2026-06 删除（上游工具已 archive） |
+| 抖音 | ✅ 登录态 Chrome 搜索 + 有界 MP4 下载 | ❌ 2026-06 删除（上游工具已 archive） |
 | TikTok | ✅ 搜索 | ❌ 从未支持 |
 | 输出契约 | 全部 17 源统一 pydantic JSON schema；管道自动 JSON | 设计上无包装层 —— 各上游工具各自的格式（YAML / 纯文本 / 字幕文件 / 裸 JSON） |
 | `search` / `fetch` 命令 | 内置 `omnireach search` + `omnireach fetch <url>`（host 感知路由） | 无 search/read 命令 —— 引导 agent 直接调各上游工具 |
@@ -138,6 +139,10 @@ omnireach media parse --language en --json "https://www.youtube.com/watch?v=<id>
 # B站字幕需要登录时，显式指定已登录的 Chrome profile
 omnireach media parse --cookies-from-browser "chrome:Profile 1" \
   --language zh-Hans --json "https://www.bilibili.com/video/<BV-id>"
+
+# 抖音当前需要新鲜浏览器 cookies；结果返回路径、字节数和 SHA-256
+omnireach media download --cookies-from-browser "chrome:Profile 1" \
+  --max-size-mb 500 --json "https://www.douyin.com/video/<id>"
 
 # 完整流水线：搜索 → 批量抓全文
 omnireach search --on wechat --json "claude 4.7" \
@@ -169,7 +174,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach media parse <media-url> --subtitle-url <vtt>` | 给直接音视频解析旁挂 VTT/SRT/JSON3 字幕 |
 | `omnireach media parse <url> --cookies-from-browser "chrome:Profile 1"` | B站字幕需要登录时，显式复用该浏览器 profile |
 | `omnireach media parse <url> --no-cache --max-duration 3600` | 跳过哈希校验缓存，并拒绝超过一小时的媒体 |
-| `omnireach mcp` | 通过 MCP stdio提供搜索、抓取和媒体解析 |
+| `omnireach media download <douyin-url> --cookies-from-browser "chrome:Profile 1"` | 默认下载兼容性更好的 H.264 MP4，并返回哈希校验后的本地产物 |
+| `omnireach media download <douyin-url> --quality small --max-size-mb 100` | 优先最小的合并 MP4，并拒绝超过 100 MiB 的格式 |
+| `omnireach mcp` | 通过 MCP stdio 提供搜索、抓取、媒体解析和有界抖音下载 |
 | `omnireach init` | 写默认 `~/.omnireach/preferences.toml` |
 | `omnireach sources` | 列出所有源 + 状态 |
 | `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 |
@@ -179,6 +186,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach agy configure <conversation-id>` | 配置实验性 agy grounded-search backend |
 | `omnireach agy status --json` | 检查 agy conversation 与 AgentAPI endpoint |
 | `omnireach doctor` | 健康检查 (含 sources / fetch / media / wechat backends) |
+
+真实上游格式、登录态下载、缓存、大小限制、隐私与 MCP 证据见
+[抖音下载验证记录](docs/verification/douyin-download.md)。
 
 ---
 
@@ -215,7 +225,7 @@ omnireach search --on wechat --json "claude 4.7" \
 ## Agent 调用约定
 
 Agent 应优先调用 `omnireach_search` 做搜索、`omnireach_fetch` 读取网页，并用
-`omnireach_parse_media` 解析音视频元数据或字幕。只有 MCP 不可用时才回退 CLI；走 CLI 时，**永远显式拿 JSON**：
+`omnireach_parse_media` 解析音视频元数据或字幕，`omnireach_download_media` 有界下载抖音 MP4。只有 MCP 不可用时才回退 CLI；走 CLI 时，**永远显式拿 JSON**：
 
 ```bash
 # 方式 1：每条命令加 --json

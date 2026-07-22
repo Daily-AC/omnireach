@@ -1,0 +1,56 @@
+{
+  "_fixture": "Captured from yt-dlp 2026.06.09 on 2026-07-22; signed media URLs and duplicate CDN formats removed",
+  "id": "7664188112177079482",
+  "title": "2分钟学会：用AI做公益短片（附全流程） 两分钟用AI手搓一条公益短片！这期全程干货，从捏人像、写剧本到生成视频全流程拆解，新手小白三步就...",
+  "uploader": "47591814474",
+  "duration": 216,
+  "timestamp": 1784457852,
+  "thumbnail": "https://signed.example/cover.jpeg?x-expires=1785924000&x-signature=redacted",
+  "width": 720,
+  "height": 960,
+  "vcodec": "h265",
+  "acodec": "aac",
+  "ext": "mp4",
+  "formats": [
+    {
+      "format_id": "download_addr-0",
+      "ext": "mp4",
+      "width": 720,
+      "height": 960,
+      "vcodec": "h264",
+      "acodec": "aac",
+      "filesize": 15078321,
+      "tbr": null
+    },
+    {
+      "format_id": "bytevc1_540p_229197-0",
+      "ext": "mp4",
+      "width": 576,
+      "height": 768,
+      "vcodec": "h265",
+      "acodec": "aac",
+      "filesize": 6197443,
+      "tbr": 229
+    },
+    {
+      "format_id": "h264_720p_441058-0",
+      "ext": "mp4",
+      "width": 720,
+      "height": 960,
+      "vcodec": "h264",
+      "acodec": "aac",
+      "filesize": 11926110,
+      "tbr": 441
+    },
+    {
+      "format_id": "bytevc1_720p_254815-0",
+      "ext": "mp4",
+      "width": 720,
+      "height": 960,
+      "vcodec": "h265",
+      "acodec": "aac",
+      "filesize": 6890140,
+      "tbr": 254
+    }
+  ]
+}

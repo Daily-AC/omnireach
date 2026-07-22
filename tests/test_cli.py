@@ -319,6 +319,17 @@ def test_entrypoint_emits_json_for_usage_error_when_json_requested(
     assert "--definitely-invalid" in payload["error"]["message"]
 
 
+def test_entrypoint_propagates_click_exit_return(monkeypatch):
+    from omnireach.cli import _entrypoint
+
+    monkeypatch.setattr("omnireach.cli.main.main", lambda **kwargs: 1)
+
+    with pytest.raises(SystemExit) as exc_info:
+        _entrypoint()
+
+    assert exc_info.value.code == 1
+
+
 def test_v092_sources_auto_json_when_stdout_not_tty():
     """v0.9.2: sources auto-JSON in non-TTY (same as search/doctor)."""
     import json as _json

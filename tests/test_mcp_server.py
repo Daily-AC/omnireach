@@ -22,7 +22,7 @@ def test_initialize_advertises_static_tools():
     }
 
 
-def test_tools_list_exposes_search_fetch_and_media():
+def test_tools_list_exposes_search_fetch_parse_and_download_media():
     response = handle_message({
         "jsonrpc": "2.0",
         "id": 2,
@@ -33,11 +33,89 @@ def test_tools_list_exposes_search_fetch_and_media():
     tools = {tool["name"]: tool for tool in response["result"]["tools"]}
     assert set(tools) == {
         "omnireach_search", "omnireach_fetch", "omnireach_parse_media",
+        "omnireach_download_media",
     }
     assert tools["omnireach_search"]["inputSchema"]["required"] == ["query"]
     assert tools["omnireach_fetch"]["annotations"]["readOnlyHint"] is True
     assert tools["omnireach_parse_media"]["annotations"]["readOnlyHint"] is False
     assert tools["omnireach_parse_media"]["outputSchema"]["title"] == "MediaEnvelope"
+    assert tools["omnireach_download_media"]["annotations"]["readOnlyHint"] is False
+
+
+def test_download_media_tool_uses_managed_output_and_converts_size(monkeypatch):
+    from omnireach.media.contract import MediaEnvelope
+
+    captured = {}
+
+    def fake_download(url, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return MediaEnvelope(
+            ok=True,
+            url=url,
+            source="douyin",
+            media_type="video",
+            backend="yt-dlp",
+            mode="download",
+            parsed_at="2026-07-22T00:00:00Z",
+        )
+
+    monkeypatch.setattr("omnireach.mcp_server.download_media", fake_download)
+    response = handle_message({
+        "jsonrpc": "2.0",
+        "id": 15,
+        "method": "tools/call",
+        "params": {
+            "name": "omnireach_download_media",
+            "arguments": {
+                "url": "https://www.douyin.com/video/123",
+                "quality": "small",
+                "cookies_from_browser": "chrome:Profile 1",
+                "max_size_mb": 25,
+                "timeout": 90,
+            },
+        },
+    })
+
+    assert response["result"]["isError"] is False
+    assert captured == {
+        "url": "https://www.douyin.com/video/123",
+        "quality": "small",
+        "cookies_from_browser": "chrome:Profile 1",
+        "reuse_cache": True,
+        "max_bytes": 25 * 1024 * 1024,
+        "timeout": 90,
+    }
+
+
+def test_download_media_tool_rejects_output_directory_and_invalid_limit():
+    output_dir = handle_message({
+        "jsonrpc": "2.0",
+        "id": 16,
+        "method": "tools/call",
+        "params": {
+            "name": "omnireach_download_media",
+            "arguments": {
+                "url": "https://www.douyin.com/video/123",
+                "output_dir": "/tmp/arbitrary",
+            },
+        },
+    })
+    invalid_limit = handle_message({
+        "jsonrpc": "2.0",
+        "id": 17,
+        "method": "tools/call",
+        "params": {
+            "name": "omnireach_download_media",
+            "arguments": {
+                "url": "https://www.douyin.com/video/123",
+                "max_size_mb": 0,
+            },
+        },
+    })
+
+    assert output_dir["error"]["code"] == -32602
+    assert invalid_limit["error"]["code"] == -32602
 
 
 def test_initialized_notification_has_no_response():
