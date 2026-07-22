@@ -63,10 +63,25 @@ def media_cmd() -> None:
 @click.argument("url")
 @_backend_option
 @click.option("--timeout", type=click.FloatRange(min=1, max=300), default=60, show_default=True)
+@click.option(
+    "--cookies-from-browser",
+    help="Explicitly reuse yt-dlp browser cookies, e.g. chrome:Profile 1",
+)
 @click.option("--json", "json_out", is_flag=True, help="Output a JSON envelope")
-def media_inspect_cmd(url: str, backend: str, timeout: float, json_out: bool) -> None:
+def media_inspect_cmd(
+    url: str,
+    backend: str,
+    timeout: float,
+    cookies_from_browser: str | None,
+    json_out: bool,
+) -> None:
     """Inspect metadata and available subtitle tracks without writing files."""
-    envelope = inspect_media(url, backend=backend, timeout=timeout)
+    envelope = inspect_media(
+        url,
+        backend=backend,
+        cookies_from_browser=cookies_from_browser,
+        timeout=timeout,
+    )
     _render(envelope, json_out)
     if not envelope.ok:
         raise click.exceptions.Exit(1)
@@ -78,7 +93,17 @@ def media_inspect_cmd(url: str, backend: str, timeout: float, json_out: bool) ->
 @_backend_option
 @click.option("--language", help="Preferred subtitle language, e.g. en or zh-Hans")
 @click.option("--subtitle-url", help="HTTP(S) sidecar VTT, SRT, or JSON3 subtitle")
+@click.option(
+    "--cookies-from-browser",
+    help="Explicitly reuse yt-dlp browser cookies, e.g. chrome:Profile 1",
+)
 @click.option("--output-dir", type=click.Path(path_type=Path, file_okay=False))
+@click.option("--cache/--no-cache", "reuse_cache", default=True, show_default=True)
+@click.option(
+    "--max-duration",
+    type=click.FloatRange(min=1, max=86400),
+    help="Reject media longer than this many seconds",
+)
 @click.option("--timeout", type=click.FloatRange(min=1, max=300), default=60, show_default=True)
 @click.option("--json", "json_out", is_flag=True, help="Output a JSON envelope")
 def media_parse_cmd(
@@ -87,7 +112,10 @@ def media_parse_cmd(
     backend: str,
     language: str | None,
     subtitle_url: str | None,
+    cookies_from_browser: str | None,
     output_dir: Path | None,
+    reuse_cache: bool,
+    max_duration: float | None,
     timeout: float,
     json_out: bool,
 ) -> None:
@@ -98,7 +126,10 @@ def media_parse_cmd(
         backend=backend,
         language=language,
         subtitle_url=subtitle_url,
+        cookies_from_browser=cookies_from_browser,
         output_dir=output_dir,
+        reuse_cache=reuse_cache,
+        max_duration=max_duration,
         timeout=timeout,
     )
     _render(envelope, json_out)

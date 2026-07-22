@@ -92,6 +92,8 @@ def test_media_backend_doctor_reports_ytdlp_and_ffprobe(monkeypatch):
     assert statuses["yt-dlp"].ok is True
     assert statuses["ffprobe"].ok is False
     assert "ffmpeg" in statuses["ffprobe"].fix_hint
+    assert {"ffmpeg", "whisper-cli"}.issubset(statuses)
+    assert "future" in statuses["whisper-cli"].detail
 
 
 def test_fetch_backend_doctor_reports_builtin_http_without_external_binary(monkeypatch):

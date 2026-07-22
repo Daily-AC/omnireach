@@ -19,6 +19,7 @@
     "code": 0,
     "message": "OK",
     "data": {
+      "need_login_subtitle": true,
       "subtitle": {
         "allow_submit": false,
         "lan": "",

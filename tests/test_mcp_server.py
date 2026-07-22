@@ -157,13 +157,18 @@ def test_media_inspect_tool_does_not_materialize_artifacts(monkeypatch):
                 "url": "https://www.youtube.com/watch?v=abc",
                 "mode": "inspect",
                 "backend": "yt-dlp",
+                "cookies_from_browser": "chrome:Profile 1",
             },
         },
     })
 
     assert response["result"]["isError"] is False
     assert response["result"]["structuredContent"]["artifacts"] == []
-    assert captured == {"backend": "yt-dlp", "timeout": 60}
+    assert captured == {
+        "backend": "yt-dlp",
+        "cookies_from_browser": "chrome:Profile 1",
+        "timeout": 60,
+    }
 
 
 def test_media_tool_rejects_non_http_subtitle_url():
@@ -198,6 +203,36 @@ def test_media_tool_rejects_arbitrary_output_directory():
     })
 
     assert response["error"]["code"] == -32602
+
+
+def test_media_tool_rejects_invalid_cache_and_duration_options():
+    invalid_cache = handle_message({
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "tools/call",
+        "params": {
+            "name": "omnireach_parse_media",
+            "arguments": {
+                "url": "https://example.com/video.mp4",
+                "reuse_cache": "yes",
+            },
+        },
+    })
+    invalid_duration = handle_message({
+        "jsonrpc": "2.0",
+        "id": 14,
+        "method": "tools/call",
+        "params": {
+            "name": "omnireach_parse_media",
+            "arguments": {
+                "url": "https://example.com/video.mp4",
+                "max_duration": 0,
+            },
+        },
+    })
+
+    assert invalid_cache["error"]["code"] == -32602
+    assert invalid_duration["error"]["code"] == -32602
 
 
 def test_invalid_tool_arguments_return_minus_32602():

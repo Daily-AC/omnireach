@@ -108,6 +108,8 @@ class MediaEnvelope(BaseModel):
     backend: Literal["direct", "yt-dlp", "bilibili-api"] | None = None
     mode: Literal["inspect", "quick"]
     parsed_at: str
+    cache_key: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    cache_hit: bool = False
     metadata: MediaMetadata | None = None
     tracks: list[MediaTrack] = Field(default_factory=list)
     artifacts: list[MediaArtifact] = Field(default_factory=list)

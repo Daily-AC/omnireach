@@ -138,6 +138,10 @@ omnireach fetch --json "https://mp.weixin.qq.com/s/<token>"
 # Parse captions without downloading the full YouTube video
 omnireach media parse --language en --json "https://www.youtube.com/watch?v=<id>"
 
+# Bilibili captions can require an explicitly selected logged-in Chrome profile
+omnireach media parse --cookies-from-browser "chrome:Profile 1" \
+  --language zh-Hans --json "https://www.bilibili.com/video/<BV-id>"
+
 # Full pipeline: search → fetch all results
 omnireach search --on wechat --json "claude 4.7" \
   | jq -r '.results[].url' \
@@ -166,6 +170,8 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach media inspect <url>` | Inspect normalized metadata and subtitle tracks without writing files |
 | `omnireach media parse <url> --language en` | Materialize metadata, selected captions, transcript JSON/Markdown, and a manifest |
 | `omnireach media parse <media-url> --subtitle-url <vtt>` | Parse a direct audio/video URL with a sidecar VTT/SRT/JSON3 subtitle |
+| `omnireach media parse <url> --cookies-from-browser "chrome:Profile 1"` | Explicitly reuse that browser profile when Bilibili captions require login |
+| `omnireach media parse <url> --no-cache --max-duration 3600` | Bypass verified artifact reuse and reject media longer than one hour |
 | `omnireach mcp` | Serve search, fetch, and media parsing over MCP stdio |
 | `omnireach init` | Write default `~/.omnireach/preferences.toml` |
 | `omnireach sources` | List all sources + tier status |

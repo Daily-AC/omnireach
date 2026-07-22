@@ -114,6 +114,12 @@ def run_media_backend_doctor() -> list[MediaBackendStatus]:
     definitions = (
         ("yt-dlp", "YouTube and supported-page metadata + subtitles", "pip install -U yt-dlp"),
         ("ffprobe", "direct audio/video metadata", "Install ffmpeg (includes ffprobe)"),
+        ("ffmpeg", "media conversion for future deep parsing", "Install ffmpeg"),
+        (
+            "whisper-cli",
+            "optional local ASR readiness for future deep parsing",
+            "Install whisper.cpp to enable future local ASR",
+        ),
     )
     statuses: list[MediaBackendStatus] = []
     for tool, purpose, hint in definitions:

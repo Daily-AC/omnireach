@@ -123,6 +123,24 @@ TOOLS = [
                 },
                 "language": {"type": "string", "minLength": 1},
                 "subtitle_url": {"type": "string", "format": "uri"},
+                "cookies_from_browser": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": (
+                        "Explicit yt-dlp browser cookie source, e.g. chrome:Profile 1. "
+                        "Omit to avoid reading browser cookies."
+                    ),
+                },
+                "reuse_cache": {
+                    "type": "boolean",
+                    "default": True,
+                },
+                "max_duration": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 86400,
+                    "description": "Reject media longer than this many seconds",
+                },
                 "timeout": {
                     "type": "number",
                     "minimum": 1,
@@ -265,7 +283,10 @@ def _validate_fetch(arguments: dict[str, Any]) -> dict[str, Any]:
 def _validate_media(arguments: dict[str, Any]) -> dict[str, Any]:
     _reject_extra(
         arguments,
-        {"url", "mode", "backend", "language", "subtitle_url", "timeout"},
+        {
+            "url", "mode", "backend", "language", "subtitle_url",
+            "cookies_from_browser", "reuse_cache", "max_duration", "timeout",
+        },
     )
     url = arguments.get("url")
     if not isinstance(url, str):
@@ -289,6 +310,21 @@ def _validate_media(arguments: dict[str, Any]) -> dict[str, Any]:
         subtitle_parsed = urlparse(subtitle_url)
         if subtitle_parsed.scheme not in {"http", "https"} or not subtitle_parsed.netloc:
             raise InvalidParams("subtitle_url must be an absolute HTTP or HTTPS URL")
+    cookies_from_browser = arguments.get("cookies_from_browser")
+    if cookies_from_browser is not None and (
+        not isinstance(cookies_from_browser, str) or not cookies_from_browser.strip()
+    ):
+        raise InvalidParams("cookies_from_browser must be a non-empty string")
+    reuse_cache = arguments.get("reuse_cache", True)
+    if not isinstance(reuse_cache, bool):
+        raise InvalidParams("reuse_cache must be a boolean")
+    max_duration = arguments.get("max_duration")
+    if max_duration is not None and (
+        isinstance(max_duration, bool)
+        or not isinstance(max_duration, (int, float))
+        or not 1 <= max_duration <= 86400
+    ):
+        raise InvalidParams("max_duration must be between 1 and 86400")
     timeout = arguments.get("timeout", 60)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= 300:
         raise InvalidParams("timeout must be between 1 and 300")
@@ -298,6 +334,9 @@ def _validate_media(arguments: dict[str, Any]) -> dict[str, Any]:
         "backend": backend,
         "language": language,
         "subtitle_url": subtitle_url,
+        "cookies_from_browser": cookies_from_browser,
+        "reuse_cache": reuse_cache,
+        "max_duration": max_duration,
         "timeout": timeout,
     }
 
@@ -332,6 +371,8 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             if mode == "inspect":
                 kwargs.pop("language")
                 kwargs.pop("subtitle_url")
+                kwargs.pop("reuse_cache")
+                kwargs.pop("max_duration")
                 envelope = inspect_media(url, **kwargs)
             else:
                 envelope = parse_media(

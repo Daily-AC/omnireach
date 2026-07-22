@@ -2,12 +2,17 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import httpx
+
 from omnireach.media.service import inspect_media, parse_media
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
 YTDLP_PAYLOAD = json.loads(
     (FIXTURES / "ytdlp_youtube_captioned_sanitized.json").read_text()
+)
+BILIBILI_YTDLP_PAYLOAD = json.loads(
+    (FIXTURES / "ytdlp_bilibili_captioned_sanitized.json").read_text()
 )
 
 
@@ -106,6 +111,51 @@ def test_ytdlp_ssl_eof_is_retryable(monkeypatch):
     assert "retry" in envelope.errors[0].hint.lower()
 
 
+def test_bilibili_browser_cookies_select_ytdlp_and_inline_subtitles(
+    monkeypatch, tmp_path,
+):
+    commands = []
+    monkeypatch.setattr("shutil.which", lambda tool: f"/usr/bin/{tool}")
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        if command == ["yt-dlp", "--version"]:
+            return MagicMock(returncode=0, stdout="2026.06.09\n", stderr="")
+        return MagicMock(
+            returncode=0,
+            stdout=json.dumps(BILIBILI_YTDLP_PAYLOAD),
+            stderr="",
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "omnireach.media.service.httpx.get",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("inline subtitles must not trigger an HTTP fetch")
+        ),
+    )
+
+    envelope = parse_media(
+        "https://www.bilibili.com/video/BV12N4y1M7rh",
+        cookies_from_browser="chrome:Profile 1",
+        language="zh-Hans",
+        output_dir=tmp_path,
+    )
+
+    assert envelope.ok is True
+    assert envelope.backend == "yt-dlp"
+    assert envelope.transcript.segment_count == 3
+    assert envelope.transcript.text_preview.startswith("你好\n我是小夫")
+    inspect_command = next(command for command in commands if "--dump-single-json" in command)
+    assert inspect_command[-3:] == [
+        "--cookies-from-browser",
+        "chrome:Profile 1",
+        "https://www.bilibili.com/video/BV12N4y1M7rh",
+    ]
+    assert "chrome:Profile 1" not in envelope.model_dump_json()
+    assert "chrome:Profile 1" not in (tmp_path / "manifest.json").read_text()
+
+
 def test_quick_parse_writes_transcript_and_manifest(monkeypatch, tmp_path):
     _fake_ytdlp(monkeypatch)
     response = MagicMock(
@@ -177,6 +227,120 @@ def test_subtitle_size_limit_is_structured_failure(monkeypatch, tmp_path):
     assert envelope.errors[0].stage == "subtitle"
 
 
+def test_subtitle_network_failure_has_retry_hint(monkeypatch, tmp_path):
+    _fake_ytdlp(monkeypatch)
+    monkeypatch.setattr(
+        "omnireach.media.service.httpx.get",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            httpx.ConnectError("SSL EOF")
+        ),
+    )
+
+    envelope = parse_media(
+        "https://www.youtube.com/watch?v=abc",
+        language="en",
+        output_dir=tmp_path,
+    )
+
+    error = envelope.errors[0]
+    assert error.retryable is True
+    assert "retry the same command" in error.hint
+    assert "language" not in error.hint
+
+
+def test_quick_parse_reuses_hash_verified_cache(monkeypatch, tmp_path):
+    _fake_ytdlp(monkeypatch)
+    response = MagicMock(
+        content=b"WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nHello cache\n",
+        encoding="utf-8",
+        headers={},
+    )
+    response.raise_for_status.return_value = None
+    monkeypatch.setattr("omnireach.media.service.httpx.get", lambda *args, **kwargs: response)
+
+    first = parse_media(
+        "https://www.youtube.com/watch?v=abc",
+        language="en",
+        output_dir=tmp_path,
+    )
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("cache hit must skip yt-dlp")
+        ),
+    )
+    monkeypatch.setattr(
+        "omnireach.media.service.httpx.get",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("cache hit must skip subtitle HTTP")
+        ),
+    )
+
+    second = parse_media(
+        "https://www.youtube.com/watch?v=abc",
+        language="en",
+        output_dir=tmp_path,
+    )
+
+    assert first.cache_hit is False
+    assert second.cache_hit is True
+    assert second.cache_key == first.cache_key
+    assert [artifact.path for artifact in second.artifacts] == [
+        artifact.path for artifact in first.artifacts
+    ]
+
+
+def test_quick_parse_rejects_tampered_cache(monkeypatch, tmp_path):
+    _fake_ytdlp(monkeypatch)
+    calls = {"subtitle": 0}
+
+    def subtitle_response(*args, **kwargs):
+        calls["subtitle"] += 1
+        response = MagicMock(
+            content=b"WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nUntampered\n",
+            encoding="utf-8",
+            headers={},
+        )
+        response.raise_for_status.return_value = None
+        return response
+
+    monkeypatch.setattr("omnireach.media.service.httpx.get", subtitle_response)
+    first = parse_media(
+        "https://www.youtube.com/watch?v=abc",
+        language="en",
+        output_dir=tmp_path,
+    )
+    subtitle_path = Path(next(
+        artifact.path for artifact in first.artifacts if artifact.kind == "subtitle"
+    ))
+    subtitle_path.write_text("tampered")
+
+    second = parse_media(
+        "https://www.youtube.com/watch?v=abc",
+        language="en",
+        output_dir=tmp_path,
+    )
+
+    assert second.cache_hit is False
+    assert calls["subtitle"] == 2
+    assert subtitle_path.read_bytes().startswith(b"WEBVTT")
+
+
+def test_quick_parse_rejects_media_over_duration_limit(monkeypatch, tmp_path):
+    _fake_ytdlp(monkeypatch)
+
+    envelope = parse_media(
+        "https://www.youtube.com/watch?v=abc",
+        max_duration=10,
+        output_dir=tmp_path,
+    )
+
+    assert envelope.ok is False
+    assert envelope.errors[0].category == "limit"
+    assert "213" in envelope.errors[0].message
+    assert envelope.artifacts == []
+
+
 def test_direct_inspect_uses_ffprobe(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda tool: "/usr/bin/ffprobe")
     payload = {
@@ -223,3 +387,4 @@ def test_bilibili_auto_backend_uses_public_api(monkeypatch):
     assert envelope.backend == "bilibili-api"
     assert envelope.metadata.title.startswith("【4KHDR")
     assert envelope.tracks[0].language == "zh-CN"
+    assert "subtitles require login" in envelope.warnings[0]
