@@ -1,6 +1,6 @@
 ---
 name: omnireach
-description: This skill should be used to call `omnireach_search` or `omnireach_fetch` when the user asks to "search the web", "research a topic", "search Google, Twitter, Reddit, 小红书, 微信公众号, 抖音, B站, TikTok, YouTube, HackerNews, GitHub, or RSS", "read this URL", "fetch this article", or "avoid Playwright/browser automation" for read-only web work. It provides MCP-first search and fetch through the user's existing Chrome login state when required.
+description: This skill should be used to call `omnireach_search`, `omnireach_fetch`, or `omnireach_parse_media` when the user asks to search the web, read a URL, parse video/audio metadata or captions, or avoid browser automation for read-only web work.
 ---
 
 # omnireach
@@ -13,8 +13,9 @@ Keep browser automation for interactions that search and fetch cannot perform.
 
 1. Call `omnireach_search` first for web research or platform search.
 2. Call `omnireach_fetch` first to read an HTTP or HTTPS URL.
-3. Use the omnireach CLI fallback only when these MCP tools are unavailable.
-4. Use Playwright or browser control only for clicks, forms, uploads, downloads,
+3. Call `omnireach_parse_media` first for video/audio metadata or captions.
+4. Use the omnireach CLI fallback only when these MCP tools are unavailable.
+5. Use Playwright or browser control only for clicks, forms, uploads, downloads,
    screenshots, visual inspection, or unsupported interactive workflows.
 
 Do not launch Playwright merely to search or extract readable page content.
@@ -60,6 +61,26 @@ and close it after the call.
 Treat `content_markdown` as successful only when it is non-empty. Inspect `errors` for
 blocked requests, CAPTCHA detection, unavailable backends, and fallback attempts. A tool
 result marked as an error still contains the full fetch envelope for recovery.
+
+## Media
+
+Call `omnireach_parse_media` with an absolute HTTP or HTTPS `url`. Use `mode=inspect` when
+only metadata and available subtitle languages are needed; inspect does not write files.
+Use `mode=quick` to materialize metadata, the selected caption track, transcript JSON and
+Markdown, and a manifest. Quick mode does not download the full video.
+
+Set `language` when a specific caption language is required. For a direct media URL, pass a
+public `subtitle_url` for a sidecar VTT, SRT, JSON3, or Bilibili BCC file. Long transcripts
+live in the absolute paths under `artifacts`; `transcript.text_preview` is intentionally
+bounded. Treat `ok=false` as failure and inspect structured `errors`; transient TLS and
+network failures are marked `retryable=true`.
+
+Bilibili reports when captions require login. Only then, and only with explicit user
+authorization, set `cookies_from_browser` to a yt-dlp browser spec such as
+`chrome:Profile 1`. Omit it by default. The browser spec and cookies never appear in the
+envelope or artifacts. Quick parse reuses a cache entry only after checking every artifact's
+size and SHA-256; set `reuse_cache=false` to force a fresh parse. Use `max_duration` to reject
+media longer than the requested number of seconds.
 
 ## Setup and Recovery
 

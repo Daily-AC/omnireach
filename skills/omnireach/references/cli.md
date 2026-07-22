@@ -1,6 +1,6 @@
 # omnireach CLI Fallback Reference
 
-Use this reference only when the `omnireach_search` and `omnireach_fetch` MCP tools are not
+Use this reference only when the omnireach search, fetch, and media MCP tools are not
 available or when diagnosing the installed CLI.
 
 ## Machine-Readable Output
@@ -10,6 +10,8 @@ Always request JSON explicitly from an agent terminal:
 ```bash
 omnireach search --json "Claude Code"
 omnireach fetch --json "https://example.com/article"
+omnireach media inspect --json "https://www.youtube.com/watch?v=<id>"
+omnireach media parse --language en --json "https://www.youtube.com/watch?v=<id>"
 ```
 
 Alternatively, force JSON for the entire harness:
@@ -150,8 +152,19 @@ Use this standard MCP configuration in clients that do not install the omnireach
 }
 ```
 
-The server exposes `omnireach_search` and `omnireach_fetch` and writes only MCP JSON-RPC
+The server exposes `omnireach_search`, `omnireach_fetch`, and `omnireach_parse_media` and writes only MCP JSON-RPC
 messages to stdout.
+
+## Media
+
+`media inspect` returns metadata and subtitle tracks without writing files. `media parse`
+uses upstream captions when available and writes normalized artifacts under
+`~/.cache/omnireach/media/` by default. Override this with `--output-dir`. Direct media can
+use `--subtitle-url <url>` for a sidecar VTT, SRT, JSON3, or Bilibili BCC subtitle.
+When Bilibili reports that captions require login, explicitly pass
+`--cookies-from-browser "chrome:Profile 1"` for an authorized logged-in profile. Cached
+artifacts are reused only after size and SHA-256 verification; `--no-cache` forces a fresh
+parse. `--max-duration <seconds>` rejects unexpectedly long media before writing artifacts.
 
 ## Diagnosis
 

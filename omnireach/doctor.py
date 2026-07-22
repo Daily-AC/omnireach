@@ -37,6 +37,16 @@ class FetchBackendStatus:
 
 
 @dataclass
+class MediaBackendStatus:
+    """An external binary used by `omnireach media`."""
+
+    tool: str
+    ok: bool
+    detail: str
+    fix_hint: str = ""
+
+
+@dataclass
 class WechatBackendStatus:
     """v0.10.1: host-specific cookie-strategy backend for mp.weixin.qq.com.
 
@@ -97,6 +107,30 @@ def run_fetch_backend_doctor() -> list[FetchBackendStatus]:
                 fix_hint=b["fix_hint"],
             ))
     return out
+
+
+def run_media_backend_doctor() -> list[MediaBackendStatus]:
+    """Probe the two binaries used by page and direct-media backends."""
+    definitions = (
+        ("yt-dlp", "YouTube and supported-page metadata + subtitles", "pip install -U yt-dlp"),
+        ("ffprobe", "direct audio/video metadata", "Install ffmpeg (includes ffprobe)"),
+        ("ffmpeg", "media conversion for future deep parsing", "Install ffmpeg"),
+        (
+            "whisper-cli",
+            "optional local ASR readiness for future deep parsing",
+            "Install whisper.cpp to enable future local ASR",
+        ),
+    )
+    statuses: list[MediaBackendStatus] = []
+    for tool, purpose, hint in definitions:
+        found = bool(shutil.which(tool))
+        statuses.append(MediaBackendStatus(
+            tool=tool,
+            ok=found,
+            detail=f"{purpose} — {'在 PATH' if found else '不在 PATH'}",
+            fix_hint="" if found else hint,
+        ))
+    return statuses
 
 
 def run_wechat_backend_doctor() -> list[WechatBackendStatus]:

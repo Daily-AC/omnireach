@@ -45,6 +45,7 @@ def test_skill_requires_mcp_before_browser_automation():
     text = (SKILL_ROOT / "SKILL.md").read_text().lower()
     assert "omnireach_search" in text
     assert "omnireach_fetch" in text
+    assert "omnireach_parse_media" in text
     assert "playwright" in text
     assert text.index("omnireach_search") < text.index("playwright")
 
