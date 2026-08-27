@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="omnireach">
+  <circle cx="50.0" cy="50.0" r="32.0" fill="none" stroke="#FF6B5A" stroke-width="4.5"/>
+  <g fill="#FF6B5A">
+    <circle cx="50.0" cy="50.0" r="11.0"/>
+    <circle cx="50.0" cy="18.0" r="8.0"/>
+    <circle cx="82.0" cy="50.0" r="8.0"/>
+    <circle cx="50.0" cy="82.0" r="8.0"/>
+    <circle cx="18.0" cy="50.0" r="8.0"/>
+  </g>
+</svg>
