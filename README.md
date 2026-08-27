@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Daily-AC/omnireach/main/docs/assets/logo-256.png" width="88" alt="">
+</p>
+
 # omnireach
 
 <sub>English · [中文](https://github.com/Daily-AC/omnireach/blob/main/README.zh.md)</sub>
