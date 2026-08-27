@@ -446,7 +446,7 @@ CAPTCHA-shaped responses are rejected rather than returned as successful article
 <details>
 <summary><b>Design</b></summary>
 
-See `docs/superpowers/specs/2026-05-25-omnireach-design.md`.
+See `docs/design/2026-05-25-omnireach-design.md`.
 
 </details>
 
