@@ -14,7 +14,7 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 
 ![demo — zero-config WeChat search, uniform JSON across sources](https://raw.githubusercontent.com/Daily-AC/omnireach/main/docs/assets/demo-wechat.gif)
 
-**Watch it work:** [Overdrive](https://github.com/Daily-AC/videos/releases/download/renders-2026-07/omnireach-overdrive.mp4) (36s) · [Native bridge](https://github.com/Daily-AC/videos/releases/download/renders-2026-07/omnireach-native-bridge.mp4) (51s) · [Terminal demo](https://github.com/Daily-AC/videos/releases/download/renders-2026-07/omnireach-douyin-promo.mp4) (30s) — video sources in [Daily-AC/videos](https://github.com/Daily-AC/videos).
+**Watch it work:** [Overdrive](https://github.com/Daily-AC/assets/releases/download/renders-2026-07/omnireach-overdrive.mp4) (36s) · [Native bridge](https://github.com/Daily-AC/assets/releases/download/renders-2026-07/omnireach-native-bridge.mp4) (51s) · [Terminal demo](https://github.com/Daily-AC/assets/releases/download/renders-2026-07/omnireach-douyin-promo.mp4) (30s) — video sources in [Daily-AC/assets](https://github.com/Daily-AC/assets).
 
 ### MCP before Playwright
 
