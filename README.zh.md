@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./docs/assets/logo-256.png" width="88" alt="">
+</p>
+
 # omnireach
 
 <sub>[English](./README.md) · 中文</sub>
