@@ -14,6 +14,8 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 
 ![demo — zero-config WeChat search, uniform JSON across sources](https://raw.githubusercontent.com/Daily-AC/omnireach/main/docs/assets/demo-wechat.gif)
 
+**Watch it work:** [Overdrive](https://github.com/Daily-AC/videos/releases/download/renders-2026-07/omnireach-overdrive.mp4) (36s) · [Native bridge](https://github.com/Daily-AC/videos/releases/download/renders-2026-07/omnireach-native-bridge.mp4) (51s) · [Terminal demo](https://github.com/Daily-AC/videos/releases/download/renders-2026-07/omnireach-douyin-promo.mp4) (30s) — video sources in [Daily-AC/videos](https://github.com/Daily-AC/videos).
+
 ### MCP before Playwright
 
 For search, reading, media parsing, and bounded Douyin downloads, start with the four focused MCP tools instead of browser automation.
