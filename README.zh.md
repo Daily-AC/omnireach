@@ -14,6 +14,8 @@ omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
 
 ![demo — 零配置微信搜索, 跨源统一 JSON](./docs/assets/demo-wechat.gif)
 
+**看它跑起来：**[Overdrive](https://github.com/Daily-AC/videos/releases/download/renders-2026-07/omnireach-overdrive.mp4)（36 秒）· [原生桥接](https://github.com/Daily-AC/videos/releases/download/renders-2026-07/omnireach-native-bridge.mp4)（51 秒）· [终端演示](https://github.com/Daily-AC/videos/releases/download/renders-2026-07/omnireach-douyin-promo.mp4)（30 秒）—— 视频工程源码在 [Daily-AC/videos](https://github.com/Daily-AC/videos)。
+
 ### 先读网页，再启动 Playwright
 
 搜索、读取、媒体解析和有界抖音下载先用四个聚焦的 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
