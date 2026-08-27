@@ -222,7 +222,9 @@ v0.1 起 README 写「`omnireach init` 自动装好 agent-reach 等零配置依�
 2. `git pull` (拿到这份 handoff 和 main 上其他可能的变更)
 3. `cat docs/handoff/2026-05-26-session-handoff.md` (这份文档)
 4. `gh issue view 12` (看 menoking 有没有回评论;如果回了,看他补充信息)
-5. **直接开 v0.7 spec** (`docs/superpowers/specs/2026-XX-XX-tikhub-douyin.md`),不再问 user 方向
+5. **直接开 v0.7 spec** (`docs/design/2026-XX-XX-tikhub-douyin.md`),不再问 user 方向
+   > 实际走向 (回填于 2026-08-27): TikHub 付费 API 路线被 user 喊停,v0.7.2 改用 OpenCLI fork 解决,
+   > 这份 spec 从未创建。
 6. 跑 plan → subagent-driven-development → ship,跟 v0.4-v0.6 节奏一致
 7. ship 后 `gh issue comment 12 -b "..." && gh issue close 12`
 
@@ -237,9 +239,9 @@ v0.1 起 README 写「`omnireach init` 自动装好 agent-reach 等零配置依�
 - v0.7 milestone: https://github.com/Daily-AC/omnireach/milestone/1
 - TikHub Swagger: https://api.tikhub.io/
 - TikHub Python SDK 参考: https://github.com/TikHub/TikHub-API-Python-SDK
-- 主 spec: `docs/superpowers/specs/2026-05-25-omnireach-design.md`
+- 主 spec: `docs/design/2026-05-25-omnireach-design.md`
 - v0.5 retro: `docs/retrospectives/2026-05-26-v0.3-v0.5-lessons.md`
-- 历史 plans: `docs/superpowers/plans/2026-05-25-omnireach-v0.{1,2,3,4}.md` + `2026-05-26-omnireach-v0.{5,6}.md`
+- 历史 plans: 已于 2026-08-27 删除 (执行计划，完成即失效；设计决策见 `docs/design/`)
 
 ---
 

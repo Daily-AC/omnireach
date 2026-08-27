@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # v0.8: SERP-snippet rule enforced at the contract boundary. Full upstream
 # payloads remain accessible via SearchResult.raw — see
-# docs/superpowers/specs/2026-05-27-omnireach-v0.8-design.md.
+# docs/design/2026-05-27-omnireach-v0.8-design.md.
 _SNIPPET_MAX = 500
 _ELLIPSIS = "…"
 

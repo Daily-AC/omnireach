@@ -441,7 +441,7 @@ Backend 矩阵：
 <details>
 <summary><b>设计文档</b></summary>
 
-详见 `docs/superpowers/specs/2026-05-25-omnireach-design.md`。
+详见 `docs/design/2026-05-25-omnireach-design.md`。
 
 </details>
 
