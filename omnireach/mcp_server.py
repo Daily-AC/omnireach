@@ -8,10 +8,12 @@ import sys
 from typing import Any, TextIO
 from urllib.parse import urlparse
 
+from datetime import datetime, timezone
+
 from omnireach import __version__
-from omnireach.contract import FetchEnvelope, SearchEnvelope
+from omnireach.contract import FetchEnvelope, SearchEnvelope, SourceError
 from omnireach.fetcher import fetch
-from omnireach.media.contract import MediaEnvelope
+from omnireach.media.contract import MediaEnvelope, MediaError
 from omnireach.media.service import download_media, inspect_media, parse_media
 from omnireach.service import search
 
@@ -214,6 +216,46 @@ TOOLS = [
 
 class InvalidParams(ValueError):
     """Raised when a tools/call argument object violates its schema."""
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _crashed_search(query: str, exc: Exception) -> dict[str, Any]:
+    return SearchEnvelope(
+        query=query,
+        ts=_now(),
+        errors=[SourceError(source="omnireach", error=str(exc), category="failed")],
+    ).model_dump(mode="json")
+
+
+def _crashed_fetch(url: str, exc: Exception) -> dict[str, Any]:
+    return FetchEnvelope(
+        url=url, fetched_at=_now(), errors=[str(exc)],
+    ).model_dump(mode="json")
+
+
+def _crashed_media(
+    url: str,
+    mode: str,
+    exc: Exception,
+) -> dict[str, Any]:
+    return MediaEnvelope(
+        ok=False,
+        url=url,
+        source="direct",
+        media_type="unknown",
+        mode=mode,
+        parsed_at=_now(),
+        errors=[MediaError(
+            stage="resolve",
+            backend="none",
+            category="failed",
+            message=f"{exc.__class__.__name__}: {exc}",
+            hint="This is an omnireach bug; please report it with the message above",
+        )],
+    ).model_dump(mode="json")
 
 
 def _result(request_id: object, value: dict[str, Any]) -> dict[str, Any]:
@@ -453,7 +495,7 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         except ValueError as exc:
             raise InvalidParams(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001
-            return _tool_result({"error": str(exc)}, is_error=True)
+            return _tool_result(_crashed_search(query, exc), is_error=True)
         return _tool_result(envelope.model_dump(mode="json"))
     if name == "omnireach_fetch":
         kwargs = _validate_fetch(arguments)
@@ -461,7 +503,7 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         try:
             envelope = fetch(url, **kwargs)
         except Exception as exc:  # noqa: BLE001
-            return _tool_result({"error": str(exc)}, is_error=True)
+            return _tool_result(_crashed_fetch(url, exc), is_error=True)
         return _tool_result(
             envelope.model_dump(mode="json"),
             is_error=not bool(envelope.content_markdown),
@@ -484,7 +526,7 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     **kwargs,
                 )
         except Exception as exc:  # noqa: BLE001
-            return _tool_result({"error": str(exc)}, is_error=True)
+            return _tool_result(_crashed_media(url, mode, exc), is_error=True)
         return _tool_result(
             envelope.model_dump(mode="json"), is_error=not envelope.ok,
         )
@@ -494,7 +536,7 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         try:
             envelope = download_media(url, **kwargs)
         except Exception as exc:  # noqa: BLE001
-            return _tool_result({"error": str(exc)}, is_error=True)
+            return _tool_result(_crashed_media(url, "download", exc), is_error=True)
         return _tool_result(
             envelope.model_dump(mode="json"), is_error=not envelope.ok,
         )

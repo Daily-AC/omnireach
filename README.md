@@ -356,6 +356,13 @@ To disable: edit `~/.omnireach/preferences.toml` and set `[boosters] auto_enable
 
 `~/.omnireach/preferences.toml` can configure default sources, language, output format, and `source_trust` overrides.
 
+`[media] cookies_from_browser` sets the default yt-dlp browser cookie source for `omnireach media inspect / parse / download`, so an authorized profile does not have to be repeated on every call. An explicit `--cookies-from-browser` always wins, and the preference never moves Bilibili off its cookie-free native backend.
+
+```toml
+[media]
+cookies_from_browser = "chrome:Profile 1"
+```
+
 ```bash
 omnireach preferences show     # view current config
 omnireach preferences edit     # open in $EDITOR

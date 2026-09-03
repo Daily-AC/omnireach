@@ -342,3 +342,67 @@ def test_unknown_tool_and_method_return_minus_32601():
 
     assert unknown_tool["error"]["code"] == -32601
     assert unknown_method["error"]["code"] == -32601
+
+
+def _call(name, arguments, request_id=900):
+    return handle_message({
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "method": "tools/call",
+        "params": {"name": name, "arguments": arguments},
+    })
+
+
+def test_crashing_search_still_answers_with_a_valid_envelope(monkeypatch):
+    """An `isError` payload the declared outputSchema rejects is a silent failure."""
+    from omnireach.contract import SearchEnvelope
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("synthetic adapter crash")
+
+    monkeypatch.setattr("omnireach.mcp_server.search", boom)
+
+    result = _call("omnireach_search", {"query": "python"})["result"]
+    payload = result["structuredContent"]
+
+    assert result["isError"] is True
+    assert SearchEnvelope.model_validate(payload).errors[0].error.endswith(
+        "synthetic adapter crash"
+    )
+
+
+def test_crashing_fetch_still_answers_with_a_valid_envelope(monkeypatch):
+    from omnireach.contract import FetchEnvelope
+
+    monkeypatch.setattr(
+        "omnireach.mcp_server.fetch",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("synthetic crash")),
+    )
+
+    result = _call("omnireach_fetch", {"url": "https://example.com/a"})["result"]
+
+    assert result["isError"] is True
+    envelope = FetchEnvelope.model_validate(result["structuredContent"])
+    assert envelope.url == "https://example.com/a"
+    assert envelope.errors == ["synthetic crash"]
+
+
+def test_crashing_media_download_still_answers_with_a_valid_envelope(monkeypatch):
+    from omnireach.media.contract import MediaEnvelope
+
+    monkeypatch.setattr(
+        "omnireach.mcp_server.download_media",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("synthetic crash")),
+    )
+
+    result = _call(
+        "omnireach_download_media",
+        {"url": "https://www.douyin.com/video/1"},
+    )["result"]
+
+    assert result["isError"] is True
+    envelope = MediaEnvelope.model_validate(result["structuredContent"])
+    assert envelope.ok is False
+    assert envelope.mode == "download"
+    assert len(envelope.errors) == 1
+    assert "synthetic crash" in envelope.errors[0].message

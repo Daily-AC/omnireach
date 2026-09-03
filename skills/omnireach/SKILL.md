@@ -78,7 +78,9 @@ network failures are marked `retryable=true`.
 
 Bilibili reports when captions require login. Only then, and only with explicit user
 authorization, set `cookies_from_browser` to a yt-dlp browser spec such as
-`chrome:Profile 1`. Omit it by default. The browser spec and cookies never appear in the
+`chrome:Profile 1`. Omit it by default — the user may already have authorized a default
+profile through `[media] cookies_from_browser` in `~/.omnireach/preferences.toml`, which
+applies whenever the call omits the argument. The browser spec and cookies never appear in the
 envelope or artifacts. Quick parse reuses a cache entry only after checking every artifact's
 size and SHA-256; set `reuse_cache=false` to force a fresh parse. Use `max_duration` to reject
 media longer than the requested number of seconds.
@@ -88,7 +90,9 @@ It writes one combined MP4 into an OmniReach-managed directory and returns a `me
 artifact with an absolute path, byte count, and SHA-256. `quality=compatible` prefers H.264;
 `best` maximizes resolution/bitrate and `small` minimizes bytes. Keep `max_size_mb` bounded.
 Douyin currently requires fresh cookies, so set `cookies_from_browser` only with explicit
-user authorization. MCP does not accept an arbitrary output directory. Cached files are
+user authorization. Douyin also answers a verification challenge at random; omnireach
+already retries that automatically, so a returned `retryable=true` error means the whole
+retry budget was spent — wait before repeating the call rather than looping on it. MCP does not accept an arbitrary output directory. Cached files are
 reused only after size and SHA-256 verification.
 
 ## Setup and Recovery

@@ -4,7 +4,13 @@ from unittest.mock import MagicMock
 
 import httpx
 
-from omnireach.media.service import download_media, inspect_media, parse_media
+from omnireach.media.contract import MediaEnvelope
+from omnireach.media.service import (
+    _RETRY_ATTEMPTS,
+    download_media,
+    inspect_media,
+    parse_media,
+)
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -522,3 +528,301 @@ def test_bilibili_auto_backend_uses_public_api(monkeypatch):
     assert envelope.metadata.title.startswith("【4KHDR")
     assert envelope.tracks[0].language == "zh-CN"
     assert "subtitles require login" in envelope.warnings[0]
+
+
+def _write_media_preference(path: Path, value: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f'[media]\ncookies_from_browser = "{value}"\n')
+
+
+def _capturing_ytdlp(monkeypatch, commands, payload=None):
+    monkeypatch.setattr("shutil.which", lambda tool: f"/usr/bin/{tool}")
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        if command == ["yt-dlp", "--version"]:
+            return MagicMock(returncode=0, stdout="2026.06.09\n", stderr="")
+        return MagicMock(
+            returncode=0,
+            stdout=json.dumps(payload if payload is not None else YTDLP_PAYLOAD),
+            stderr="",
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+
+def test_media_cookies_preference_supplies_the_default_ytdlp_argv(
+    monkeypatch, isolated_preferences
+):
+    _write_media_preference(isolated_preferences, "chrome:Profile 1")
+    commands = []
+    _capturing_ytdlp(monkeypatch, commands)
+
+    envelope = inspect_media("https://www.youtube.com/watch?v=abc")
+
+    inspect_command = next(c for c in commands if "--dump-single-json" in c)
+    assert inspect_command[-3:-1] == ["--cookies-from-browser", "chrome:Profile 1"]
+    assert envelope.ok is True
+    assert "chrome:Profile 1" not in envelope.model_dump_json()
+
+
+def test_explicit_cookies_argument_overrides_the_preference(
+    monkeypatch, isolated_preferences
+):
+    _write_media_preference(isolated_preferences, "chrome:Profile 1")
+    commands = []
+    _capturing_ytdlp(monkeypatch, commands)
+
+    inspect_media(
+        "https://www.youtube.com/watch?v=abc",
+        cookies_from_browser="firefox",
+    )
+
+    inspect_command = next(c for c in commands if "--dump-single-json" in c)
+    assert inspect_command[-3:-1] == ["--cookies-from-browser", "firefox"]
+
+
+def test_blank_cookies_preference_adds_no_flag(monkeypatch, isolated_preferences):
+    _write_media_preference(isolated_preferences, "   ")
+    commands = []
+    _capturing_ytdlp(monkeypatch, commands)
+
+    inspect_media("https://www.youtube.com/watch?v=abc")
+
+    inspect_command = next(c for c in commands if "--dump-single-json" in c)
+    assert "--cookies-from-browser" not in inspect_command
+
+
+def test_cookies_preference_does_not_move_bilibili_off_the_api_backend(
+    monkeypatch, isolated_preferences
+):
+    """Only an explicit argument may cost Bilibili its richer native backend."""
+    _write_media_preference(isolated_preferences, "chrome:Profile 1")
+    monkeypatch.setattr("shutil.which", lambda tool: f"/usr/bin/{tool}")
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda command, **kwargs: (_ for _ in ()).throw(
+            AssertionError("yt-dlp must not run for a cookie-free Bilibili inspect")
+        ),
+    )
+    monkeypatch.setattr(
+        "omnireach.media.service._inspect_bilibili",
+        lambda url, timeout: (
+            MediaEnvelope(
+                ok=True, url=url, source="bilibili", media_type="video",
+                backend="bilibili-api", mode="inspect", parsed_at="2026-09-03T00:00:00Z",
+            ),
+            [],
+        ),
+    )
+
+    envelope = inspect_media("https://www.bilibili.com/video/BV1R1e4zKEh1")
+
+    assert envelope.backend == "bilibili-api"
+
+
+def test_download_uses_the_cookies_preference_and_keys_the_cache_on_it(
+    monkeypatch, tmp_path, isolated_preferences
+):
+    _write_media_preference(isolated_preferences, "chrome:Profile 1")
+    commands = []
+    monkeypatch.setattr(
+        "omnireach.media.service._yt_dlp_version", lambda timeout: "2026.06.09",
+    )
+    monkeypatch.setattr("shutil.which", lambda tool: f"/usr/bin/{tool}")
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda command, **kwargs: MagicMock(
+            returncode=0, stdout=json.dumps(DOUYIN_YTDLP_PAYLOAD), stderr="",
+        ),
+    )
+
+    def fake_download(command, timeout):
+        commands.append(command)
+        template = Path(command[command.index("--output") + 1])
+        path = Path(str(template).replace("%(ext)s", "mp4"))
+        path.write_bytes(b"downloaded")
+        return path.resolve()
+
+    monkeypatch.setattr("omnireach.media.service._run_download", fake_download)
+
+    url = "https://www.douyin.com/video/7664188112177079482"
+    first = download_media(url, output_dir=tmp_path, max_bytes=20 * 1024 * 1024)
+    assert commands[0][-3:-1] == ["--cookies-from-browser", "chrome:Profile 1"]
+
+    _write_media_preference(isolated_preferences, "chrome:Profile 2")
+    second = download_media(url, output_dir=tmp_path, max_bytes=20 * 1024 * 1024)
+
+    assert first.cache_key != second.cache_key
+    assert second.cache_hit is False
+    assert len(commands) == 2
+
+
+def _flaky_ytdlp(monkeypatch, failures, payload=None):
+    """yt-dlp that answers the Douyin verification challenge `failures` times."""
+    calls = {"n": 0}
+    monkeypatch.setattr("shutil.which", lambda tool: f"/usr/bin/{tool}")
+    monkeypatch.setattr("omnireach.media.service.time.sleep", lambda seconds: None)
+
+    def fake_run(command, **kwargs):
+        if command == ["yt-dlp", "--version"]:
+            return MagicMock(returncode=0, stdout="2026.06.09\n", stderr="")
+        calls["n"] += 1
+        if calls["n"] <= failures:
+            return MagicMock(
+                returncode=1,
+                stdout="",
+                stderr=(
+                    "ERROR: [Douyin] 7658178405476748584: Fresh cookies "
+                    "(not necessarily logged in) are needed"
+                ),
+            )
+        return MagicMock(
+            returncode=0,
+            stdout=json.dumps(payload if payload is not None else DOUYIN_YTDLP_PAYLOAD),
+            stderr="",
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    return calls
+
+
+def test_transient_fresh_cookies_challenge_is_retried_and_reported(monkeypatch):
+    calls = _flaky_ytdlp(monkeypatch, failures=1)
+
+    envelope = inspect_media("https://www.douyin.com/video/7658178405476748584")
+
+    assert envelope.ok is True
+    assert calls["n"] == 2
+    assert any("succeeded on attempt 2" in warning for warning in envelope.warnings)
+
+
+def test_fresh_cookies_challenge_gives_up_after_the_configured_attempts(monkeypatch):
+    calls = _flaky_ytdlp(monkeypatch, failures=99)
+
+    envelope = inspect_media("https://www.douyin.com/video/7658178405476748584")
+
+    assert envelope.ok is False
+    assert calls["n"] == _RETRY_ATTEMPTS
+    assert envelope.errors[0].category == "blocked"
+    assert envelope.errors[0].retryable is True
+    assert f"verification challenge {_RETRY_ATTEMPTS} times" in envelope.errors[0].hint
+
+
+def test_non_transient_failure_is_not_retried(monkeypatch):
+    calls = {"n": 0}
+    monkeypatch.setattr("shutil.which", lambda tool: f"/usr/bin/{tool}")
+    monkeypatch.setattr("omnireach.media.service.time.sleep", lambda seconds: None)
+
+    def fake_run(command, **kwargs):
+        calls["n"] += 1
+        return MagicMock(
+            returncode=1, stdout="", stderr="ERROR: Video unavailable",
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    envelope = inspect_media("https://www.douyin.com/video/7658178405476748584")
+
+    assert envelope.ok is False
+    assert calls["n"] == 1
+    assert envelope.errors[0].retryable is False
+
+
+def test_retry_never_outlives_the_caller_timeout_budget(monkeypatch):
+    """Every attempt draws from one shared deadline, so retries cannot stretch it."""
+    seen_timeouts = []
+    clock = {"now": 0.0}
+    monkeypatch.setattr("shutil.which", lambda tool: f"/usr/bin/{tool}")
+    monkeypatch.setattr(
+        "omnireach.media.service.time.monotonic", lambda: clock["now"],
+    )
+
+    def fake_sleep(seconds):
+        clock["now"] += seconds
+
+    monkeypatch.setattr("omnireach.media.service.time.sleep", fake_sleep)
+
+    def fake_run(command, **kwargs):
+        seen_timeouts.append(kwargs["timeout"])
+        clock["now"] += 1.0
+        return MagicMock(
+            returncode=1, stdout="", stderr="ERROR: Fresh cookies are needed",
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    envelope = inspect_media(
+        "https://www.douyin.com/video/7658178405476748584", timeout=20,
+    )
+
+    assert envelope.ok is False
+    # Attempts and backoffs are all charged to one deadline, so every attempt
+    # after the first is handed strictly less than the caller's timeout and the
+    # total never reaches it.
+    assert seen_timeouts == [20.0, 18.0, 15.0, 11.0]
+    assert clock["now"] == 10.0
+
+
+def test_retry_is_skipped_when_too_little_budget_remains(monkeypatch):
+    """A sliver-sized retry would report its own timeout, hiding the real cause."""
+    seen_timeouts = []
+    clock = {"now": 0.0}
+    monkeypatch.setattr("shutil.which", lambda tool: f"/usr/bin/{tool}")
+    monkeypatch.setattr(
+        "omnireach.media.service.time.monotonic", lambda: clock["now"],
+    )
+    monkeypatch.setattr(
+        "omnireach.media.service.time.sleep",
+        lambda seconds: clock.__setitem__("now", clock["now"] + seconds),
+    )
+
+    def fake_run(command, **kwargs):
+        seen_timeouts.append(kwargs["timeout"])
+        clock["now"] += 1.0
+        return MagicMock(
+            returncode=1, stdout="", stderr="ERROR: Fresh cookies are needed",
+        )
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    envelope = inspect_media(
+        "https://www.douyin.com/video/7658178405476748584", timeout=3,
+    )
+
+    assert seen_timeouts == [3.0]
+    assert "Fresh cookies" in envelope.errors[0].message
+    assert envelope.errors[0].category == "blocked"
+
+
+def test_download_retries_a_transient_challenge(monkeypatch, tmp_path):
+    attempts = {"n": 0}
+    monkeypatch.setattr("omnireach.media.service.time.sleep", lambda seconds: None)
+    monkeypatch.setattr(
+        "omnireach.media.service._ytdlp_payload",
+        lambda *args, **kwargs: DOUYIN_YTDLP_PAYLOAD,
+    )
+    monkeypatch.setattr(
+        "omnireach.media.service._yt_dlp_version", lambda timeout: "2026.06.09",
+    )
+
+    def fake_download(command, timeout):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise RuntimeError("ERROR: [Douyin] 1: Fresh cookies are needed")
+        template = Path(command[command.index("--output") + 1])
+        path = Path(str(template).replace("%(ext)s", "mp4"))
+        path.write_bytes(b"downloaded-after-retry")
+        return path.resolve()
+
+    monkeypatch.setattr("omnireach.media.service._run_download", fake_download)
+
+    envelope = download_media(
+        "https://www.douyin.com/video/7664188112177079482",
+        output_dir=tmp_path,
+        max_bytes=20 * 1024 * 1024,
+    )
+
+    assert envelope.ok is True
+    assert attempts["n"] == 2
+    assert any("yt-dlp download succeeded on attempt 2" in w for w in envelope.warnings)

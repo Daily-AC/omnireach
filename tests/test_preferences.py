@@ -72,3 +72,22 @@ def test_write_default_preferences_roundtrip(tmp_path: Path):
 
 def test_default_toml_has_comments():
     assert "#" in DEFAULT_PREFERENCES_TOML
+
+
+def test_media_cookies_from_browser_round_trips(tmp_path: Path):
+    f = tmp_path / "preferences.toml"
+    f.write_text('[media]\ncookies_from_browser = "chrome:Profile 1"\n')
+
+    assert load_preferences(f).media.cookies_from_browser == "chrome:Profile 1"
+
+
+def test_media_section_defaults_to_no_cookie_source(tmp_path: Path):
+    assert load_preferences(tmp_path / "missing.toml").media.cookies_from_browser is None
+
+
+def test_default_preferences_template_documents_the_media_section(tmp_path: Path):
+    f = tmp_path / "preferences.toml"
+    f.write_text(DEFAULT_PREFERENCES_TOML)
+
+    assert "[media]" in DEFAULT_PREFERENCES_TOML
+    assert load_preferences(f).media.cookies_from_browser is None
