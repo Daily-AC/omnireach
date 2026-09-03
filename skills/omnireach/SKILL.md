@@ -1,6 +1,6 @@
 ---
 name: omnireach
-description: This skill should be used to call `omnireach_search`, `omnireach_fetch`, `omnireach_parse_media`, or `omnireach_download_media` when the user asks to search the web, read a URL, parse video/audio metadata or captions, download a Douyin video, or avoid browser automation for supported web work.
+description: This skill should be used to call `omnireach_search`, `omnireach_author`, `omnireach_fetch`, `omnireach_parse_media`, or `omnireach_download_media` when the user asks to search the web, list what one creator posted, read a URL, parse video/audio metadata or captions, download a Douyin video, or avoid browser automation for supported web work.
 ---
 
 # omnireach
@@ -12,11 +12,13 @@ bounded Douyin MP4 through stable schemas. Keep browser automation for unsupport
 ## Tool Choice Policy
 
 1. Call `omnireach_search` first for web research or platform search.
-2. Call `omnireach_fetch` first to read an HTTP or HTTPS URL.
-3. Call `omnireach_parse_media` first for video/audio metadata or captions.
-4. Call `omnireach_download_media` for an explicitly requested Douyin video download.
-5. Use the omnireach CLI fallback only when these MCP tools are unavailable.
-6. Use Playwright or browser control only for clicks, forms, uploads, unsupported downloads,
+2. Call `omnireach_author` when the question is what one named creator posted, rather than
+   what was posted about them.
+3. Call `omnireach_fetch` first to read an HTTP or HTTPS URL.
+4. Call `omnireach_parse_media` first for video/audio metadata or captions.
+5. Call `omnireach_download_media` for an explicitly requested Douyin video download.
+6. Use the omnireach CLI fallback only when these MCP tools are unavailable.
+7. Use Playwright or browser control only for clicks, forms, uploads, unsupported downloads,
    screenshots, visual inspection, or unsupported interactive workflows.
 
 Do not launch Playwright merely to search or extract readable page content.
@@ -62,6 +64,43 @@ and close it after the call.
 Treat `content_markdown` as successful only when it is non-empty. Inspect `errors` for
 blocked requests, CAPTCHA detection, unavailable backends, and fallback attempts. A tool
 result marked as an error still contains the full fetch envelope for recovery.
+
+## Creator Catalog
+
+Call `omnireach_author` with a `handle` when the user names a creator and wants that
+creator's own works. `omnireach_search` answers a different question — it matches captions,
+so a creator's name returns mostly other accounts' fan edits, reaction videos, and clips
+that merely `@` them, and ranking those by likes puts a stranger at the top.
+
+`source` is `douyin` today. Optional arguments:
+
+- `limit`: 1 through 200 works, default 20.
+- `order`: `recent` or `likes`. `recent` is true newest-first: Douyin hoists pinned works to
+  the front of its own response, and each result carries `raw.pinned` so a pinned older video
+  is visible for what it is instead of reading as the newest. `likes` has to page the entire
+  catalog before it can rank, so it is the slow path — raise `timeout` and check `complete`
+  before trusting the top of the list.
+- `include_media_urls`: attach the expiring signed CDN playback URL to each result's `raw`.
+  Off by default. Turn it on only when the user is going to download the files, and treat
+  the URLs as valid for minutes, not hours.
+- `timeout`: 5 through 600 seconds, default 180. A ~355-work catalog paged in about 40
+  seconds when measured.
+
+Read `author` to confirm which account was resolved. A bare nickname is resolved by follower
+count because impersonator accounts copy nicknames exactly; when the user needs certainty,
+pass the profile URL instead and `author.resolved_from` will read `url`. `scanned` reports
+how many works were paged and `complete` reports whether paging reached the end.
+
+Engagement counters on catalog results are exact, unlike keyword-search results. `views` is
+always absent because the endpoint no longer reports play counts.
+
+Do not classify content from this metadata. On a measured 355-work sample only 9 captions
+contained the topic word at all, and the platform's own `video_tag` taxonomy labelled just 2
+of them correctly, so filtering by caption or tag silently discards most matches.
+
+The creator catalog needs the native Chrome bridge. If the tool reports that the connected
+extension does not implement `douyin.author`, run `omnireach bridge install` and ask the
+user to reload the unpacked extension at `chrome://extensions`.
 
 ## Media
 

@@ -153,7 +153,7 @@
 - id: douyin
   tier: heavy
   adapter: omnireach.adapters.douyin.DouyinAdapter
-  description: 抖音视频搜索 (Omnireach 原生 Chrome 桥优先, OpenCLI 兼容回退)
+  description: 抖音视频搜索 + 作者目录 (原生 Chrome 桥优先; OpenCLI 回退仅覆盖 search)
   query_hints: ["抖音", douyin]
   default_in_auto: false
   trust: 0.55

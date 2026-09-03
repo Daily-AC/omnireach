@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Omnireach Native Bridge",
-  "version": "0.2.8",
+  "version": "0.3.4",
   "description": "Read-only Chrome session bridge for Omnireach.",
   "permissions": ["offscreen", "scripting", "tabs"],
   "host_permissions": [

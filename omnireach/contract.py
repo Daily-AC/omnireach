@@ -19,6 +19,10 @@ class Engagement(BaseModel):
     comments: int | None = None
     shares: int | None = None
     views: int | None = None
+    # Declared rather than left to extra="allow": the Douyin creator catalog
+    # emits it, and an undeclared field is invisible to any Agent reading the
+    # MCP outputSchema.
+    collects: int | None = None
 
 
 class SearchResult(BaseModel):
@@ -62,6 +66,44 @@ class SearchEnvelope(BaseModel):
     query: str
     ts: str
     results: list[SearchResult] = Field(default_factory=list)
+    errors: list[SourceError] = Field(default_factory=list)
+
+
+class AuthorIdentity(BaseModel):
+    """Which account a creator-catalog request actually resolved to."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    handle: str = Field(description="what the caller asked for")
+    id: str = Field(description="platform-stable creator id, e.g. a Douyin sec_uid")
+    name: str = ""
+    url: str = ""
+    followers: int | None = None
+    resolved_from: Literal["url", "search"] = "search"
+
+
+class AuthorEnvelope(BaseModel):
+    """The top-level JSON returned by `omnireach author <handle>`.
+
+    Results reuse `SearchResult` so a catalog is consumable by anything that
+    already reads a search envelope; the extra fields say *whose* catalog it
+    is and how much of it was actually seen.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    query: str
+    ts: str
+    author: AuthorIdentity | None = None
+    order: Literal["recent", "likes"] = "recent"
+    scanned: int = Field(default=0, ge=0, description="works seen while paging")
+    complete: bool = Field(
+        default=False,
+        description="whether paging reached the end of the catalog",
+    )
+    results: list[SearchResult] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
     errors: list[SourceError] = Field(default_factory=list)
 
 

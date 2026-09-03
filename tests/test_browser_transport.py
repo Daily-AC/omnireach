@@ -151,3 +151,85 @@ async def test_invalid_transport_mode_is_rejected(monkeypatch):
         await run_browser_json(
             "douyin", "search", {"query": "x"}, ("douyin", "search", "x")
         )
+
+
+async def test_native_only_command_never_downgrades_to_opencli(monkeypatch):
+    """douyin.author has no OpenCLI equivalent, so a downgrade would lie."""
+    monkeypatch.delenv("OMNIREACH_BROWSER_TRANSPORT", raising=False)
+    monkeypatch.setattr("omnireach.browser_transport.bridge_configured", lambda: True)
+    monkeypatch.setattr(
+        "omnireach.browser_transport.run_native_job",
+        lambda command, payload, **kwargs: [{"command": command, **kwargs}],
+    )
+    opencli = AsyncMock(side_effect=AssertionError("OpenCLI must not run"))
+    monkeypatch.setattr("omnireach.browser_transport.run_opencli_json", opencli)
+
+    result = await run_browser_json(
+        "douyin", "author", {"handle": "x"}, result_timeout=120,
+    )
+
+    assert result.adapter == "native-chrome"
+    assert result.items[0]["command"] == "douyin.author"
+    assert result.items[0]["result_timeout"] == 120
+    opencli.assert_not_awaited()
+
+
+async def test_stale_extension_asks_for_a_reload_instead_of_falling_back(monkeypatch):
+    monkeypatch.delenv("OMNIREACH_BROWSER_TRANSPORT", raising=False)
+    monkeypatch.setattr("omnireach.browser_transport.bridge_configured", lambda: True)
+
+    def stale(command, payload, **kwargs):
+        raise NativeBridgeCommandError(
+            'command is not allowed: "douyin.author"; allowed=["douyin.search"]'
+        )
+
+    monkeypatch.setattr("omnireach.browser_transport.run_native_job", stale)
+    opencli = AsyncMock(side_effect=AssertionError("OpenCLI must not run"))
+    monkeypatch.setattr("omnireach.browser_transport.run_opencli_json", opencli)
+
+    with pytest.raises(AdapterUnavailable) as exc_info:
+        await run_browser_json("douyin", "author", {"handle": "x"})
+
+    assert "does not implement douyin.author" in exc_info.value.reason
+    assert "reload the unpacked extension" in exc_info.value.hint
+    opencli.assert_not_awaited()
+
+
+async def test_native_only_command_reports_a_missing_bridge(monkeypatch):
+    monkeypatch.delenv("OMNIREACH_BROWSER_TRANSPORT", raising=False)
+    monkeypatch.setattr("omnireach.browser_transport.bridge_configured", lambda: False)
+    opencli = AsyncMock(side_effect=AssertionError("OpenCLI must not run"))
+    monkeypatch.setattr("omnireach.browser_transport.run_opencli_json", opencli)
+
+    with pytest.raises(AdapterUnavailable) as exc_info:
+        await run_browser_json("douyin", "author", {"handle": "x"})
+
+    assert "bridge install" in exc_info.value.hint
+    opencli.assert_not_awaited()
+
+
+async def test_opencli_mode_cannot_serve_a_native_only_command(monkeypatch):
+    monkeypatch.setenv("OMNIREACH_BROWSER_TRANSPORT", "opencli")
+
+    with pytest.raises(AdapterUnavailable) as exc_info:
+        await run_browser_json("douyin", "author", {"handle": "x"})
+
+    assert "requires the native Chrome bridge" in exc_info.value.reason
+
+
+async def test_native_only_bridge_disconnect_is_actionable(monkeypatch):
+    monkeypatch.delenv("OMNIREACH_BROWSER_TRANSPORT", raising=False)
+    monkeypatch.setattr("omnireach.browser_transport.bridge_configured", lambda: True)
+
+    def disconnected(command, payload, **kwargs):
+        raise NativeBridgeUnavailable("native bridge extension did not connect")
+
+    monkeypatch.setattr("omnireach.browser_transport.run_native_job", disconnected)
+    opencli = AsyncMock(side_effect=AssertionError("OpenCLI must not run"))
+    monkeypatch.setattr("omnireach.browser_transport.run_opencli_json", opencli)
+
+    with pytest.raises(AdapterUnavailable) as exc_info:
+        await run_browser_json("douyin", "author", {"handle": "x"})
+
+    assert "did not connect" in exc_info.value.reason
+    opencli.assert_not_awaited()

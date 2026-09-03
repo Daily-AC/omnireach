@@ -88,6 +88,7 @@ def test_mcp_stdio_lifecycle_and_fetch(article_url):
         listed = _read(proc)
         assert {tool["name"] for tool in listed["result"]["tools"]} == {
             "omnireach_search",
+            "omnireach_author",
             "omnireach_fetch",
             "omnireach_parse_media",
             "omnireach_download_media",

@@ -22,7 +22,7 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 
 ### MCP before Playwright
 
-For search, reading, media parsing, and bounded Douyin downloads, start with the four focused MCP tools instead of browser automation.
+For search, creator catalogs, reading, media parsing, and bounded Douyin downloads, start with the five focused MCP tools instead of browser automation.
 Ordinary page fetches never start Chrome. Google, Reddit, Twitter, Xiaohongshu, TikTok,
 and Douyin search now use Omnireach's own small, read-only Chrome bridge first, with
 OpenCLI retained as a compatibility fallback. Browser-backed calls use temporary background
@@ -82,9 +82,10 @@ On proxy / relay-station / Bedrock / Vertex-Claude-3.x setups where the built-in
 
 ## Agent fast path — MCP before Playwright
 
-The plugin exposes four model-controlled tools:
+The plugin exposes five model-controlled tools:
 
 - `omnireach_search` for web research and platform search
+- `omnireach_author` for the works one creator published, which keyword search cannot answer
 - `omnireach_fetch` for reading an HTTP or HTTPS URL as Markdown
 - `omnireach_parse_media` for YouTube, Bilibili, and direct-media metadata or transcripts
 - `omnireach_download_media` for bounded Douyin MP4 downloads with verified local artifacts
@@ -178,6 +179,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach fetch <url> --backend jina` | Force Jina Reader SaaS (zero local deps) |
 | `omnireach fetch <url> --backend crwl` | Explicitly opt into local Crawl4AI |
 | `omnireach fetch <url> --backend opencli` | Force OpenCLI wechat logged-in path (v0.10.1+) |
+| **`omnireach author "<nickname>"`** | **A creator's own works** — keyword search returns other accounts' fan edits; this returns the catalog, with exact like/comment/share/collect counts |
+| `omnireach author "https://www.douyin.com/user/<sec_uid>"` | Pin an exact account instead of resolving a nickname by follower count |
+| `omnireach author "<nickname>" --order likes --limit 30` | Rank the whole catalog by likes (pages every work before sorting, so allow a larger `--timeout`) |
 | `omnireach media inspect <url>` | Inspect normalized metadata and subtitle tracks without writing files |
 | `omnireach media parse <url> --language en` | Materialize metadata, selected captions, transcript JSON/Markdown, and a manifest |
 | `omnireach media parse <media-url> --subtitle-url <vtt>` | Parse a direct audio/video URL with a sidecar VTT/SRT/JSON3 subtitle |
@@ -185,7 +189,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach media parse <url> --no-cache --max-duration 3600` | Bypass verified artifact reuse and reject media longer than one hour |
 | `omnireach media download <douyin-url> --cookies-from-browser "chrome:Profile 1"` | Download a bounded H.264 MP4 by default and return a hash-verified local artifact |
 | `omnireach media download <douyin-url> --quality small --max-size-mb 100` | Prefer the smallest combined MP4 and reject formats over 100 MiB |
-| `omnireach mcp` | Serve search, fetch, media parsing, and bounded Douyin download over MCP stdio |
+| `omnireach mcp` | Serve search, creator catalogs, fetch, media parsing, and bounded Douyin download over MCP stdio |
 | `omnireach init` | Write default `~/.omnireach/preferences.toml` |
 | `omnireach sources` | List all sources + tier status |
 | `omnireach setup <source>` | Guided setup for a 🟡 / 🔴 source |
@@ -214,7 +218,7 @@ upstream format shape, authenticated download, cache, size-limit, privacy, and M
 | twitter | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Automatically included when either transport is available; inherits Chrome login |
 | xiaohongshu | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Inherits the current Chrome login |
 | tiktok | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | TikTok international; real DOM result extraction |
-| douyin | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Reuses the current Chrome login without invoking OpenCLI on the native path |
+| douyin | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback for search only | Reuses the current Chrome login without invoking OpenCLI on the native path. `omnireach author` has no OpenCLI equivalent and needs the bridge |
 | agy | 🚧 experimental | authenticated agy CLI + dedicated conversation | Explicit `--on agy` only; reuses agy's server-side grounded WebSearch |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | paid (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | paid (v0.4) |

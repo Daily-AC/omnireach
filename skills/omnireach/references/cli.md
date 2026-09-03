@@ -14,6 +14,7 @@ omnireach media inspect --json "https://www.youtube.com/watch?v=<id>"
 omnireach media parse --language en --json "https://www.youtube.com/watch?v=<id>"
 omnireach media download --cookies-from-browser "chrome:Profile 1" --json \
   "https://www.douyin.com/video/<id>"
+omnireach author --json "<creator nickname or profile URL>"
 ```
 
 Alternatively, force JSON for the entire harness:
@@ -97,6 +98,32 @@ snippet.
 Browser-backed heavy sources default to 60 seconds for cold starts. An explicit `--timeout`
 overrides every selected source. Use `--profile <name>` when `omnireach doctor --json` reports
 multiple connected OpenCLI Browser Bridge profiles.
+
+## Creator Catalog
+
+List what one creator posted, which keyword search cannot answer:
+
+```bash
+omnireach author --json "彭十六"
+omnireach author --json "https://www.douyin.com/user/<sec_uid>"
+omnireach author --order likes --limit 30 --timeout 300 --json "<nickname>"
+```
+
+- `--source` is `douyin` today.
+- `--limit` accepts 1 through 200 and defaults to 20.
+- `--order recent` is true newest-first and stops paging as soon as enough unpinned works
+  are in hand; pinned works are flagged as `raw.pinned` rather than left at the front where
+  Douyin puts them. `--order likes` must page the whole catalog before ranking, so give it a
+  larger `--timeout` and check `complete`.
+- `--include-media-urls` attaches the expiring signed CDN playback URL to each result's
+  `raw.play_url`. Off by default.
+- A bare nickname resolves by follower count and adds a warning; pass the profile URL for
+  an exact account.
+
+This command requires the native Chrome bridge. When it reports that the connected
+extension does not implement `douyin.author`, run `omnireach bridge install` and reload the
+unpacked extension at `chrome://extensions`; `omnireach bridge status --json` reports
+`reload_required`.
 
 ## Fetch
 

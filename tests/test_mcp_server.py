@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from omnireach.mcp_server import handle_message
 
 
@@ -32,7 +34,8 @@ def test_tools_list_exposes_search_fetch_parse_and_download_media():
 
     tools = {tool["name"]: tool for tool in response["result"]["tools"]}
     assert set(tools) == {
-        "omnireach_search", "omnireach_fetch", "omnireach_parse_media",
+        "omnireach_search", "omnireach_author",
+        "omnireach_fetch", "omnireach_parse_media",
         "omnireach_download_media",
     }
     assert tools["omnireach_search"]["inputSchema"]["required"] == ["query"]
@@ -353,6 +356,10 @@ def _call(name, arguments, request_id=900):
     })
 
 
+def _author_call(arguments, request_id=800):
+    return _call("omnireach_author", arguments, request_id)
+
+
 def test_crashing_search_still_answers_with_a_valid_envelope(monkeypatch):
     """An `isError` payload the declared outputSchema rejects is a silent failure."""
     from omnireach.contract import SearchEnvelope
@@ -406,3 +413,98 @@ def test_crashing_media_download_still_answers_with_a_valid_envelope(monkeypatch
     assert envelope.mode == "download"
     assert len(envelope.errors) == 1
     assert "synthetic crash" in envelope.errors[0].message
+
+
+def test_author_tool_declares_the_catalog_envelope_schema():
+    response = handle_message({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {},
+    })
+
+    tool = next(
+        item for item in response["result"]["tools"]
+        if item["name"] == "omnireach_author"
+    )
+    assert tool["inputSchema"]["required"] == ["handle"]
+    assert tool["inputSchema"]["properties"]["order"]["enum"] == ["recent", "likes"]
+    assert tool["inputSchema"]["properties"]["include_media_urls"]["default"] is False
+    assert "author" in tool["outputSchema"]["properties"]
+
+
+def test_author_tool_forwards_validated_arguments(monkeypatch):
+    from omnireach.contract import AuthorEnvelope
+
+    captured = {}
+
+    async def fake_catalog(handle, **kwargs):
+        captured.update({"handle": handle, **kwargs})
+        return AuthorEnvelope(query=handle, ts="2026-09-03T00:00:00Z", scanned=355)
+
+    monkeypatch.setattr("omnireach.mcp_server.author_catalog", fake_catalog)
+
+    result = _author_call({
+        "handle": "彭十六", "limit": 50, "order": "likes", "timeout": 300,
+    })["result"]
+
+    assert result["isError"] is False
+    assert result["structuredContent"]["scanned"] == 355
+    assert captured == {
+        "handle": "彭十六",
+        "source": "douyin",
+        "limit": 50,
+        "order": "likes",
+        "include_media_urls": False,
+        "timeout": 300,
+    }
+
+
+def test_author_tool_answers_a_crash_with_a_valid_envelope(monkeypatch):
+    from omnireach.contract import AuthorEnvelope
+
+    async def boom(handle, **kwargs):
+        raise RuntimeError("synthetic bridge crash")
+
+    monkeypatch.setattr("omnireach.mcp_server.author_catalog", boom)
+
+    result = _author_call({"handle": "彭十六"})["result"]
+
+    assert result["isError"] is True
+    envelope = AuthorEnvelope.model_validate(result["structuredContent"])
+    assert envelope.errors[0].error == "synthetic bridge crash"
+
+
+def test_author_tool_reports_a_structured_failure_as_an_error(monkeypatch):
+    from omnireach.contract import AuthorEnvelope, SourceError
+
+    async def unavailable(handle, **kwargs):
+        return AuthorEnvelope(
+            query=handle,
+            ts="2026-09-03T00:00:00Z",
+            errors=[SourceError(
+                source="douyin", error="reload the extension", category="unavailable",
+            )],
+        )
+
+    monkeypatch.setattr("omnireach.mcp_server.author_catalog", unavailable)
+
+    assert _author_call({"handle": "彭十六"})["result"]["isError"] is True
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        ({}, "handle must be"),
+        ({"handle": "  "}, "handle must be"),
+        ({"handle": "x", "source": "youtube"}, "source must be"),
+        ({"handle": "x", "limit": 0}, "limit must be"),
+        ({"handle": "x", "limit": 201}, "limit must be"),
+        ({"handle": "x", "order": "oldest"}, "order must be"),
+        ({"handle": "x", "include_media_urls": "yes"}, "include_media_urls must be"),
+        ({"handle": "x", "timeout": 1}, "timeout must be"),
+        ({"handle": "x", "nope": 1}, "unknown argument"),
+    ],
+)
+def test_author_tool_rejects_invalid_arguments(arguments, message):
+    response = _author_call(arguments)
+
+    assert response["error"]["code"] == -32602
+    assert message in response["error"]["message"]

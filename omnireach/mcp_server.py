@@ -11,7 +11,18 @@ from urllib.parse import urlparse
 from datetime import datetime, timezone
 
 from omnireach import __version__
-from omnireach.contract import FetchEnvelope, SearchEnvelope, SourceError
+from omnireach.author import (
+    AUTHOR_SOURCES,
+    MAX_AUTHOR_LIMIT,
+    author_catalog,
+    failed_author_envelope,
+)
+from omnireach.contract import (
+    AuthorEnvelope,
+    FetchEnvelope,
+    SearchEnvelope,
+    SourceError,
+)
 from omnireach.fetcher import fetch
 from omnireach.media.contract import MediaEnvelope, MediaError
 from omnireach.media.service import download_media, inspect_media, parse_media
@@ -70,6 +81,63 @@ TOOLS = [
             "additionalProperties": False,
         },
         "outputSchema": SearchEnvelope.model_json_schema(),
+        "annotations": TOOL_ANNOTATIONS,
+    },
+    {
+        "name": "omnireach_author",
+        "title": "List a creator's own works with omnireach",
+        "description": (
+            "List the works one creator published, which keyword search cannot "
+            "answer: searching a creator's name returns other accounts' fan "
+            "edits and reaction videos. Accepts a nickname or a profile URL; a "
+            "nickname is resolved by follower count, so pass the URL to pin an "
+            "exact account. order=likes must page the entire catalog before it "
+            "can rank, so it is slower and needs a larger timeout."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Creator nickname or profile URL",
+                },
+                "source": {
+                    "type": "string",
+                    "enum": list(AUTHOR_SOURCES),
+                    "default": "douyin",
+                },
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": MAX_AUTHOR_LIMIT,
+                    "default": 20,
+                },
+                "order": {
+                    "type": "string",
+                    "enum": ["recent", "likes"],
+                    "default": "recent",
+                },
+                "include_media_urls": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "Attach the expiring CDN playback URL to each result's "
+                        "raw payload. Off by default: the URLs are signed, "
+                        "short-lived, and large."
+                    ),
+                },
+                "timeout": {
+                    "type": "number",
+                    "minimum": 5,
+                    "maximum": 600,
+                    "default": 180,
+                },
+            },
+            "required": ["handle"],
+            "additionalProperties": False,
+        },
+        "outputSchema": AuthorEnvelope.model_json_schema(),
         "annotations": TOOL_ANNOTATIONS,
     },
     {
@@ -354,6 +422,47 @@ def _validate_search(arguments: dict[str, Any]) -> dict[str, Any]:
     return validated
 
 
+def _validate_author(arguments: dict[str, Any]) -> dict[str, Any]:
+    _reject_extra(
+        arguments,
+        {"handle", "source", "limit", "order", "include_media_urls", "timeout"},
+    )
+    handle = arguments.get("handle")
+    if not isinstance(handle, str) or not handle.strip():
+        raise InvalidParams("handle must be a non-empty string")
+    source = arguments.get("source", "douyin")
+    if source not in AUTHOR_SOURCES:
+        raise InvalidParams(f"source must be one of: {', '.join(AUTHOR_SOURCES)}")
+    order = arguments.get("order", "recent")
+    if order not in {"recent", "likes"}:
+        raise InvalidParams("order must be recent or likes")
+    limit = arguments.get("limit", 20)
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or not 1 <= limit <= MAX_AUTHOR_LIMIT
+    ):
+        raise InvalidParams(f"limit must be an integer between 1 and {MAX_AUTHOR_LIMIT}")
+    include_media_urls = arguments.get("include_media_urls", False)
+    if not isinstance(include_media_urls, bool):
+        raise InvalidParams("include_media_urls must be a boolean")
+    timeout = arguments.get("timeout", 180)
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not 5 <= timeout <= 600
+    ):
+        raise InvalidParams("timeout must be between 5 and 600")
+    return {
+        "handle": handle,
+        "source": source,
+        "limit": limit,
+        "order": order,
+        "include_media_urls": include_media_urls,
+        "timeout": timeout,
+    }
+
+
 def _validate_fetch(arguments: dict[str, Any]) -> dict[str, Any]:
     _reject_extra(arguments, {"url", "backend", "timeout"})
     url = arguments.get("url")
@@ -497,6 +606,23 @@ def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001
             return _tool_result(_crashed_search(query, exc), is_error=True)
         return _tool_result(envelope.model_dump(mode="json"))
+    if name == "omnireach_author":
+        kwargs = _validate_author(arguments)
+        handle = kwargs.pop("handle")
+        try:
+            envelope = asyncio.run(author_catalog(handle, **kwargs))
+        except ValueError as exc:
+            raise InvalidParams(str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001
+            return _tool_result(
+                failed_author_envelope(
+                    handle, kwargs["source"], str(exc),
+                ).model_dump(mode="json"),
+                is_error=True,
+            )
+        return _tool_result(
+            envelope.model_dump(mode="json"), is_error=bool(envelope.errors),
+        )
     if name == "omnireach_fetch":
         kwargs = _validate_fetch(arguments)
         url = kwargs.pop("url")
@@ -560,9 +686,10 @@ def handle_message(message: object) -> dict[str, Any] | None:
             "capabilities": {"tools": {"listChanged": False}},
             "serverInfo": SERVER_INFO,
             "instructions": (
-                "Use omnireach_search for research, omnireach_fetch for reading pages, "
-                "omnireach_parse_media for media metadata or transcripts, and "
-                "omnireach_download_media for bounded Douyin downloads before "
+                "Use omnireach_search for research, omnireach_author when the "
+                "question is what one creator posted, omnireach_fetch for reading "
+                "pages, omnireach_parse_media for media metadata or transcripts, "
+                "and omnireach_download_media for bounded Douyin downloads before "
                 "launching browser automation."
             ),
         })
