@@ -201,6 +201,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 
 - 推 tag 后**必须** `gh release create vX.Y.Z-alpha --title "..." --notes "..."` 否则 `omnireach check-update` 走 `/releases/latest` 会 404
 - 如果同时创建多个 release, GitHub 把最后创建的标为 Latest, 不是 tag 顺序; 用 `gh release edit vLATEST --latest` 修正
+- **不要给 alpha release 加 `--prerelease`**: GitHub 的 `/releases/latest` 端点按定义跳过 prerelease, 而 `check-update` 正是读这个端点 —— v0.19 用 `--prerelease` 发出去后, 它仍然把 v0.18 当最新, 老用户永远收不到升级提示。修法 `gh release edit vX.Y.Z-alpha --prerelease=false --latest`。本仓库的历史是混的 (v0.16/v0.16.1 是 prerelease, v0.17/v0.18 不是), 别照抄相邻的那一版。
 - check-update 实现走 GitHub Releases API, 见 `omnireach/commands/check_update.py`
 - **版本号有四处源, bump 时四处都要改**: `omnireach/__init__.py __version__` (CLI `--version` 读这里) + `pyproject.toml [project] version` (build/wheel 元数据, static 不是 dynamic) + `.claude-plugin/plugin.json version` + `uv.lock` (改完跑 `uv lock` 同步)。`tests/test_version_metadata.py` 会钉死前三处一致 —— v0.19 bump 时就是它抓到 plugin.json 漏改。v0.11.0 踩过: 只改了 `__init__` 导致 build 元数据落在旧版; `omnireach --version` 与 wheel 版本不一致。
 
