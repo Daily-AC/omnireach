@@ -126,6 +126,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `v0.7.2-alpha` (2026-05-26): **douyin via OpenCLI fork** — 不等上游, omnireach 切到 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)。OpenCLI 系 4 源全切 fork; 上游 merge 后切回, adapter 不动。`plays/comments/shares` zero→None normalize (DOM 卡片只暴露 likes)。E2E 实测 likes=40000。PR #15, **closes issue #12**。209 tests
 - `v0.8.0-alpha` (2026-05-27): **架构修复** — `SearchResult.content` 在 contract 层 (pydantic `field_validator`) 强制截到 500 字 + "…"; 全文保留在 `result.raw` (4 个长文本源 wechat/xhs/exa/tavily 上游 payload 本就存了)。零 adapter 改动, 单一实现点防未来 adapter 漂移。218 tests。PR #18
 - `v0.8.1-alpha` (2026-05-27): **xhs adapter 字段映射 hotfix** — 真 E2E 时发现 OpenCLI v1.7.22+ 真实 xhs 输出 key 是 `likes(string)/title/url/published_at/rank/author/author_url`, 没有 `content / like_count / comment_count / collect_count`。adapter 自 v0.5.2 起就在猜 key 名（同 v0.7.0→v0.7.1 同类 bug）, engagement 一直全 None。v0.8.0 README 文档里"xhs 全文在 raw['content']"的话也是错的（OpenCLI 搜索不返正文）。修：`likes:str→int` via `_parse_likes()`, 删 comment_count/collect_count map, 测试 fixture 改用真 OpenCLI shape。README "如何取全文" 表加 twitter 行(长 thread 触发 validator), 删 xhs 行(无全文)。E2E 实测 likes=83/102/45 (was None)。PR #19
+- `v0.19.0-alpha` (2026-09-03): **失败契约补洞 + 抖音作者目录 + 扩展自重载** —— (a) `cli.py::_entrypoint` 此前把任何 ClickException 渲染成只有 `error` 没有 `errors` 的信封, agent 读到空列表, 看起来像「跑完了什么都没找到」; 现在 CLI/MCP 每条失败路径都填 `errors`, 崩溃 traceback 改走 stderr, MCP 异常兜底返回真信封而不是 outputSchema 不认的 `{"error": ...}` (issue #45, PR #47)。抖音 fresh-cookies 抖动是实测的: 冷启动 1/10、被限流后 4/10, 1 秒与 5 秒间隔失败率一样 —— **加尝试次数有用、加退避没用**, 定 4 次共享一个 timeout 预算。(b) `omnireach author` + `omnireach_author`: 关键词搜索匹配的是文案, 按点赞排「彭十六」排出来的全是陌生人; 走登录态页面上下文里的 `aweme/v1/web/aweme/post/` (无需 a_bogus/X-Bogus 签名), engagement 是精确值 (issue #46, PR #48)。四个只有真数据才暴露的坑记在 `docs/verification/douyin-author.md`。(c) `omnireach bridge reload` 让扩展自己重载, 1.8 秒, 终结了改扩展必须人工点 `chrome://extensions` 的循环 (PR #51, 验证记录 `docs/verification/bridge-self-reload.md`)。(d) CLAUDE.md 架构边界与版本历史对齐已 ship 的现实, 回填 v0.12→v0.18 (PR #50)。485 tests。扩展 0.4.0, `NATIVE_EXTENSION_MIN_VERSION` 故意不抬 —— 没重载扩展的用户其余命令照常。
 - `v0.18.0-alpha` (2026-07-22): **有界抖音下载** — `omnireach media download <douyin-url>` + `omnireach_download_media`, SHA-256 寻址产物、字节数校验、哈希核对后的缓存复用; 匿名验证失败返 `category=blocked` + cookie 恢复提示 + 非零退出码。PR #44。验证记录 `docs/verification/douyin-download.md`。
 - `v0.17.0-alpha` (2026-07-22): **media parse 基础** — `media inspect` / `media parse` + `omnireach_parse_media` + `MediaEnvelope` 契约; YouTube 走 yt-dlp, B站默认走匿名官方 read API (需登录的字幕才走显式 `--cookies-from-browser`), 直接媒体走 ffprobe; 签名字幕 URL 与浏览器凭据不入 envelope/manifest。PR #43。**注意: 这一版起「不塞 parse/download 子命令」那条老边界已被推翻, 见上方架构边界节。**
 - `v0.16.1-alpha` (2026-07-16): **hotfix 并发多源** — dispatcher 并发跑源, 而每个 native adapter 各自去绑 `127.0.0.1:19826`, 单源过、多源只有第一个能起, 其余 `Address already in use`。改为串行化 native job 并让排队中的 job 可取消。378 tests + 12 JS。PR #38
@@ -201,7 +202,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - 推 tag 后**必须** `gh release create vX.Y.Z-alpha --title "..." --notes "..."` 否则 `omnireach check-update` 走 `/releases/latest` 会 404
 - 如果同时创建多个 release, GitHub 把最后创建的标为 Latest, 不是 tag 顺序; 用 `gh release edit vLATEST --latest` 修正
 - check-update 实现走 GitHub Releases API, 见 `omnireach/commands/check_update.py`
-- **版本号有三处源, bump 时三处都要改**: `omnireach/__init__.py __version__` (CLI `--version` 读这里) + `pyproject.toml [project] version` (build/wheel 元数据, static 不是 dynamic) + `uv.lock` (改完跑 `uv lock` 同步)。v0.11.0 踩过: 只改了 `__init__` 导致 build 元数据落在旧版; `omnireach --version` 与 wheel 版本不一致。
+- **版本号有四处源, bump 时四处都要改**: `omnireach/__init__.py __version__` (CLI `--version` 读这里) + `pyproject.toml [project] version` (build/wheel 元数据, static 不是 dynamic) + `.claude-plugin/plugin.json version` + `uv.lock` (改完跑 `uv lock` 同步)。`tests/test_version_metadata.py` 会钉死前三处一致 —— v0.19 bump 时就是它抓到 plugin.json 漏改。v0.11.0 踩过: 只改了 `__init__` 导致 build 元数据落在旧版; `omnireach --version` 与 wheel 版本不一致。
 
 ## 工作偏好 (来自用户跨项目 feedback memory, 这里只记跟 omnireach 有关的部分)
 
@@ -219,8 +220,10 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 仍 OPEN，所以还不能切回上游。
 
 **改 `omnireach/chrome_extension/` 下的代码要注意**：`omnireach bridge install` 只是把文件拷到
-`~/.omnireach/chrome-extension`，运行中的 Chrome 不会加载新代码，MV3 service worker 空闲重启也不会；
-必须人工去 `chrome://extensions` 点「重新加载」，而 Chrome 136+ 已不向 CDP 暴露扩展 target，自动化无解。
-判据是 `omnireach bridge status --json` 的 `reload_required` / `connected_version`。**所以纯逻辑先在
-`douyin.js` 这类 node 可测的层里用 `node --test tests/js/native-extension.test.mjs` 钉死，再上真浏览器，
-别拿真浏览器当调试循环。**
+`~/.omnireach/chrome-extension`，运行中的 Chrome 不会加载新代码，MV3 service worker 空闲重启也不会。
+判据是 `omnireach bridge status --json` 的 `reload_required` / `connected_version`。
+**v0.19 起用 `omnireach bridge reload` 让扩展自己重载**（走 `chrome.runtime.reload()`，1.8 秒，
+service worker 与 offscreen document 都会自动回来 —— 实测记录见 `docs/verification/bridge-self-reload.md`）；
+在此之前只能人工去 `chrome://extensions` 点「重新加载」，因为 Chrome 136+ 不向 CDP 暴露扩展 target。
+**但纯逻辑仍然先在 `douyin.js` 这类 node 可测的层里用 `node --test tests/js/native-extension.test.mjs`
+钉死，再上真浏览器 —— 重载变便宜了不等于真浏览器适合当调试循环。**
