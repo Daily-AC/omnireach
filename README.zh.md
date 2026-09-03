@@ -22,7 +22,7 @@ omnireach search --on wechat "Claude Code 技巧"   # 装完 60 秒内能跑
 
 ### 先读网页，再启动 Playwright
 
-搜索、读取、媒体解析和有界抖音下载先用四个聚焦的 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
+搜索、作者目录、读取、媒体解析和有界抖音下载先用五个聚焦的 MCP 工具，不要先启动浏览器自动化。普通网页 fetch
 完全不启动 Chrome；Google、Reddit、Twitter、小红书、TikTok、抖音现在都优先走
 Omnireach 自己的轻量只读 Chrome 桥，OpenCLI 保留为兼容回退。浏览器路径使用后台
 临时 tab，用完即关；`quick` 模式仍完全不碰浏览器。点击、表单、文件传输、截图和
@@ -80,9 +80,10 @@ Twitter、Reddit、小红书、微信公众号、抖音、B站、TikTok —— �
 
 ## Agent 快路径 —— MCP 优先于 Playwright
 
-plugin 暴露四个由模型直接调用的工具：
+plugin 暴露五个由模型直接调用的工具：
 
 - `omnireach_search`：联网研究与平台搜索
+- `omnireach_author`：某个创作者本人发布的作品，关键词搜索答不了这个问题
 - `omnireach_fetch`：把 HTTP/HTTPS URL 读取为 Markdown
 - `omnireach_parse_media`：解析 YouTube、B站和直接媒体的元数据或字幕
 - `omnireach_download_media`：有界下载抖音 MP4，并返回经过哈希校验的本地产物
@@ -214,7 +215,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | twitter | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | 任一 transport 可用时自动加入；继承 Chrome 登录态 |
 | xiaohongshu | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | 继承当前 Chrome 登录态 |
 | tiktok | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | TikTok 国际版；从真实 DOM 提取结果 |
-| douyin | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI fallback | 原生路径继承当前 Chrome 登录态，不调用 OpenCLI |
+| douyin | 🔴 heavy | Omnireach 原生 Chrome 桥；OpenCLI 仅对 search 有回退 | 原生路径继承当前 Chrome 登录态，不调用 OpenCLI。`omnireach author` 没有 OpenCLI 等价物，必须走桥 |
 | agy | 🚧 experimental | 已登录 agy CLI + 专用 conversation | 仅显式 `--on agy`；复用 agy 服务端 grounded WebSearch |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | 付费 (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | 付费 (v0.4) |

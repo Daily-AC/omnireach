@@ -22,7 +22,7 @@ Installed as a Claude Code skill, so your agent just knows how to use it next se
 
 ### MCP before Playwright
 
-For search, reading, media parsing, and bounded Douyin downloads, start with the four focused MCP tools instead of browser automation.
+For search, creator catalogs, reading, media parsing, and bounded Douyin downloads, start with the five focused MCP tools instead of browser automation.
 Ordinary page fetches never start Chrome. Google, Reddit, Twitter, Xiaohongshu, TikTok,
 and Douyin search now use Omnireach's own small, read-only Chrome bridge first, with
 OpenCLI retained as a compatibility fallback. Browser-backed calls use temporary background
@@ -82,9 +82,10 @@ On proxy / relay-station / Bedrock / Vertex-Claude-3.x setups where the built-in
 
 ## Agent fast path — MCP before Playwright
 
-The plugin exposes four model-controlled tools:
+The plugin exposes five model-controlled tools:
 
 - `omnireach_search` for web research and platform search
+- `omnireach_author` for the works one creator published, which keyword search cannot answer
 - `omnireach_fetch` for reading an HTTP or HTTPS URL as Markdown
 - `omnireach_parse_media` for YouTube, Bilibili, and direct-media metadata or transcripts
 - `omnireach_download_media` for bounded Douyin MP4 downloads with verified local artifacts
@@ -217,7 +218,7 @@ upstream format shape, authenticated download, cache, size-limit, privacy, and M
 | twitter | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Automatically included when either transport is available; inherits Chrome login |
 | xiaohongshu | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Inherits the current Chrome login |
 | tiktok | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | TikTok international; real DOM result extraction |
-| douyin | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback | Reuses the current Chrome login without invoking OpenCLI on the native path |
+| douyin | 🔴 heavy | Omnireach native Chrome bridge; OpenCLI fallback for search only | Reuses the current Chrome login without invoking OpenCLI on the native path. `omnireach author` has no OpenCLI equivalent and needs the bridge |
 | agy | 🚧 experimental | authenticated agy CLI + dedicated conversation | Explicit `--on agy` only; reuses agy's server-side grounded WebSearch |
 | 💎 tavily | booster | env `TAVILY_API_KEY` | paid (v0.4) |
 | 💎 brave | booster | env `BRAVE_API_KEY` | paid (v0.4) |

@@ -90,3 +90,42 @@ def test_offscreen_bridge_contract_uses_authenticated_fixed_endpoints():
     assert 'fetch(`${config.baseUrl}/v1/result`' in source
     assert 'method: "POST"' in source
     assert '"X-Omnireach-Extension-Version"' in source
+
+
+def _service_worker_source() -> str:
+    return (
+        files("omnireach.chrome_extension")
+        .joinpath("service-worker.js")
+        .read_text(encoding="utf-8")
+    )
+
+
+def test_python_and_extension_agree_on_the_native_command_set():
+    """A command allowed on one side and missing on the other fails silently.
+
+    browser_transport routes on `_NATIVE_COMMANDS`; the extension gates on its
+    own `COMMANDS` set. When they drift, `auto` mode either downgrades a
+    supported command to OpenCLI or asks the extension for one it rejects.
+    """
+    import re
+
+    from omnireach.browser_transport import _NATIVE_COMMANDS
+
+    source = _service_worker_source()
+    block = re.search(r"const COMMANDS = new Set\(\[(.*?)\]\)", source, re.S)
+    assert block is not None, "service-worker.js no longer declares a COMMANDS set"
+    declared = set(re.findall(r'"([a-z]+\.[a-z]+)"', block.group(1)))
+
+    expected = {f"{source_id}.{command}" for source_id, command in _NATIVE_COMMANDS}
+    assert declared == expected | {"system.ping"}
+
+
+def test_python_and_extension_agree_on_the_catalog_limit():
+    from omnireach.author import MAX_AUTHOR_LIMIT
+
+    limit = (
+        files("omnireach.chrome_extension")
+        .joinpath("douyin.js")
+        .read_text(encoding="utf-8")
+    )
+    assert f"const MAX_AUTHOR_LIMIT = {MAX_AUTHOR_LIMIT};" in limit

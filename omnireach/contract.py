@@ -19,6 +19,10 @@ class Engagement(BaseModel):
     comments: int | None = None
     shares: int | None = None
     views: int | None = None
+    # Declared rather than left to extra="allow": the Douyin creator catalog
+    # emits it, and an undeclared field is invisible to any Agent reading the
+    # MCP outputSchema.
+    collects: int | None = None
 
 
 class SearchResult(BaseModel):
