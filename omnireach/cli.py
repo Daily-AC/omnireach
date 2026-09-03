@@ -15,6 +15,7 @@ from rich.table import Table
 from omnireach import __version__
 from omnireach.commands.check_update import check_update_cmd
 from omnireach.commands.agy import agy_cmd
+from omnireach.commands.author import author_cmd
 from omnireach.commands.bridge import bridge_cmd
 from omnireach.commands.fetch import fetch_cmd
 from omnireach.commands.init import init_cmd
@@ -253,6 +254,7 @@ def doctor_cmd(json_out: bool) -> None:
 
 main.add_command(init_cmd)
 main.add_command(agy_cmd)
+main.add_command(author_cmd)
 main.add_command(bridge_cmd)
 main.add_command(setup_cmd)
 main.add_command(sources_cmd)

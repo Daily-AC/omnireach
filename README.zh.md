@@ -175,6 +175,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach fetch <url> --backend jina` | 强制走 Jina Reader SaaS (零本地依赖) |
 | `omnireach fetch <url> --backend crwl` | 显式选择本地 Crawl4AI |
 | `omnireach fetch <url> --backend opencli` | 强制走 OpenCLI weixin 登录态路径 (v0.10.1+) |
+| **`omnireach author "<昵称>"`** | **某个创作者本人的作品** — 关键词搜索搜到的多是别人的二创；这条返回作品目录，附精确的点赞/评论/转发/收藏数 |
+| `omnireach author "https://www.douyin.com/user/<sec_uid>"` | 直接钉死账号，不靠粉丝数从同名号里猜 |
+| `omnireach author "<昵称>" --order likes --limit 30` | 按点赞排全量目录（必须翻完所有作品才能排序，`--timeout` 要给够） |
 | `omnireach media inspect <url>` | 只检查归一化元数据和字幕轨，不写文件 |
 | `omnireach media parse <url> --language zh-CN` | 生成元数据、字幕、时间轴 JSON/Markdown 和 manifest |
 | `omnireach media parse <media-url> --subtitle-url <vtt>` | 给直接音视频解析旁挂 VTT/SRT/JSON3 字幕 |
@@ -182,7 +185,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach media parse <url> --no-cache --max-duration 3600` | 跳过哈希校验缓存，并拒绝超过一小时的媒体 |
 | `omnireach media download <douyin-url> --cookies-from-browser "chrome:Profile 1"` | 默认下载兼容性更好的 H.264 MP4，并返回哈希校验后的本地产物 |
 | `omnireach media download <douyin-url> --quality small --max-size-mb 100` | 优先最小的合并 MP4，并拒绝超过 100 MiB 的格式 |
-| `omnireach mcp` | 通过 MCP stdio 提供搜索、抓取、媒体解析和有界抖音下载 |
+| `omnireach mcp` | 通过 MCP stdio 提供搜索、作者目录、抓取、媒体解析和有界抖音下载 |
 | `omnireach init` | 写默认 `~/.omnireach/preferences.toml` |
 | `omnireach sources` | 列出所有源 + 状态 |
 | `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 |

@@ -178,6 +178,9 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach fetch <url> --backend jina` | Force Jina Reader SaaS (zero local deps) |
 | `omnireach fetch <url> --backend crwl` | Explicitly opt into local Crawl4AI |
 | `omnireach fetch <url> --backend opencli` | Force OpenCLI wechat logged-in path (v0.10.1+) |
+| **`omnireach author "<nickname>"`** | **A creator's own works** — keyword search returns other accounts' fan edits; this returns the catalog, with exact like/comment/share/collect counts |
+| `omnireach author "https://www.douyin.com/user/<sec_uid>"` | Pin an exact account instead of resolving a nickname by follower count |
+| `omnireach author "<nickname>" --order likes --limit 30` | Rank the whole catalog by likes (pages every work before sorting, so allow a larger `--timeout`) |
 | `omnireach media inspect <url>` | Inspect normalized metadata and subtitle tracks without writing files |
 | `omnireach media parse <url> --language en` | Materialize metadata, selected captions, transcript JSON/Markdown, and a manifest |
 | `omnireach media parse <media-url> --subtitle-url <vtt>` | Parse a direct audio/video URL with a sidecar VTT/SRT/JSON3 subtitle |
@@ -185,7 +188,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach media parse <url> --no-cache --max-duration 3600` | Bypass verified artifact reuse and reject media longer than one hour |
 | `omnireach media download <douyin-url> --cookies-from-browser "chrome:Profile 1"` | Download a bounded H.264 MP4 by default and return a hash-verified local artifact |
 | `omnireach media download <douyin-url> --quality small --max-size-mb 100` | Prefer the smallest combined MP4 and reject formats over 100 MiB |
-| `omnireach mcp` | Serve search, fetch, media parsing, and bounded Douyin download over MCP stdio |
+| `omnireach mcp` | Serve search, creator catalogs, fetch, media parsing, and bounded Douyin download over MCP stdio |
 | `omnireach init` | Write default `~/.omnireach/preferences.toml` |
 | `omnireach sources` | List all sources + tier status |
 | `omnireach setup <source>` | Guided setup for a 🟡 / 🔴 source |
