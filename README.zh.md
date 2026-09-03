@@ -351,6 +351,13 @@ omnireach setup exa          # v0.5 新增（替代旧 web 源）
 
 `~/.omnireach/preferences.toml` 可配置默认源、语言、输出格式、`source_trust` 覆盖。
 
+`[media] cookies_from_browser` 给 `omnireach media inspect / parse / download` 指定默认的 yt-dlp 浏览器 cookie 源，不用每次调用都重复写授权过的 profile。显式 `--cookies-from-browser` 永远优先；这条偏好不会把 B 站从它免 cookie 的原生后端上挪走。
+
+```toml
+[media]
+cookies_from_browser = "chrome:Profile 1"
+```
+
 ```bash
 omnireach preferences show     # 查看当前配置
 omnireach preferences edit     # 用 $EDITOR 编辑

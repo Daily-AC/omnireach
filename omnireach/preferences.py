@@ -27,11 +27,19 @@ class Boosters(BaseModel):
     auto_enable: bool = True
 
 
+class Media(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # Default yt-dlp browser cookie source (e.g. "chrome:Profile 1") used by media
+    # inspect/parse/download when the caller passes none. Empty/None = no cookies.
+    cookies_from_browser: str | None = None
+
+
 class Preferences(BaseModel):
     model_config = ConfigDict(extra="forbid")
     defaults: Defaults = Field(default_factory=Defaults)
     output: Output = Field(default_factory=Output)
     boosters: Boosters = Field(default_factory=Boosters)
+    media: Media = Field(default_factory=Media)
     trust_overrides: dict[str, float] = Field(default_factory=dict)
 
 
@@ -51,6 +59,10 @@ max_results_per_source = 8
 [boosters]
 # false 表示即使配了 Key 也不调用付费源
 auto_enable = true
+
+[media]
+# media inspect/parse/download 调 yt-dlp 时默认复用的浏览器 cookie（调用方显式传参会覆盖）
+# cookies_from_browser = "chrome:Profile 1"
 
 [trust_overrides]
 # 覆盖 sources.yml 的默认 source_trust（0.0-1.0）

@@ -32,6 +32,10 @@ load_secrets_env(_SECRETS_PATH)
 ISSUE_URL = "https://github.com/Daily-AC/omnireach/issues/new/choose"
 
 console = Console()
+# Diagnostics must never land on stdout: an Agent pipes stdout into a JSON
+# parser, so a rich traceback there is indistinguishable from a truncated
+# envelope.
+error_console = Console(stderr=True)
 
 
 def _augment_with_active_boosters(source_ids, reg, explicit_sources):
@@ -258,6 +262,40 @@ main.add_command(fetch_cmd)
 main.add_command(media_cmd)
 
 
+def _json_requested() -> bool:
+    return "--json" in sys.argv[1:] or os.environ.get(
+        "OMNIREACH_FORCE_JSON", ""
+    ).lower() in ("1", "true", "yes")
+
+
+def _emit_cli_failure(
+    *,
+    stage: str,
+    category: str,
+    message: str,
+    hint: str,
+    legacy: dict[str, object],
+) -> None:
+    """Print the one JSON shape every omnireach failure path shares.
+
+    `errors` is the field every envelope in this project exposes and the one
+    Agents read, so a CLI-level failure has to fill it too — an `ok: false`
+    payload whose `errors` is missing reads exactly like a successful run
+    that found nothing. `error` is kept for pre-0.19 callers.
+    """
+    click.echo(json.dumps({
+        "ok": False,
+        "errors": [{
+            "stage": stage,
+            "category": category,
+            "message": message,
+            "hint": hint,
+            "retryable": False,
+        }],
+        "error": legacy,
+    }, ensure_ascii=False))
+
+
 def _entrypoint() -> None:
     """Console-script wrapper that catches unhandled exceptions and points users at issues."""
     try:
@@ -265,33 +303,49 @@ def _entrypoint() -> None:
         if isinstance(exit_code, int) and exit_code != 0:
             raise SystemExit(exit_code)
     except click.ClickException as exc:
-        json_requested = "--json" in sys.argv[1:] or os.environ.get(
-            "OMNIREACH_FORCE_JSON", ""
-        ).lower() in ("1", "true", "yes")
-        if json_requested:
-            click.echo(json.dumps({
-                "ok": False,
-                "error": {
+        if _json_requested():
+            _emit_cli_failure(
+                stage="usage",
+                category="invalid",
+                message=exc.format_message(),
+                hint="Re-run the same command with --help to see valid arguments",
+                legacy={
                     "type": "usage_error",
                     "message": exc.format_message(),
                     "exit_code": exc.exit_code,
                 },
-            }, ensure_ascii=False))
+            )
         else:
             exc.show()
         raise SystemExit(exc.exit_code)
     except click.exceptions.Exit as exc:
         raise SystemExit(exc.exit_code)
     except KeyboardInterrupt:
-        console.print("\n[yellow]中断[/yellow]")
+        error_console.print("\n[yellow]中断[/yellow]")
         raise SystemExit(130)
     except Exception as exc:  # noqa: BLE001
         import traceback
-        console.print(f"\n[red]omnireach 内部错误: {exc.__class__.__name__}: {exc}[/red]")
-        console.print("[dim]" + traceback.format_exc() + "[/dim]")
-        console.print(
+        trace = traceback.format_exc()
+        error_console.print(
+            f"\n[red]omnireach 内部错误: {exc.__class__.__name__}: {exc}[/red]"
+        )
+        error_console.print("[dim]" + trace + "[/dim]")
+        error_console.print(
             f"\n[bold]💬 请把上面这段 traceback + `omnireach --version` 一起提 issue:[/bold]\n   {ISSUE_URL}"
         )
+        if _json_requested():
+            _emit_cli_failure(
+                stage="internal",
+                category="failed",
+                message=f"{exc.__class__.__name__}: {exc}",
+                hint=f"This is an omnireach bug; please report it at {ISSUE_URL}",
+                legacy={
+                    "type": "internal_error",
+                    "message": f"{exc.__class__.__name__}: {exc}",
+                    "exit_code": 2,
+                    "traceback": trace,
+                },
+            )
         raise SystemExit(2)
 
 
