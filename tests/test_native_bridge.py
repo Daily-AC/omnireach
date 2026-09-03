@@ -387,3 +387,39 @@ def test_native_bridge_cancellation_stops_waiting(tmp_path):
             result_timeout=1,
             cancel_event=cancel,
         )
+
+
+def test_request_extension_reload_treats_a_lost_result_as_started():
+    """chrome.runtime.reload() can outrun its own reply; that is not a failure."""
+    import omnireach.native_bridge as bridge_mod
+
+    def timed_out(command, payload, **kwargs):
+        raise bridge_mod.NativeBridgeCommandError("native bridge result timeout")
+
+    original = bridge_mod.run_native_job
+    bridge_mod.run_native_job = timed_out
+    try:
+        result = bridge_mod.request_extension_reload()
+    finally:
+        bridge_mod.run_native_job = original
+
+    assert result["reloading"] is True
+    assert "result not delivered" in result["detail"]
+
+
+def test_request_extension_reload_still_reports_an_unsupported_command():
+    import omnireach.native_bridge as bridge_mod
+    import pytest as _pytest
+
+    def refuse(command, payload, **kwargs):
+        raise bridge_mod.NativeBridgeCommandError(
+            'command is not allowed: "system.reload"'
+        )
+
+    original = bridge_mod.run_native_job
+    bridge_mod.run_native_job = refuse
+    try:
+        with _pytest.raises(bridge_mod.NativeBridgeCommandError):
+            bridge_mod.request_extension_reload()
+    finally:
+        bridge_mod.run_native_job = original

@@ -3,7 +3,7 @@ from importlib.resources import files
 
 from omnireach.native_bridge import NATIVE_EXTENSION_MIN_VERSION
 
-EXTENSION_VERSION = "0.3.4"
+EXTENSION_VERSION = "0.4.0"
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
@@ -27,6 +27,9 @@ def test_native_extension_manifest_has_narrow_permissions():
     assert manifest["manifest_version"] == 3
     assert manifest["version"] == EXTENSION_VERSION
     assert set(manifest["permissions"]) == {
+        # alarms is the wake-up for the offscreen document that polls the
+        # bridge; it grants no network or data access.
+        "alarms",
         "offscreen",
         "scripting",
         "tabs",
@@ -116,8 +119,10 @@ def test_python_and_extension_agree_on_the_native_command_set():
     assert block is not None, "service-worker.js no longer declares a COMMANDS set"
     declared = set(re.findall(r'"([a-z]+\.[a-z]+)"', block.group(1)))
 
+    # system.* commands address the bridge itself, not a source, so they are
+    # dispatched through run_native_job directly and listed here explicitly.
     expected = {f"{source_id}.{command}" for source_id, command in _NATIVE_COMMANDS}
-    assert declared == expected | {"system.ping"}
+    assert declared == expected | {"system.ping", "system.reload"}
 
 
 def test_python_and_extension_agree_on_the_catalog_limit():
@@ -129,3 +134,24 @@ def test_python_and_extension_agree_on_the_catalog_limit():
         .read_text(encoding="utf-8")
     )
     assert f"const MAX_AUTHOR_LIMIT = {MAX_AUTHOR_LIMIT};" in limit
+
+
+def test_service_worker_answers_before_reloading_itself():
+    """chrome.runtime.reload() destroys the document that delivers the reply."""
+    source = _service_worker_source()
+
+    assert '"system.reload"' in source
+    reload_call = source.index("chrome.runtime.reload()")
+    answer = source.index("reloading: true")
+    assert reload_call < answer, "the reload must be deferred, not awaited"
+    assert "setTimeout(() => chrome.runtime.reload(), RELOAD_DELAY_MS)" in source
+
+
+def test_service_worker_keeps_the_offscreen_poller_alive_with_an_alarm():
+    """Only the worker can recreate the offscreen document, and only an event
+    wakes an idle worker — without the alarm a lost document is unrecoverable."""
+    source = _service_worker_source()
+
+    assert "chrome.alarms.create(KEEPALIVE_ALARM" in source
+    assert "chrome.alarms.onAlarm.addListener" in source
+    assert "periodInMinutes: 1" in source

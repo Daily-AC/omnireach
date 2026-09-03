@@ -87,3 +87,91 @@ def test_bridge_status_json_reports_connection_error(monkeypatch, tmp_path):
     assert payload["installed"] is True
     assert payload["connected"] is False
     assert payload["error"] == "extension did not connect"
+
+
+def _installed_extension(monkeypatch, tmp_path, version=EXTENSION_VERSION):
+    from pathlib import Path
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    CliRunner().invoke(main, ["bridge", "install", "--json"])
+    manifest = tmp_path / ".omnireach" / "chrome-extension" / "manifest.json"
+    payload = json.loads(manifest.read_text())
+    payload["version"] = version
+    manifest.write_text(json.dumps(payload))
+    return manifest
+
+
+def test_bridge_reload_confirms_the_new_version_actually_connected(
+    monkeypatch, tmp_path
+):
+    """Asking for a reload proves nothing; the version coming back does."""
+    _installed_extension(monkeypatch, tmp_path, version="0.9.9")
+    asked = []
+    versions = iter(["0.3.4", "0.9.9"])
+
+    monkeypatch.setattr(
+        "omnireach.commands.bridge.request_extension_reload",
+        lambda: asked.append(True) or {"reloading": True},
+    )
+    monkeypatch.setattr(
+        "omnireach.commands.bridge.probe_native_bridge",
+        lambda: {"extensionVersion": next(versions)},
+    )
+
+    result = CliRunner().invoke(main, ["bridge", "reload", "--json", "--timeout", "5"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["reloaded"] is True
+    assert payload["connected_version"] == "0.9.9"
+    assert asked == [True]
+
+
+def test_bridge_reload_tells_the_truth_when_the_extension_is_too_old(
+    monkeypatch, tmp_path
+):
+    from omnireach.native_bridge import NativeBridgeCommandError
+
+    _installed_extension(monkeypatch, tmp_path)
+
+    def refuse():
+        raise NativeBridgeCommandError(
+            'command is not allowed: "system.reload"; allowed=["system.ping"]'
+        )
+
+    monkeypatch.setattr(
+        "omnireach.commands.bridge.request_extension_reload", refuse
+    )
+
+    result = CliRunner().invoke(main, ["bridge", "reload", "--json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["reloaded"] is False
+    assert "chrome://extensions" in payload["error"]
+
+
+def test_bridge_reload_fails_when_the_extension_never_comes_back(
+    monkeypatch, tmp_path
+):
+    from omnireach.native_bridge import NativeBridgeUnavailable
+
+    _installed_extension(monkeypatch, tmp_path, version="0.9.9")
+    monkeypatch.setattr(
+        "omnireach.commands.bridge.request_extension_reload",
+        lambda: {"reloading": True},
+    )
+
+    def never():
+        raise NativeBridgeUnavailable("extension did not connect")
+
+    monkeypatch.setattr("omnireach.commands.bridge.probe_native_bridge", never)
+    monkeypatch.setattr("time.sleep", lambda seconds: None)
+
+    result = CliRunner().invoke(main, ["bridge", "reload", "--json", "--timeout", "5"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["reloaded"] is False
+    assert payload["connected_version"] is None
