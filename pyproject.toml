@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "omnireach"
-version = "0.18.0-alpha"
+version = "0.19.0-alpha"
 description = "Search and read the login-walled Chinese internet, parse media, and download bounded Douyin videos for AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
