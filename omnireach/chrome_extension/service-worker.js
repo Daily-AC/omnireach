@@ -1,9 +1,17 @@
 importScripts("douyin.js", "sites.js");
 
 const OFFSCREEN_DOCUMENT = "offscreen.html";
-const EXTENSION_VERSION = "0.2.8";
+const EXTENSION_VERSION = "0.3.4";
+// A full creator catalog is fetched in batches so that every `executeScript`
+// round trip resets the MV3 service-worker idle timer; 83 pages / 355 works
+// measured at ~0.5s per page.
+const AUTHOR_PAGES_PER_BATCH = 10;
+const AUTHOR_MAX_PAGES = 400;
+const AUTHOR_BUDGET_MS = 150000;
+const AUTHOR_MAX_BUDGET_MS = 570000;
 const COMMANDS = new Set([
   "system.ping",
+  "douyin.author",
   "douyin.search",
   "google.search",
   "reddit.search",
@@ -78,7 +86,11 @@ function requireExtracted(source, extracted) {
     return extracted.rows || extracted.cards || [];
   }
   if (extracted.state === "login") {
-    throw new Error(`${source} requires login in the connected Chrome profile`);
+    throw new Error(
+      extracted.message
+        ? `${source} requires login in the connected Chrome profile (${extracted.message})`
+        : `${source} requires login in the connected Chrome profile`,
+    );
   }
   if (extracted.state === "blocked") {
     throw new Error(extracted.message || `${source} returned a verification wall`);
@@ -92,13 +104,27 @@ function requireExtracted(source, extracted) {
   throw new Error(`unknown ${source} extractor state: ${extracted.state}`);
 }
 
-async function withSearchTab(
-  source,
-  url,
-  extractor,
-  args,
-  timeoutMs = 20000,
-) {
+async function injectExtractor(source, tabId, extractor, args, world) {
+  const injected = await chrome.scripting.executeScript({
+    target: { tabId },
+    args,
+    func: extractor,
+    ...(world ? { world } : {}),
+  });
+  const injection = injected[0];
+  if (injection && injection.error) {
+    const message = injection.error.message || String(injection.error);
+    throw new Error(`${source} extractor failed: ${message}`);
+  }
+  if (!injection || !("result" in injection)) {
+    throw new Error(
+      `${source} extractor returned no result envelope: ${JSON.stringify(injected)}`,
+    );
+  }
+  return injection.result;
+}
+
+async function withTab(source, url, timeoutMs, run) {
   let tabId;
   try {
     const tab = await chrome.tabs.create({
@@ -107,30 +133,27 @@ async function withSearchTab(
     });
     tabId = tab.id;
     if (!tabId) {
-      throw new Error(`Chrome did not create a ${source} search tab`);
+      throw new Error(`Chrome did not create a ${source} tab`);
     }
     await waitForTab(tabId, source, timeoutMs);
-    const injected = await chrome.scripting.executeScript({
-      target: { tabId },
-      args,
-      func: extractor,
-    });
-    const injection = injected[0];
-    if (injection && injection.error) {
-      const message = injection.error.message || String(injection.error);
-      throw new Error(`${source} extractor failed: ${message}`);
-    }
-    if (!injection || !("result" in injection)) {
-      throw new Error(
-        `${source} extractor returned no result envelope: ${JSON.stringify(injected)}`,
-      );
-    }
-    return requireExtracted(source, injection && injection.result);
+    return await run(tabId);
   } finally {
     if (tabId) {
       await chrome.tabs.remove(tabId).catch(() => undefined);
     }
   }
+}
+
+async function withSearchTab(
+  source,
+  url,
+  extractor,
+  args,
+  timeoutMs = 20000,
+) {
+  return withTab(source, url, timeoutMs, async (tabId) =>
+    requireExtracted(source, await injectExtractor(source, tabId, extractor, args)),
+  );
 }
 
 async function executeDouyinSearch(payload) {
@@ -181,6 +204,288 @@ async function executeDouyinSearch(payload) {
     throw new Error("Douyin result cards no longer match the expected shape");
   }
   return projected.rows;
+}
+
+async function extractDouyinUserCandidates(timeoutMs) {
+  const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+  const deadline = Date.now() + timeoutMs;
+  let previousCount = 0;
+  let stableRounds = 0;
+  let rows = [];
+  while (Date.now() < deadline) {
+    const pageText = document.body ? document.body.innerText : "";
+    if (/登录后|扫码登录|验证码登录|密码登录/.test(pageText)) {
+      return { state: "login", rows: [] };
+    }
+    const unique = new Map();
+    for (const anchor of document.querySelectorAll('a[href*="/user/"]')) {
+      const href = anchor.getAttribute("href") || anchor.href || "";
+      const match = href.match(/\/user\/([A-Za-z0-9_-]+)/);
+      if (!match || match[1] === "self" || unique.has(match[1])) continue;
+      const lines = (anchor.innerText || anchor.textContent || "")
+        .split(/\n+/)
+        .map((text) => text.trim())
+        .filter(Boolean);
+      if (lines.length === 0) continue;
+      unique.set(match[1], { secUid: match[1], lines });
+    }
+    rows = Array.from(unique.values());
+    if (rows.length > 0) {
+      stableRounds = rows.length === previousCount ? stableRounds + 1 : 0;
+      previousCount = rows.length;
+      if (stableRounds >= 2) return { state: "ready", rows };
+    } else if (/没有找到|暂无|无相关/.test(pageText)) {
+      return { state: "empty", rows: [] };
+    }
+    await delay(400);
+  }
+  return rows.length > 0 ? { state: "ready", rows } : { state: "timeout", rows: [] };
+}
+
+async function fetchDouyinAwemeBatch(
+  secUid,
+  startCursor,
+  maxPages,
+  includeMediaUrls,
+  stopAfterUnpinned,
+) {
+  const trim = (item) => {
+    const video = (item && item.video) || {};
+    const stats = (item && item.statistics) || {};
+    const author = (item && item.author) || {};
+    const row = {
+      aweme_id: item && item.aweme_id,
+      desc: item && item.desc,
+      create_time: item && item.create_time,
+      duration: (item && item.duration) || video.duration,
+      media_type: item && item.media_type,
+      is_top: item && item.is_top,
+      statistics: {
+        digg_count: stats.digg_count,
+        comment_count: stats.comment_count,
+        share_count: stats.share_count,
+        collect_count: stats.collect_count,
+        play_count: stats.play_count,
+      },
+      author: { nickname: author.nickname, sec_uid: author.sec_uid },
+      music: (item && item.music && item.music.title) || "",
+      hashtags: ((item && item.text_extra) || [])
+        .map((entry) => entry && entry.hashtag_name)
+        .filter(Boolean),
+      video_tags: ((item && item.video_tag) || [])
+        .map((tag) => tag && tag.tag_name)
+        .filter(Boolean),
+    };
+    if (includeMediaUrls) {
+      const urls = (video.play_addr && video.play_addr.url_list) || [];
+      if (urls[0]) row.play_url = urls[0];
+    }
+    return row;
+  };
+
+  const rows = [];
+  let unpinned = 0;
+  let cursor = String(startCursor);
+  let pages = 0;
+  while (pages < maxPages) {
+    const params = new URLSearchParams({
+      sec_user_id: secUid,
+      max_cursor: cursor,
+      count: "20",
+      aid: "6383",
+    });
+    let response;
+    try {
+      response = await fetch(
+        `https://www.douyin.com/aweme/v1/web/aweme/post/?${params}`,
+        { credentials: "include", headers: { referer: "https://www.douyin.com/" } },
+      );
+    } catch (error) {
+      return {
+        state: "error",
+        message: `Douyin catalog request failed: ${error && error.message}`,
+        rows,
+        cursor,
+        hasMore: 1,
+        pages,
+      };
+    }
+    if (!response.ok) {
+      // Say enough on the first failure to tell the three causes apart: a
+      // rejected origin, a session that is not logged in, and a verification
+      // challenge all arrive here looking alike otherwise.
+      let snippet = "";
+      try {
+        snippet = (await response.text()).slice(0, 200).replace(/\s+/g, " ");
+      } catch {
+        snippet = "<unreadable body>";
+      }
+      const session = `cookie_chars=${document.cookie.length}`;
+      const detail =
+        `Douyin catalog API returned HTTP ${response.status} ` +
+        `(${session}; body: ${snippet})`;
+      const login = response.status === 401 || response.status === 403;
+      return {
+        state: login ? "login" : "blocked",
+        message: detail,
+        rows: login ? [] : rows,
+        cursor,
+        hasMore: 1,
+        pages,
+      };
+    }
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return {
+        state: "blocked",
+        message:
+          "Douyin catalog API returned a non-JSON body; a verification wall or a "
+          + `signed-out session is likely (cookie_chars=${document.cookie.length})`,
+        rows,
+        cursor,
+        hasMore: 1,
+        pages,
+      };
+    }
+    if (data && data.status_code) {
+      return {
+        state: "blocked",
+        message: `Douyin catalog API answered status_code ${data.status_code}`,
+        rows,
+        cursor,
+        hasMore: 1,
+        pages,
+      };
+    }
+    for (const item of Array.isArray(data.aweme_list) ? data.aweme_list : []) {
+      const row = trim(item);
+      if (!row.is_top) unpinned += 1;
+      rows.push(row);
+    }
+    pages += 1;
+    // Only has_more === 0 ends a catalog. Runs of empty pages in the middle are
+    // normal — 19 consecutive empty pages measured on a 355-work account — so
+    // stopping at the first empty page silently truncates the catalog.
+    if (!data.has_more) {
+      return { state: "ready", rows, cursor: String(data.max_cursor), hasMore: 0, pages };
+    }
+    const next = data.max_cursor;
+    if (next === undefined || next === null || String(next) === cursor) {
+      return { state: "ready", rows, cursor, hasMore: 0, pages, stalled: true };
+    }
+    cursor = String(next);
+    // Pinned works are hoisted to the front and everything after them is
+    // strictly newest-first, so once this many unpinned works are in hand every
+    // work still unfetched is older than all of them.
+    if (stopAfterUnpinned > 0 && unpinned >= stopAfterUnpinned) {
+      return { state: "ready", rows, cursor, hasMore: 1, pages };
+    }
+  }
+  return { state: "ready", rows, cursor, hasMore: 1, pages };
+}
+
+async function executeDouyinAuthor(payload) {
+  const handle = typeof payload.handle === "string" ? payload.handle.trim() : "";
+  if (!handle) throw new Error("handle must be a non-empty string");
+  const limit = globalThis.OmnireachDouyin.normalizeAuthorLimit(payload.limit);
+  const order = payload.order === "likes" ? "likes" : "recent";
+  const includeMediaUrls = payload.include_media_urls === true;
+
+  let secUid = globalThis.OmnireachDouyin.secUidFromInput(handle);
+  let resolvedFrom = "url";
+  let nickname = "";
+  let followers = 0;
+  if (!secUid) {
+    const candidates = await withSearchTab(
+      "Douyin user",
+      `https://www.douyin.com/search/${encodeURIComponent(handle)}?type=user`,
+      extractDouyinUserCandidates,
+      [15000],
+    );
+    const picked = globalThis.OmnireachDouyin.pickUserCandidate(candidates, handle);
+    if (!picked) {
+      const seen = globalThis.OmnireachDouyin.userCandidates(candidates)
+        .slice(0, 5)
+        .map((row) => row.nickname)
+        .join(", ");
+      throw new Error(
+        `Douyin user search for ${JSON.stringify(handle)} returned no account whose `
+        + `name matches${seen ? `; it offered: ${seen}` : ""}. `
+        + "Pass the profile URL to target an exact account.",
+      );
+    }
+    secUid = picked.secUid;
+    nickname = picked.nickname;
+    followers = picked.followers;
+    resolvedFrom = "search";
+  }
+
+  // Ranking by likes has to see every work; "recent" only needs enough unpinned
+  // ones to be sure nothing newer is left unfetched.
+  const stopAfter = order === "likes" ? 0 : limit;
+  const requested = Number(payload.budget_ms);
+  const budgetMs = Number.isFinite(requested) && requested > 0
+    ? Math.min(Math.max(requested, 5000), AUTHOR_MAX_BUDGET_MS)
+    : AUTHOR_BUDGET_MS;
+  const deadline = Date.now() + budgetMs;
+  const collected = [];
+  const seen = new Set();
+  let cursor = "0";
+  let hasMore = 1;
+  let pages = 0;
+  let unpinned = 0;
+  await withTab(
+    "Douyin author",
+    `https://www.douyin.com/user/${encodeURIComponent(secUid)}`,
+    20000,
+    async (tabId) => {
+      while (hasMore && pages < AUTHOR_MAX_PAGES && Date.now() < deadline) {
+        // MAIN world, not the default isolated world. A content-script fetch is
+        // issued from the extension's own network context, and Douyin answers
+        // it 403; measured 2026-09-03, dropping the Referer from a page-context
+        // request changes nothing, so the rejected extension origin is what
+        // matters. Inside the page this API needs no request signing at all.
+        const batch = await injectExtractor(
+          "Douyin author",
+          tabId,
+          fetchDouyinAwemeBatch,
+          [secUid, cursor, AUTHOR_PAGES_PER_BATCH, includeMediaUrls, stopAfter],
+          "MAIN",
+        );
+        requireExtracted("Douyin author", batch);
+        for (const row of batch.rows || []) {
+          const id = String(row && row.aweme_id);
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          if (!row.is_top) unpinned += 1;
+          collected.push(row);
+        }
+        pages += batch.pages || 0;
+        cursor = batch.cursor;
+        hasMore = batch.hasMore;
+        if (stopAfter > 0 && unpinned >= stopAfter) break;
+      }
+    },
+  );
+
+  const projected = globalThis.OmnireachDouyin.projectAwemeList(collected, limit, order);
+  if (projected.invalidCount > 0 && projected.rows.length === 0) {
+    throw new Error("Douyin catalog items no longer match the expected shape");
+  }
+  return [{
+    sec_uid: secUid,
+    nickname: nickname || (projected.rows[0] && projected.rows[0].author) || "",
+    followers,
+    resolved_from: resolvedFrom,
+    order,
+    pages,
+    scanned: projected.scanned,
+    returned: projected.rows.length,
+    complete: !hasMore,
+    works: projected.rows,
+  }];
 }
 
 async function executeGoogleSearch(payload) {
@@ -481,6 +786,7 @@ async function executeTwitterSearch(payload) {
 }
 
 const SEARCH_HANDLERS = Object.freeze({
+  "douyin.author": executeDouyinAuthor,
   "douyin.search": executeDouyinSearch,
   "google.search": executeGoogleSearch,
   "reddit.search": executeRedditSearch,

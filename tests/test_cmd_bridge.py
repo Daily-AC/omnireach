@@ -3,6 +3,7 @@ import json
 from click.testing import CliRunner
 
 from omnireach.cli import main
+from tests.test_extension_manifest import EXTENSION_VERSION
 
 
 def test_bridge_install_json_reports_stable_path(monkeypatch, tmp_path):
@@ -61,7 +62,7 @@ def test_bridge_status_json_reports_real_ping(monkeypatch, tmp_path):
     payload = json.loads(result.output)
     assert payload["installed"] is True
     assert payload["connected"] is True
-    assert payload["installed_version"] == "0.2.8"
+    assert payload["installed_version"] == EXTENSION_VERSION
     assert payload["connected_version"] == "0.1.0"
     assert payload["reload_required"] is True
 

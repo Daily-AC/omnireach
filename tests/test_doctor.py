@@ -305,3 +305,44 @@ def test_v0101_wechat_backend_doctor_opencli_help_nonzero(monkeypatch):
     assert wb.ok is False
     assert "weixin download" in wb.detail
     assert "Daily-AC/OpenCLI" in wb.fix_hint
+
+
+def test_doctor_reports_a_bridge_that_predates_the_creator_catalog():
+    """Green on search while `omnireach author` fails would be doctor lying."""
+    from omnireach.doctor import OpenCLIProbe, browser_source_status
+
+    probe = OpenCLIProbe(ok=False, detail="opencli 未安装", fix_hint="npm i -g opencli")
+    status = browser_source_status(
+        "douyin",
+        "heavy",
+        probe,
+        native_configured=True,
+        native_details={
+            "extensionVersion": "0.2.8",
+            "commands": ["douyin.search", "system.ping"],
+        },
+    )
+
+    assert status.ok is True
+    assert "douyin.author" in status.detail
+    assert status.fix_hint == "omnireach bridge install"
+
+
+def test_doctor_stays_quiet_when_the_bridge_has_every_command():
+    from omnireach.doctor import OpenCLIProbe, browser_source_status
+
+    probe = OpenCLIProbe(ok=False, detail="opencli 未安装", fix_hint="npm i -g opencli")
+    status = browser_source_status(
+        "douyin",
+        "heavy",
+        probe,
+        native_configured=True,
+        native_details={
+            "extensionVersion": "0.3.4",
+            "commands": ["douyin.author", "douyin.search", "system.ping"],
+        },
+    )
+
+    assert status.ok is True
+    assert "缺" not in status.detail
+    assert status.fix_hint == ""

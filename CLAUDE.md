@@ -92,6 +92,14 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - 长文本源 (wechat / xhs / exa / tavily) content 字段应截到 ~500 字 snippet (v0.8 起由 `SearchResult` validator 强制), 全文保留在 `result.raw` 中, Agent 按需取用; 真要 omnifetch 才能拿的是 omnireach 本来就没全文的场景 (HN/GH/Twitter thread 等)
 - 用户问"加 X 功能"时, 先判断 X 属于 search / fetch / parse 哪层, 不属于 search 就拒绝**并指向本 repo 未来 sibling binary** (v0.8 之前的措辞是"指向未来 sister repo", 2026-05-27 改成 monorepo 模型 — 见上方"项目是什么"节)
 
+> **TODO — 上面两条已被后来的甲方决定推翻, 本文尚未整体重写** (2026-09-03):
+> `omnireach media inspect/parse/download` 在 v0.17/v0.18 已 ship, 所以"不塞 parse/download
+> 子命令"那条不再成立; parse 层现在就在本 repo 里, 按 monorepo + sibling subcommand 模型走。
+> "不抓视频直链 mp4 CDN"仍是**默认**: `omnireach author` 只在调用方显式传
+> `--include-media-urls` / `include_media_urls: true` 时才把会过期的 `play_url` 放进
+> `result.raw`, 默认不返。改这两条前先看 issue #46 与 `docs/verification/douyin-author.md`。
+> 版本历史停在 v0.11, v0.12~v0.18 未回填。
+
 **~~当前违规~~已修** (v0.8 修复): 4 个长文本源 (wechat/xiaohongshu/exa/tavily) 在 `SearchResult.content` 上的全文塞入由 contract 层 `field_validator` 截到 500 字 + "…"; 全文保留在 `result.raw` 中。见 `docs/design/2026-05-27-omnireach-v0.8-design.md`。
 
 **为什么 v0.8 不抄 Claude Code 的 LLM-summarized snippet**: Claude Code 用 sub-LLM (Haiku) 压缩 snippet 是因为 user-facing 直接看; omnireach 用户 = Agent (本身就是 LLM), 拿到截断 raw 自己能消化, 不需要 omnireach 替它压缩。抄了反而让 omnireach 从"纯多源汇聚 + 零 LLM 依赖"变成"小 Agent + LLM key 必需", 边界模糊化。
