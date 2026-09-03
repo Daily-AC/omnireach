@@ -287,6 +287,14 @@ def run_opencli_doctor() -> OpenCLIProbe:
     return OpenCLIProbe(ok=True, detail="opencli doctor 通过，Browser Bridge 可用")
 
 
+# Capabilities a source has beyond keyword search. Missing ones do not make the
+# source unusable, but doctor must say so — otherwise it reports green while
+# `omnireach author` fails against an extension that was never reloaded.
+OPTIONAL_NATIVE_COMMANDS: dict[str, tuple[str, ...]] = {
+    "douyin": ("douyin.author",),
+}
+
+
 def browser_source_status(
     source_id: str,
     tier: str,
@@ -306,11 +314,27 @@ def browser_source_status(
             else source_id == "douyin"
         )
         if supports_command:
+            missing = (
+                [
+                    command
+                    for command in OPTIONAL_NATIVE_COMMANDS.get(source_id, ())
+                    if command not in commands
+                ]
+                if isinstance(commands, list)
+                else []
+            )
+            detail = f"原生 Chrome bridge 已连接 (extension {version})"
+            if missing:
+                detail += (
+                    f"; 该扩展缺 {', '.join(missing)} —— 跑 `omnireach bridge install` "
+                    "并在 chrome://extensions reload"
+                )
             return SourceStatus(
                 source_id,
                 tier,
                 ok=True,
-                detail=f"原生 Chrome bridge 已连接 (extension {version})",
+                detail=detail,
+                fix_hint="omnireach bridge install" if missing else "",
             )
         native_error = NativeBridgeCommandError(
             f"extension {version} 不支持 {source_id}.search；重新运行 "
