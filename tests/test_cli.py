@@ -344,3 +344,69 @@ def test_v092_sources_auto_json_when_stdout_not_tty():
     assert "sources" in data
     ids = {s["id"] for s in data["sources"]}
     assert {"hackernews", "wechat", "bilibili"} <= ids
+
+
+def test_entrypoint_usage_error_json_carries_a_non_empty_errors_list(
+    monkeypatch, capsys
+):
+    """An `ok: false` payload whose `errors` is empty reads like an empty result."""
+    from omnireach.cli import _entrypoint
+
+    monkeypatch.setattr(
+        "sys.argv", ["omnireach", "media", "download", "--json"],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        _entrypoint()
+
+    assert exc_info.value.code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert len(payload["errors"]) == 1
+    assert payload["errors"][0]["category"] == "invalid"
+    assert "Missing argument" in payload["errors"][0]["message"]
+
+
+def test_entrypoint_internal_error_keeps_stdout_parseable(monkeypatch, capsys):
+    from omnireach.cli import _entrypoint
+
+    monkeypatch.setattr("sys.argv", ["omnireach", "search", "x", "--json"])
+
+    def boom(**kwargs):
+        raise RuntimeError("synthetic crash")
+
+    monkeypatch.setattr("omnireach.cli.main.main", boom)
+
+    with pytest.raises(SystemExit) as exc_info:
+        _entrypoint()
+
+    assert exc_info.value.code == 2
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["ok"] is False
+    assert payload["errors"][0]["stage"] == "internal"
+    assert "synthetic crash" in payload["errors"][0]["message"]
+    # Human diagnostics go to stderr; stdout stays a single parseable document
+    # that still carries the traceback an Agent needs to file the issue.
+    assert "Traceback" in captured.err
+    assert captured.out.count("\n") == 1
+    assert "synthetic crash" in payload["error"]["traceback"]
+
+
+def test_entrypoint_internal_error_without_json_writes_only_to_stderr(
+    monkeypatch, capsys
+):
+    from omnireach.cli import _entrypoint
+
+    monkeypatch.setattr("sys.argv", ["omnireach", "search", "x"])
+    monkeypatch.setattr(
+        "omnireach.cli.main.main",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("synthetic crash")),
+    )
+
+    with pytest.raises(SystemExit):
+        _entrypoint()
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "synthetic crash" in captured.err

@@ -8,9 +8,11 @@ import mimetypes
 import re
 import shutil
 import subprocess
+import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 from urllib.parse import parse_qsl, urlparse
 
 import httpx
@@ -31,6 +33,7 @@ from omnireach.media.subtitles import (
     transcript_markdown,
     transcript_text,
 )
+from omnireach.preferences import load_preferences
 
 _DIRECT_EXTENSIONS = {
     ".aac", ".flac", ".m4a", ".m4v", ".mkv", ".mov", ".mp3", ".mp4",
@@ -48,6 +51,37 @@ _HTTP_HEADERS = {
         "AppleWebKit/537.36 Chrome/138.0.0.0 Safari/537.36"
     ),
 }
+_RETRY_ATTEMPTS = 4
+_RETRY_BACKOFF_SECONDS = (1.0, 2.0, 3.0)
+# A retry that only has a sliver of the budget left would die of a timeout and
+# report *that* instead of the upstream failure it was retrying, so below this
+# much remaining budget the original error is surfaced untouched.
+_RETRY_MIN_SLICE_SECONDS = 5.0
+# Douyin answers `aweme/v1/web/aweme/detail/` with a device-verification
+# challenge instead of the payload every so often; yt-dlp surfaces that as
+# "Fresh cookies (not necessarily logged in) are needed". Measured 2026-09-03
+# against one video with an identical command line: 1 failure in 10 runs when
+# the endpoint was cold, 4 in 10 once it had been queried a few dozen times,
+# and the outcome looked independent per attempt at both 1s and 5s spacing —
+# so attempts buy reliability while longer backoff does not. Four attempts put
+# the residual failure rate near 4% at the worst observed rate. The structural
+# fix is calling the same API from a real page context, where it is never
+# challenged; see issue #46.
+_RETRYABLE_BACKEND_MARKERS = (
+    "fresh cookies",
+    "temporarily unavailable",
+    "connection reset",
+    "connection aborted",
+    "remote end closed connection",
+    "read timed out",
+    "http error 429",
+    "http error 500",
+    "http error 502",
+    "http error 503",
+    "http error 504",
+)
+
+_T = TypeVar("_T")
 
 
 def _now() -> str:
@@ -189,10 +223,76 @@ def _subtitle_tracks(
     return tracks[:_PUBLIC_TRACK_LIMIT], internal, omitted
 
 
+def _effective_cookies(cookies_from_browser: str | None) -> str | None:
+    """Explicit argument wins; otherwise fall back to `[media].cookies_from_browser`.
+
+    Resolved once per public entry point so the value that reaches yt-dlp is
+    also the value that goes into the cache key. Backend routing keeps using
+    the *explicit* argument, so setting the preference never silently moves
+    Bilibili off the richer bilibili-api path.
+    """
+    if cookies_from_browser and cookies_from_browser.strip():
+        return cookies_from_browser
+    value = load_preferences().media.cookies_from_browser
+    return value.strip() if value and value.strip() else None
+
+
+def _is_retryable_backend_error(message: str) -> bool:
+    folded = message.casefold()
+    return any(marker in folded for marker in _RETRYABLE_BACKEND_MARKERS)
+
+
+def _run_retrying(
+    operation: Callable[[float], _T],
+    *,
+    timeout: float,
+    label: str,
+    warnings: list[str] | None = None,
+    attempts: int = _RETRY_ATTEMPTS,
+) -> _T:
+    """Run one bounded backend call, retrying only known-transient failures.
+
+    Every attempt draws from the caller's single timeout budget, so retrying
+    can never stretch the wall clock beyond what the caller asked for. A
+    non-transient failure is re-raised on the first attempt, untouched.
+    """
+    attempts = max(1, attempts)
+    deadline = time.monotonic() + timeout
+    last: RuntimeError | None = None
+    for attempt in range(attempts):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or (attempt and remaining < _RETRY_MIN_SLICE_SECONDS):
+            break
+        try:
+            result = operation(remaining)
+        except RuntimeError as exc:
+            if not _is_retryable_backend_error(str(exc)):
+                raise
+            last = exc
+            backoff = _RETRY_BACKOFF_SECONDS[
+                min(attempt, len(_RETRY_BACKOFF_SECONDS) - 1)
+            ]
+            if attempt + 1 >= attempts or deadline - time.monotonic() <= backoff:
+                break
+            time.sleep(backoff)
+            continue
+        if attempt and warnings is not None:
+            warnings.append(
+                f"{label} succeeded on attempt {attempt + 1} after a "
+                "transient upstream failure"
+            )
+        return result
+    if last is not None:
+        raise last
+    raise RuntimeError(f"{label} had no time budget left to run")
+
+
 def _ytdlp_payload(
     url: str,
     timeout: float,
     cookies_from_browser: str | None = None,
+    *,
+    retry_warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     if not shutil.which("yt-dlp"):
         raise FileNotFoundError("yt-dlp is not installed")
@@ -202,7 +302,12 @@ def _ytdlp_payload(
     if cookies_from_browser:
         command.extend(["--cookies-from-browser", cookies_from_browser])
     command.append(url)
-    return _run_json(command, timeout)
+    return _run_retrying(
+        lambda remaining: _run_json(command, remaining),
+        timeout=timeout,
+        label="yt-dlp metadata",
+        warnings=retry_warnings,
+    )
 
 
 def _normalize_ytdlp(
@@ -260,8 +365,13 @@ def _inspect_ytdlp(
     timeout: float,
     cookies_from_browser: str | None = None,
 ) -> tuple[MediaEnvelope, list[dict[str, str]]]:
-    payload = _ytdlp_payload(url, timeout, cookies_from_browser)
-    return _normalize_ytdlp(url, payload, timeout)
+    retry_warnings: list[str] = []
+    payload = _ytdlp_payload(
+        url, timeout, cookies_from_browser, retry_warnings=retry_warnings,
+    )
+    envelope, internal_tracks = _normalize_ytdlp(url, payload, timeout)
+    envelope.warnings.extend(retry_warnings)
+    return envelope, internal_tracks
 
 
 def _bilibili_bvid(url: str, timeout: float) -> str:
@@ -435,8 +545,10 @@ def _failed_envelope(
         "http error 401", "http error 403", "http error 412", "captcha",
         "verification", "fresh cookies", "login required", "sign in",
     ))
-    retryable = isinstance(exc, subprocess.TimeoutExpired) or any(
-        marker in folded for marker in ("ssl", "eof", "connection", "temporarily unavailable")
+    retryable = (
+        isinstance(exc, subprocess.TimeoutExpired)
+        or _is_retryable_backend_error(folded)
+        or any(marker in folded for marker in ("ssl", "eof", "connection"))
     )
     hint = ""
     if unavailable and "yt-dlp" in str(exc):
@@ -445,6 +557,13 @@ def _failed_envelope(
         hint = "Install ffmpeg (which includes ffprobe) and retry"
     elif isinstance(exc, subprocess.TimeoutExpired):
         hint = "Retry with a larger --timeout value"
+    elif "fresh cookies" in folded:
+        hint = (
+            f"The upstream answered a verification challenge {_RETRY_ATTEMPTS} times "
+            "in a row; retry the same command, pass "
+            "--cookies-from-browser 'chrome:Profile 1', or set "
+            "[media].cookies_from_browser in ~/.omnireach/preferences.toml"
+        )
     elif "cookie" in folded or "login required" in folded or "sign in" in folded:
         hint = (
             "Retry with an explicitly authorized browser profile, for example "
@@ -507,7 +626,7 @@ def _inspect_with_tracks(
             return _inspect_direct(url, timeout)
         if selected == "bilibili-api":
             return _inspect_bilibili(url, timeout)
-        return _inspect_ytdlp(url, timeout, cookies_from_browser)
+        return _inspect_ytdlp(url, timeout, _effective_cookies(cookies_from_browser))
     except (
         FileNotFoundError,
         RuntimeError,
@@ -797,9 +916,11 @@ def download_media(
             url, "download", "yt-dlp", ValueError("timeout must be a positive number")
         )
 
+    effective_cookies = _effective_cookies(cookies_from_browser)
     cache_key = _download_cache_key(
-        url, quality, cookies_from_browser, max_bytes,
+        url, quality, effective_cookies, max_bytes,
     )
+    retry_warnings: list[str] = []
     try:
         root = _download_artifact_dir(url, output_dir, cache_key)
     except OSError as exc:
@@ -812,7 +933,12 @@ def download_media(
             return cached
 
     try:
-        payload = _ytdlp_payload(url, min(timeout, 120), cookies_from_browser)
+        payload = _ytdlp_payload(
+            url,
+            min(timeout, 120),
+            effective_cookies,
+            retry_warnings=retry_warnings,
+        )
         envelope, _ = _normalize_ytdlp(url, payload, min(timeout, 10))
         selected = _select_download_format(payload, quality, max_bytes)
         extension = str(selected.get("ext") or "mp4").lower()
@@ -827,10 +953,15 @@ def download_media(
             "--output", str(root / "video.%(ext)s"),
             "--print", "after_move:filepath",
         ]
-        if cookies_from_browser:
-            command.extend(["--cookies-from-browser", cookies_from_browser])
+        if effective_cookies:
+            command.extend(["--cookies-from-browser", effective_cookies])
         command.append(url)
-        downloaded_path = _run_download(command, timeout)
+        downloaded_path = _run_retrying(
+            lambda remaining: _run_download(command, remaining),
+            timeout=timeout,
+            label="yt-dlp download",
+            warnings=retry_warnings,
+        )
         if not downloaded_path.is_relative_to(root) or downloaded_path != expected_path:
             raise RuntimeError("yt-dlp reported a file outside the managed download path")
         if not downloaded_path.is_file():
@@ -856,6 +987,7 @@ def download_media(
                 except OSError:
                     pass
         failed = _failed_envelope(url, "download", "yt-dlp", exc)
+        failed.warnings.extend(retry_warnings)
         failed.errors[0].stage = "download"
         if isinstance(exc, OverflowError):
             failed.errors[0].category = "limit"
@@ -864,6 +996,7 @@ def download_media(
 
     envelope.mode = "download"
     envelope.cache_key = cache_key
+    envelope.warnings.extend(retry_warnings)
     if envelope.metadata is not None:
         envelope.metadata.width = selected.get("width")
         envelope.metadata.height = selected.get("height")
@@ -913,7 +1046,7 @@ def parse_media(
         backend,
         language,
         subtitle_url,
-        cookies_from_browser,
+        _effective_cookies(cookies_from_browser),
         max_duration,
     )
     root = _artifact_dir(url, _source(url), output_dir, cache_key)
