@@ -73,7 +73,7 @@ omnireach 自己只做: 路由 (Router) + 并发分发 (Dispatcher) + 归一 (No
 - 💎 `booster`: 付费 API Key (Tavily/Brave/Perplexity/Exa)，env var 检测，结果元数据 `cost="paid"`
 - 🚧 `wip`: 待重写源，sources 列表显示但不参与 auto fanout (v0.7 起暂无 wip 源)
 
-## 架构边界 — 三层架构 (v0.7 session 拍板, 必须遵守)
+## 架构边界 (v0.7 拍板三层职责, 2026-09-03 按已发布事实修订)
 
 对照 Claude Code 的 WebSearch + WebFetch 拆分，omnireach 是三层架构里的最上层:
 
@@ -85,20 +85,22 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 
 **Why**: search vs parse 是不同职责。把解析塞进 search 会让边界变模糊、token 爆炸、违反"do one thing well"。Claude Code 自己 WebSearch + WebFetch 就是这么拆的; OpenAI Codex 走相反路线 (单 `web_search` 黑箱), 我们不抄。
 
-**永远不做的事** (违反三层架构 → 立刻拒绝):
-- 不要在 omnireach 里塞 `download` / `parse` / `fetch-content` 子命令
-- 不要在 omnireach adapter 里跑 LLM call 做 summary (会引入 LLM 依赖, 让工具变"小 Agent")
-- 视频源 (youtube / bilibili / tiktok / douyin) 只返 metadata, **不抓视频直链 mp4 CDN**
-- 长文本源 (wechat / xhs / exa / tavily) content 字段应截到 ~500 字 snippet (v0.8 起由 `SearchResult` validator 强制), 全文保留在 `result.raw` 中, Agent 按需取用; 真要 omnifetch 才能拿的是 omnireach 本来就没全文的场景 (HN/GH/Twitter thread 等)
-- 用户问"加 X 功能"时, 先判断 X 属于 search / fetch / parse 哪层, 不属于 search 就拒绝**并指向本 repo 未来 sibling binary** (v0.8 之前的措辞是"指向未来 sister repo", 2026-05-27 改成 monorepo 模型 — 见上方"项目是什么"节)
+**架构边界的当前形态** (2026-09-03 按已发布事实重写; 此前版本禁止 parse/download 子命令, 与 v0.17/v0.18 已 ship 的现实冲突):
 
-> **TODO — 上面两条已被后来的甲方决定推翻, 本文尚未整体重写** (2026-09-03):
-> `omnireach media inspect/parse/download` 在 v0.17/v0.18 已 ship, 所以"不塞 parse/download
-> 子命令"那条不再成立; parse 层现在就在本 repo 里, 按 monorepo + sibling subcommand 模型走。
-> "不抓视频直链 mp4 CDN"仍是**默认**: `omnireach author` 只在调用方显式传
-> `--include-media-urls` / `include_media_urls: true` 时才把会过期的 `play_url` 放进
-> `result.raw`, 默认不返。改这两条前先看 issue #46 与 `docs/verification/douyin-author.md`。
-> 版本历史停在 v0.11, v0.12~v0.18 未回填。
+三层职责仍然成立, 但**三层都在本 repo, 以 subcommand 形态并存** (monorepo + sibling subcommand, 不开 sister repo):
+
+- `omnireach search` — 定位 metadata + URL
+- `omnireach author` — 某个创作者本人的作品目录 (v0.19 起; 仍是 search 层语义: 返 metadata + URL, 不返内容)
+- `omnireach fetch` — 给定 URL 取全文 markdown
+- `omnireach media inspect|parse|download` — 视频/音频元数据、字幕产物、有界下载 (v0.17/v0.18)
+
+**仍然是硬边界, 违反就拒绝**:
+
+- 不要在 adapter 里跑 LLM call 做 summary (会引入 LLM 依赖, 让工具从「纯多源汇聚 + 零 LLM 依赖」变成「小 Agent + LLM key 必需」)
+- search 层的 `SearchResult.content` 统一截到 500 字 snippet (v0.8 起由 contract 层 `field_validator` 强制), 全文留在 `result.raw`
+- **视频直链 mp4 CDN 默认不进 search 层 envelope**。`omnireach author --include-media-urls` / `include_media_urls: true` 是唯一出口, **默认关**, 2026-09-03 甲方复核后维持; 打开时直链只进 `result.raw.play_url`, 且它带 `x-expires` 签名会过期。要文件走 `omnireach media download`。
+- 浏览器凭据 (cookie / profile 名 / 签名 URL) 永远不进 envelope、manifest 或任何落盘产物
+- 用户问「加 X 功能」时先判断 X 属于 search / author / fetch / media 哪层; 都不属于就说清楚它是新的一层, 由甲方决定要不要开
 
 **~~当前违规~~已修** (v0.8 修复): 4 个长文本源 (wechat/xiaohongshu/exa/tavily) 在 `SearchResult.content` 上的全文塞入由 contract 层 `field_validator` 截到 500 字 + "…"; 全文保留在 `result.raw` 中。见 `docs/design/2026-05-27-omnireach-v0.8-design.md`。
 
@@ -124,6 +126,15 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - `v0.7.2-alpha` (2026-05-26): **douyin via OpenCLI fork** — 不等上游, omnireach 切到 [Daily-AC/OpenCLI fork](https://github.com/Daily-AC/OpenCLI)。OpenCLI 系 4 源全切 fork; 上游 merge 后切回, adapter 不动。`plays/comments/shares` zero→None normalize (DOM 卡片只暴露 likes)。E2E 实测 likes=40000。PR #15, **closes issue #12**。209 tests
 - `v0.8.0-alpha` (2026-05-27): **架构修复** — `SearchResult.content` 在 contract 层 (pydantic `field_validator`) 强制截到 500 字 + "…"; 全文保留在 `result.raw` (4 个长文本源 wechat/xhs/exa/tavily 上游 payload 本就存了)。零 adapter 改动, 单一实现点防未来 adapter 漂移。218 tests。PR #18
 - `v0.8.1-alpha` (2026-05-27): **xhs adapter 字段映射 hotfix** — 真 E2E 时发现 OpenCLI v1.7.22+ 真实 xhs 输出 key 是 `likes(string)/title/url/published_at/rank/author/author_url`, 没有 `content / like_count / comment_count / collect_count`。adapter 自 v0.5.2 起就在猜 key 名（同 v0.7.0→v0.7.1 同类 bug）, engagement 一直全 None。v0.8.0 README 文档里"xhs 全文在 raw['content']"的话也是错的（OpenCLI 搜索不返正文）。修：`likes:str→int` via `_parse_likes()`, 删 comment_count/collect_count map, 测试 fixture 改用真 OpenCLI shape。README "如何取全文" 表加 twitter 行(长 thread 触发 validator), 删 xhs 行(无全文)。E2E 实测 likes=83/102/45 (was None)。PR #19
+- `v0.18.0-alpha` (2026-07-22): **有界抖音下载** — `omnireach media download <douyin-url>` + `omnireach_download_media`, SHA-256 寻址产物、字节数校验、哈希核对后的缓存复用; 匿名验证失败返 `category=blocked` + cookie 恢复提示 + 非零退出码。PR #44。验证记录 `docs/verification/douyin-download.md`。
+- `v0.17.0-alpha` (2026-07-22): **media parse 基础** — `media inspect` / `media parse` + `omnireach_parse_media` + `MediaEnvelope` 契约; YouTube 走 yt-dlp, B站默认走匿名官方 read API (需登录的字幕才走显式 `--cookies-from-browser`), 直接媒体走 ffprobe; 签名字幕 URL 与浏览器凭据不入 envelope/manifest。PR #43。**注意: 这一版起「不塞 parse/download 子命令」那条老边界已被推翻, 见上方架构边界节。**
+- `v0.16.1-alpha` (2026-07-16): **hotfix 并发多源** — dispatcher 并发跑源, 而每个 native adapter 各自去绑 `127.0.0.1:19826`, 单源过、多源只有第一个能起, 其余 `Address already in use`。改为串行化 native job 并让排队中的 job 可取消。378 tests + 12 JS。PR #38
+- `v0.16.0-alpha` (2026-07-16): **六个浏览器源全迁原生桥 + agy grounded search** — google/reddit/twitter/xiaohongshu/tiktok/douyin 全部 native-first (扩展 0.2.8 加命令/版本协商、冷启动安全的 offscreen 初始化、确定性清理、去掉 windows 权限), OpenCLI 降为自动兼容回退; TikTok 改抓真实渲染卡片而非不稳定的私有端点; 新增实验性 `agy` 源 (复用已认证的专属会话 + 其服务端 grounded WebSearch 引用, `omnireach agy configure <conversation-id>`, 只能 `--on agy` 显式调)。377 tests + 12 JS。PR #37
+- `v0.15.0-alpha` (2026-07-15): **agent 面失败契约硬化** — fetch 拒收短验证页/登录墙占位符 (真实 Reddit `Please wait for verification` 记为 `captcha_suspected` 并给 opencli 登录态回退); `--sources` 成为 `--on` 别名以对齐 MCP 参数名; heavy 源冷启动默认 60 秒, 显式 `--timeout` 改为覆盖所有选中源 (此前被静默忽略); CLI/MCP 加 `--profile` / `profile` 选 OpenCLI Browser Bridge profile 且不污染父进程环境; doctor 真跑 `opencli doctor` 探针并检测多 profile 冲突。**CLI usage error 在带 `--json` 时输出 JSON 错误信封也是这一版加的 —— 其形状缺 `errors` 字段, 由 issue #45 修正。**373 tests。PR #36
+- `v0.14.0-alpha` (2026-07-10): **自带原生 Chrome bridge** — 不再需要 OpenCLI 可执行文件: 自带只读 MV3 扩展 + 无新依赖的 Python localhost bridge (bearer 鉴权、仅回环、短生命周期), `omnireach bridge install|path|status --json`; `douyin.search` 迁到 native-first, OpenCLI 作兼容回退; `OMNIREACH_BROWSER_TRANSPORT=auto|native|opencli` 用于确定性诊断。扩展只接受 `system.ping` 和 `douyin.search`, 不要 cookie/debugger/`<all_urls>` 权限。PR #35
+- `v0.13.1-alpha` (2026-07-10): **OpenCLI 运行时错误如实上报** — 此前所有子进程/契约失败都塌缩成 `AdapterUnavailable`, TTY 只显示「1 个源未配置」, 一次真实抖音搜索因此被误报成未配置。改为: 缺 binary 才是 `unavailable`, 非零退出/坏 JSON/坏结构都是带 stderr 详情的 `failed`。PR #34
+- `v0.13.0-alpha` (2026-07-10): **google + twitter 进普通搜索** — 装了 OpenCLI 时 `omnireach search` 自动带上这两个源, 走后台 ephemeral tab 复用登录态并用后即关; `--mode quick` 仍然免浏览器, 显式 `--on` 仍然精确。选这条路是因为直连 Google 拿到的是 JS 挑战页, 而 Custom Search JSON API 已对新客户关闭。PR #33
+- `v0.12.0-alpha` (2026-07-10): **MCP 快路径** — `omnireach_search` / `omnireach_fetch` 两个模型可调工具 + 无新依赖的 `omnireach mcp` stdio server + Claude plugin 注册; 抽出共享 search/fetch service 让 CLI 与 MCP 共用同一份契约; 修掉「文章里提到 Cloudflare 就被误判为验证页」。实测读同一份 RFC 9110 五次: 冷启动中位数 1383.86ms vs Playwright+headless Chrome 3749.26ms (2.7×), 双方都热时 1311.46ms vs 1687.94ms。PR #29~#32
 - `v0.11.0-alpha` (2026-06-22): **对外定位重写 (Senses/Eyes) + AI-native 安装** — 把面向陌生人/agent 的第一屏从"补中转站 WebSearch"(冰山一角)重写成 **"give your agent the senses of a logged-in human across the whole internet"**(冰山主体: search + read 15+ 登录墙垂直源)。README (english-first) + 新 `README.zh.md` 镜像 + `plugin.json` + GitHub repo description + SKILL.md frontmatter description 全部换 Senses/Eyes 框架; 三支柱 (reach the unreachable / one uniform contract / works even when WebSearch doesn't) 占第一屏, 两层 gate 技术解释 + 命名/架构下沉到 `<details>` 折叠区。**AI-native install**: 新 `install.sh` (幂等/非交互/自包含 — 确保 uv → `uv tool install --force` → 把 canonical SKILL.md 落进 `~/.claude/skills/omnireach/`), 人类只说一句话、agent 跑一条 `curl … | sh`; `scripts/verify-install.sh` 静态校验 (非交互/幂等 marker)。SKILL.md 加 step-0 自愈段, 修掉旧的 `pipx install omnireach` 死命令 (从不在 PyPI)。Demo GIF (已于 2026-08-27 迁至 https://raw.githubusercontent.com/Daily-AC/assets/main/omnireach-images/demo.gif) 用 hyperframes 合成 (暗色终端风 + 小红书红点缀, ask-agent→install→search 小红书 flow)。零 Python 行为改动, 278 tests 不变。决策依据见 `docs/design/2026-06-22-repositioning-and-ai-native-install-design.md`。PR #27
 - `v0.10.1-alpha` (2026-05-27): **OpenCLI wechat fetch + CAPTCHA detection + host-aware fetch routing** — `omnireach fetch <mp.weixin.qq.com URL>` 现在走 OpenCLI 登录态 Chrome (`opencli weixin download --stdout`) 拿正文 markdown, 替代被验证码拦住的 crwl/jina (v0.10.0 silent-fail bug 真根因)。Click `--backend` choices 扩 `opencli`, default `auto` 时 wechat host 强走 OpenCLI, explicit `--backend X` 永远赢 (CAPTCHA 启发式兜底)。`_looks_like_captcha()` 给所有 backend 加 verification-page 关键词检测 (环境异常 / Cloudflare / Just a moment 等 7 keyword), `errors[]` 加 `captcha_suspected` entry, markdown 字段保留 (graceful degrade, Agent 自己判断)。`omnireach doctor` 加 `wechat_backends` 段, 检测 opencli + `--stdout` flag 是否存在。OpenCLI fork (Daily-AC/OpenCLI) 这边给 `weixin/download` 加 `--stdout` flag (mirror 现有 `web/read` 同款模式, 复用 `ArticleDownloadOptions.stdout` 共享 helper), 同步给 jackwener 提上游 PR #1770。E2E 验: 早上 v0.10.0 被验证码拦住的 mp.weixin.qq.com 文章, v0.10.1 干净拿到 25618 字符真 markdown (backend=opencli, errors=[])。278 tests (256 → 278, +22 host routing / 3-branch parser / CAPTCHA heuristic / wechat_backends doctor). PR #25, fork commit fe28823, upstream PR jackwener/OpenCLI#1770。
 - `v0.10.0-alpha` (2026-05-27): **`omnireach fetch <url>` subcommand + `OMNIREACH_FORCE_JSON` env override + Skill manifest Agent contract** — 第一个落地 monorepo sibling-binary 方向的功能, 但作为 subcommand 而非独立 binary (用户偏好"omnireach fetch xxx" 收敛形态)。Dual-backend: crwl (Crawl4AI 本地) 优先, jina (r.jina.ai SaaS) fallback —— 跟 wechat/bilibili 一样的 priority 模式。`--backend auto|crwl|jina` 显式选择。`_should_emit_json()` v0.10 加 `OMNIREACH_FORCE_JSON` env var 兜底 (Antigravity 等真 PTY 子进程场景 isatty=True 让 v0.9.2 自动检测失效, 这是结构性修复)。SKILL.md 加 Agent 调用约定段, 明确"always pass --json 或 set OMNIREACH_FORCE_JSON=1"作为契约。256 tests (243→256, +13 fetch + force-json env)。E2E: `omnireach fetch <hn-url> --json` 实测 crwl 真返 markdown; `--backend jina` 也通 r.jina.ai。PR #24
@@ -134,7 +145,7 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 
 ## v0.7 后续 (开着的)
 
-- **上游切回 (2026-06-23 更新, 只对了一半)**: PR #1759 (douyin search) **已 merged** (2026-05-31), 作者 review 时做了质量改进 (`extractDouyinVideoId` 抽取 / `isSearchCardMetadataText` 过滤噪音文本 / `isProjectedRowUsable` 行过滤), 但 **字段契约不变** (`rank/desc/author/url/plays/likes/comments/shares`) —— omnireach `--on douyin` 真 E2E 验过零回归 (返 10 条, likes 真实, 其余 0→None)。**但 PR #1770 (weixin `--stdout`) 仍 OPEN**, upstream 没这个 flag, 而 omnireach wechat fetch (v0.10.1) 依赖它 —— **所以 sources.yml 4 处 `github:Daily-AC/OpenCLI` 暂不能切回 `@jackwener/opencli`** (会丢 --stdout)。等 #1770 也 merged 才能完全切回。当前 fork `main` 已 merge upstream (2026-06-23), 状态 = upstream 全部 + 唯一 delta (weixin `--stdout`); douyin 已 = upstream 版。
+- **上游切回 (2026-06-23 更新, 只对了一半)**: PR #1759 (douyin search) **已 merged** (2026-05-31), 作者 review 时做了质量改进 (`extractDouyinVideoId` 抽取 / `isSearchCardMetadataText` 过滤噪音文本 / `isProjectedRowUsable` 行过滤), 但 **字段契约不变** (`rank/desc/author/url/plays/likes/comments/shares`) —— omnireach `--on douyin` 真 E2E 验过零回归 (返 10 条, likes 真实, 其余 0→None)。**但 PR #1770 (weixin `--stdout`) 仍 OPEN**, upstream 没这个 flag, 而 omnireach wechat fetch (v0.10.1) 依赖它 —— **所以 sources.yml 5 处 `github:Daily-AC/OpenCLI` 暂不能切回 `@jackwener/opencli`** (会丢 --stdout)。等 #1770 也 merged 才能完全切回。当前 fork `main` 已 merge upstream (2026-06-23), 状态 = upstream 全部 + 唯一 delta (weixin `--stdout`); douyin 已 = upstream 版。
 - **twitter delete i18n 修复** (2026-06-23): fork `delete.js` 在中文 X UI 上挂 (`aria-label === 'More'` 精确匹配 miss 了 zh 的「更多」), 加上详情页 article 晚 hydrate。修法: caret 用 `[data-testid="caret"]` + 多语言 aria-label 兜底, `findTargetArticle()` 轮询 ~5s, Delete 菜单项加「删除」。fork 分支 `fix/twitter-delete-i18n` 已 push, upstream issue [jackwener/OpenCLI#2001](https://github.com/jackwener/OpenCLI/issues/2001)。
 - TikHub.io 方向已撤 (用户在 v0.7 session 喊停, 改 OpenCLI 逆向路线)
 
@@ -167,6 +178,9 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 - v0.8 spec: `docs/design/2026-05-27-omnireach-v0.8-design.md`
 - v0.9 spec: `docs/design/2026-05-27-omnireach-v0.9-design.md`
 - 2026-05-26 session handoff: `docs/handoff/2026-05-26-session-handoff.md`
+- 真实 E2E 验证记录: `docs/verification/`（抖音下载 / media v0.17 / 抖音作者目录）—— 这里记的是
+  只有真跑才会暴露的上游行为，改相关代码前先看，别重新踩
+- 发版记录: `docs/releases/`（v0.12 起每版一份，2026-09-03 回填了 v0.15/v0.16/v0.16.1）
 - README: `README.md`
 
 > 2026-08-27: `docs/superpowers/` 拆分完毕 —— 13 个 spec 迁到 `docs/design/`（设计决策，长期有效），
@@ -199,4 +213,14 @@ omniparse    → 视频/音频专项 fetch (字幕/STT/逐帧)                  
 
 ## How to apply (未来在 omnireach 目录启动 CC 时)
 
-用户喊「继续干 omnireach」或 「v0.8」时，按上面"v0.8 候选"挑一两件优先级最高的开干，遵守三层架构边界（违反就拒绝并解释）。涉及 OpenCLI 相关动作时记得当前是 fork (Daily-AC/OpenCLI) 不是 upstream (@jackwener/opencli)，上游 PR #1759 状态决定 v0.7.3 是否成立。
+用户喊「继续干 omnireach」时，先看 GitHub 上开着的 issue（那是当前真实待办，比本文里的「v0.8 候选」新），
+再按上面「架构边界」判断该功能属于哪一层。涉及 OpenCLI 相关动作时记得当前是 fork (Daily-AC/OpenCLI)
+不是 upstream (@jackwener/opencli)；上游 PR #1759 (douyin search) 已合并，但 #1770 (weixin `--stdout`)
+仍 OPEN，所以还不能切回上游。
+
+**改 `omnireach/chrome_extension/` 下的代码要注意**：`omnireach bridge install` 只是把文件拷到
+`~/.omnireach/chrome-extension`，运行中的 Chrome 不会加载新代码，MV3 service worker 空闲重启也不会；
+必须人工去 `chrome://extensions` 点「重新加载」，而 Chrome 136+ 已不向 CDP 暴露扩展 target，自动化无解。
+判据是 `omnireach bridge status --json` 的 `reload_required` / `connected_version`。**所以纯逻辑先在
+`douyin.js` 这类 node 可测的层里用 `node --test tests/js/native-extension.test.mjs` 钉死，再上真浏览器，
+别拿真浏览器当调试循环。**
