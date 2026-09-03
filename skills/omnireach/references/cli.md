@@ -121,9 +121,16 @@ omnireach author --order likes --limit 30 --timeout 300 --json "<nickname>"
   an exact account.
 
 This command requires the native Chrome bridge. When it reports that the connected
-extension does not implement `douyin.author`, run `omnireach bridge install` and reload the
-unpacked extension at `chrome://extensions`; `omnireach bridge status --json` reports
-`reload_required`.
+extension does not implement `douyin.author`:
+
+```bash
+omnireach bridge install && omnireach bridge reload
+```
+
+`bridge reload` asks the running extension to reload itself and then confirms the new
+version reconnected. An extension older than `system.reload` cannot do that and has to be
+reloaded once by hand at `chrome://extensions`; `omnireach bridge status --json` reports
+`reload_required` either way.
 
 ## Fetch
 

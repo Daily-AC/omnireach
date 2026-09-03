@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Omnireach Native Bridge",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Read-only Chrome session bridge for Omnireach.",
-  "permissions": ["offscreen", "scripting", "tabs"],
+  "permissions": ["alarms", "offscreen", "scripting", "tabs"],
   "host_permissions": [
     "http://127.0.0.1:19826/*",
     "https://www.douyin.com/*",

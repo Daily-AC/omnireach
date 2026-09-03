@@ -1,7 +1,7 @@
 importScripts("douyin.js", "sites.js");
 
 const OFFSCREEN_DOCUMENT = "offscreen.html";
-const EXTENSION_VERSION = "0.3.4";
+const EXTENSION_VERSION = "0.4.0";
 // A full creator catalog is fetched in batches so that every `executeScript`
 // round trip resets the MV3 service-worker idle timer; 83 pages / 355 works
 // measured at ~0.5s per page.
@@ -9,8 +9,11 @@ const AUTHOR_PAGES_PER_BATCH = 10;
 const AUTHOR_MAX_PAGES = 400;
 const AUTHOR_BUDGET_MS = 150000;
 const AUTHOR_MAX_BUDGET_MS = 570000;
+const KEEPALIVE_ALARM = "omnireach-keepalive";
+const RELOAD_DELAY_MS = 750;
 const COMMANDS = new Set([
   "system.ping",
+  "system.reload",
   "douyin.author",
   "douyin.search",
   "google.search",
@@ -816,6 +819,21 @@ async function executeJob(job) {
         }],
       };
     }
+    if (job.command === "system.reload") {
+      // Answer before reloading: chrome.runtime.reload() tears down this
+      // worker *and* the offscreen document that has to deliver the result,
+      // so reloading first would look like a hung job to the caller.
+      setTimeout(() => chrome.runtime.reload(), RELOAD_DELAY_MS);
+      return {
+        id: job.id,
+        ok: true,
+        items: [{
+          reloading: true,
+          extensionVersion: EXTENSION_VERSION,
+          delayMs: RELOAD_DELAY_MS,
+        }],
+      };
+    }
     const items = await SEARCH_HANDLERS[job.command](job.payload || {});
     return { id: job.id, ok: true, items };
   } catch (error) {
@@ -828,6 +846,27 @@ chrome.runtime.onMessage.addListener((message) => {
   return executeJob(message.job);
 });
 
-chrome.runtime.onInstalled.addListener(() => void initializeOffscreenDocument());
-chrome.runtime.onStartup.addListener(() => void initializeOffscreenDocument());
+// The offscreen document is the only thing that polls the bridge, and only the
+// service worker can create it. Nothing wakes an idle worker once that document
+// is gone, so a periodic alarm is what makes the bridge self-healing — after a
+// reload, after a crash, and after any teardown the worker did not observe.
+function scheduleKeepalive() {
+  chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: 1 });
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm && alarm.name === KEEPALIVE_ALARM) {
+    void initializeOffscreenDocument();
+  }
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  scheduleKeepalive();
+  void initializeOffscreenDocument();
+});
+chrome.runtime.onStartup.addListener(() => {
+  scheduleKeepalive();
+  void initializeOffscreenDocument();
+});
+scheduleKeepalive();
 void initializeOffscreenDocument();

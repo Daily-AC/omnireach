@@ -64,8 +64,9 @@ async def _run_native(
 
 
 _STALE_EXTENSION_HINT = (
-    "run `omnireach bridge install`, then reload the unpacked extension at "
-    "chrome://extensions (`omnireach bridge status` reports reload_required)"
+    "run `omnireach bridge install && omnireach bridge reload`; if that extension "
+    "predates `system.reload`, reload it once at chrome://extensions instead "
+    "(`omnireach bridge status` reports reload_required)"
 )
 
 

@@ -194,6 +194,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach sources` | List all sources + tier status |
 | `omnireach setup <source>` | Guided setup for a 🟡 / 🔴 source |
 | `omnireach bridge install` | Install/update the Omnireach native Chrome extension assets |
+| `omnireach bridge reload` | Ask the connected extension to reload itself and pick up newly installed files |
 | `omnireach bridge path` | Print the stable unpacked-extension directory |
 | `omnireach bridge status --json` | Ping the installed extension through the authenticated localhost bridge |
 | `omnireach agy configure <conversation-id>` | Configure the experimental agy grounded-search backend |

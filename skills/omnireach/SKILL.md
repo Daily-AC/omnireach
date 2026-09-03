@@ -99,8 +99,9 @@ contained the topic word at all, and the platform's own `video_tag` taxonomy lab
 of them correctly, so filtering by caption or tag silently discards most matches.
 
 The creator catalog needs the native Chrome bridge. If the tool reports that the connected
-extension does not implement `douyin.author`, run `omnireach bridge install` and ask the
-user to reload the unpacked extension at `chrome://extensions`.
+extension does not implement `douyin.author`, run
+`omnireach bridge install && omnireach bridge reload`. Only an extension older than
+`system.reload` still needs the user to reload it by hand at `chrome://extensions`.
 
 ## Media
 
