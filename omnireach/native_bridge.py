@@ -283,3 +283,26 @@ def probe_native_bridge(*, home: Path | None = None) -> dict[str, Any]:
         result_timeout=5.0,
     )
     return items[0] if items else {"pong": True}
+
+
+def request_extension_reload(*, home: Path | None = None) -> dict[str, Any]:
+    """Ask the connected extension to reload itself so it picks up new files.
+
+    The extension answers before calling `chrome.runtime.reload()`, but the
+    reload still races the reply on a slow machine, so a lost result is
+    reported as a started reload rather than a failure. The caller confirms by
+    polling the version instead of trusting this return value.
+    """
+    try:
+        items = run_native_job(
+            "system.reload",
+            {},
+            home=home,
+            connect_timeout=2.0,
+            result_timeout=10.0,
+        )
+    except NativeBridgeCommandError as exc:
+        if "command is not allowed" in str(exc):
+            raise
+        return {"reloading": True, "detail": f"result not delivered: {exc}"}
+    return items[0] if items else {"reloading": True}

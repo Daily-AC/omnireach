@@ -191,6 +191,7 @@ omnireach search --on wechat --json "claude 4.7" \
 | `omnireach sources` | 列出所有源 + 状态 |
 | `omnireach setup <source>` | 引导式配置一个 🟡 / 🔴 源 |
 | `omnireach bridge install` | 安装或更新 Omnireach 原生 Chrome 扩展文件 |
+| `omnireach bridge reload` | 让已连接的扩展自己重载并加载刚安装的新文件 |
 | `omnireach bridge path` | 输出稳定的未打包扩展目录 |
 | `omnireach bridge status --json` | 通过鉴权 localhost 桥真实 ping 扩展 |
 | `omnireach agy configure <conversation-id>` | 配置实验性 agy grounded-search backend |

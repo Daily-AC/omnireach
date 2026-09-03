@@ -191,7 +191,8 @@ async def test_stale_extension_asks_for_a_reload_instead_of_falling_back(monkeyp
         await run_browser_json("douyin", "author", {"handle": "x"})
 
     assert "does not implement douyin.author" in exc_info.value.reason
-    assert "reload the unpacked extension" in exc_info.value.hint
+    assert "omnireach bridge reload" in exc_info.value.hint
+    assert "chrome://extensions" in exc_info.value.hint
     opencli.assert_not_awaited()
 
 
